@@ -22,6 +22,7 @@ public final class TestRunner {
         SaveFileTest.class,
         CoreTest.class,
         VerifyTargetsTest.class,
+        LuaArgsTest.class,
     };
 
     public static void main(String[] args) {
