@@ -31,6 +31,13 @@ public final class SaveFile {
 
     private SaveFile() {}
 
+    /** The file was read but is not a valid save (checksum, magic, version, length). Only these are set aside. */
+    static final class FormatException extends IOException {
+        FormatException(String message) {
+            super(message);
+        }
+    }
+
     public static Path backupOf(Path file) {
         return file.resolveSibling(file.getFileName() + ".bak");
     }
@@ -77,9 +84,12 @@ public final class SaveFile {
         if (Files.exists(file)) {
             try {
                 return decode(file, LoadResult.Status.OK);
-            } catch (IOException | RuntimeException e) {
+            } catch (FormatException | RuntimeException e) {
                 problem = file.getFileName() + " unreadable (" + e.getMessage() + ")";
                 setAside(file);
+            } catch (IOException e) {
+                // Locked by another program, access denied, etc.: the file may be fine, so leave it in place.
+                problem = file.getFileName() + " could not be read right now (" + e + ")";
             }
         } else {
             problem = file.getFileName() + " missing";
@@ -99,20 +109,20 @@ public final class SaveFile {
 
     private static LoadResult decode(Path file, LoadResult.Status okStatus) throws IOException {
         byte[] all = Files.readAllBytes(file);
-        if (all.length < HEADER_BYTES + 8) throw new IOException("file too short");
+        if (all.length < HEADER_BYTES + 8) throw new FormatException("file too short");
         CRC32 crc = new CRC32();
         crc.update(all, 0, all.length - 8);
         long stored = ByteBuffer.wrap(all, all.length - 8, 8).getLong();
-        if (stored != crc.getValue()) throw new IOException("checksum mismatch");
+        if (stored != crc.getValue()) throw new FormatException("checksum mismatch");
         DataInputStream in = new DataInputStream(new ByteArrayInputStream(all, 0, all.length - 8));
-        if (in.readInt() != MAGIC) throw new IOException("not a True Hordes save");
+        if (in.readInt() != MAGIC) throw new FormatException("not a True Hordes save");
         int version = in.readInt();
-        if (version > VERSION) throw new IOException("made by a newer version of True Hordes (" + version + ")");
+        if (version > VERSION) throw new FormatException("made by a newer version of True Hordes (" + version + ")");
         switch (version) {
             case 1:
                 return decodeV1(in, okStatus);
             default:
-                throw new IOException("unsupported save version " + version);
+                throw new FormatException("unsupported save version " + version);
         }
     }
 
@@ -121,12 +131,12 @@ public final class SaveFile {
         in.readLong(); // savedAtMillis: informational
         long nextId = in.readLong();
         int count = in.readInt();
-        if (count < 0) throw new IOException("negative entity count");
+        if (count < 0) throw new FormatException("negative entity count");
         List<Entity> entities = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             entities.add(new Entity(in.readLong(), in.readByte(), in.readFloat(), in.readFloat(), in.readByte()));
         }
-        if (in.available() != 0) throw new IOException("unexpected trailing data");
+        if (in.available() != 0) throw new FormatException("unexpected trailing data");
         return new LoadResult(okStatus, worldAge, nextId, entities, okStatus == LoadResult.Status.OK ? "loaded" : "loaded backup");
     }
 

@@ -3,6 +3,7 @@ package truehordes.core;
 import java.io.IOException;
 import java.util.Locale;
 import java.util.Random;
+import java.util.function.LongSupplier;
 import truehordes.Version;
 import truehordes.save.LoadResult;
 import truehordes.save.SaveFile;
@@ -16,6 +17,7 @@ import truehordes.util.Stats;
 /**
  * Lifecycle of the simulation for one loaded world. Starts on the first tick after a world is ready, saves when the
  * game saves, clears everything on stop. Only the machine that owns the simulation runs it (never an MP client).
+ * Entry points are synchronized: a dedicated server's shutdown hook saves and stops on another thread.
  */
 public final class Core {
     public enum State { IDLE, RUNNING, OFF, DISABLED }
@@ -23,7 +25,11 @@ public final class Core {
     /** A mod save more than this many in-game hours away from the world's time is reported. */
     public static final double MISMATCH_HOURS = 0.25;
 
+    /** Hot saves (B42 writes the world continuously) are written at most this often, in real milliseconds. */
+    public static final long HOT_SAVE_MIN_MS = 20_000L;
+
     private final GameEnv env;
+    private final LongSupplier wallClockMillis;
     private final Store store = new Store();
     private final Stats stats = new Stats();
     private final SimClock clock = new SimClock();
@@ -32,9 +38,15 @@ public final class Core {
     private String disabledReason = "";
     private String lastLoad = "";
     private double lastSaveHours = Double.NaN;
+    private long lastWriteMillis = Long.MIN_VALUE;
 
     public Core(GameEnv env) {
+        this(env, System::currentTimeMillis);
+    }
+
+    public Core(GameEnv env, LongSupplier wallClockMillis) {
         this.env = env;
+        this.wallClockMillis = wallClockMillis;
     }
 
     public State state() { return state; }
@@ -46,13 +58,13 @@ public final class Core {
     public Scheduler scheduler() { return scheduler; }
 
     /** Permanently switches the mod off for this game session. */
-    public void disable(String reason) {
+    public synchronized void disable(String reason) {
         state = State.DISABLED;
         disabledReason = reason;
         Log.warn("disabled: " + reason);
     }
 
-    public void tick() {
+    public synchronized void tick() {
         if (state == State.DISABLED || state == State.OFF || env.isClient() || !env.isWorldReady()) return;
         if (state == State.IDLE && !start()) return;
         long t0 = System.nanoTime();
@@ -89,11 +101,12 @@ public final class Core {
     }
 
     /** Writes the mod's state; called from the game's save. Returns true if a file was written. */
-    public boolean save() {
+    public synchronized boolean save() {
         if (state != State.RUNNING || env.isClient()) return false;
         try {
             SaveFile.write(env.stateFile(), store, env.worldAgeHours());
             lastSaveHours = env.worldAgeHours();
+            lastWriteMillis = wallClockMillis.getAsLong();
             Log.debug("core", "saved " + store.size() + " entities");
             return true;
         } catch (IOException e) {
@@ -102,17 +115,29 @@ public final class Core {
         }
     }
 
+    /**
+     * Called when the game hot-saves the world between full saves (single player after chunk saves, the dedicated
+     * server on its game-time timer). Writes at most every HOT_SAVE_MIN_MS so the main thread does not hitch.
+     */
+    public synchronized boolean hotSave() {
+        if (state != State.RUNNING || env.isClient()) return false;
+        long now = wallClockMillis.getAsLong();
+        if (lastWriteMillis != Long.MIN_VALUE && now - lastWriteMillis < HOT_SAVE_MIN_MS) return false;
+        return save();
+    }
+
     /** World unloaded: forget everything (no save here; the game's save already ran). */
-    public void stop() {
+    public synchronized void stop() {
         if (state == State.RUNNING) Log.info("stopped");
         if (state != State.DISABLED) state = State.IDLE;
         store.clear();
         clock.clear();
         stats.clear();
         lastSaveHours = Double.NaN;
+        lastWriteMillis = Long.MIN_VALUE;
     }
 
-    public String status() {
+    public synchronized String status() {
         StringBuilder sb = new StringBuilder();
         sb.append("True Hordes ").append(Version.VERSION).append(" | state ").append(state);
         if (state == State.DISABLED) sb.append(" (").append(disabledReason).append(')');
@@ -124,7 +149,7 @@ public final class Core {
     }
 
     /** Test only: adds placeholder entities scattered in a disc. Returns how many were added (0 if not running). */
-    public int seedTest(int count, float centerX, float centerY, float radius, Random random) {
+    public synchronized int seedTest(int count, float centerX, float centerY, float radius, Random random) {
         if (state != State.RUNNING || count <= 0) return 0;
         for (int i = 0; i < count; i++) {
             double angle = random.nextDouble() * Math.PI * 2;
@@ -136,7 +161,7 @@ public final class Core {
     }
 
     /** Test only: removes placeholder entities. */
-    public int clearTest() {
+    public synchronized int clearTest() {
         return store.removeKind(Entity.KIND_PLACEHOLDER);
     }
 }

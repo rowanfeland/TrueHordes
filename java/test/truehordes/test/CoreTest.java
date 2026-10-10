@@ -118,6 +118,55 @@ public final class CoreTest {
         Check.isTrue(core.status().contains("missing game method"), "status explains");
     }
 
+    /** Review Important #2: a dedicated server's shutdown hook saves on another thread while the main loop ticks. */
+    public static void testSaveFromAnotherThreadWhileTicking() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        Core core = new Core(env);
+        core.tick();
+        core.scheduler().register("churn", 0, dt -> {
+            for (int i = 0; i < 2000; i++) core.store().create((byte) 0, i, i, (byte) 0);
+            core.clearTest();
+        });
+        List<Throwable> errors = java.util.Collections.synchronizedList(new ArrayList<>());
+        Thread saver = new Thread(() -> {
+            for (int i = 0; i < 300; i++) {
+                try {
+                    core.save();
+                } catch (Throwable t) {
+                    errors.add(t);
+                }
+            }
+        });
+        saver.start();
+        while (saver.isAlive()) {
+            env.worldAgeHours += 0.001;
+            core.tick();
+        }
+        saver.join();
+        Check.equal(List.of(), errors, "saves while ticking must not fail");
+        Check.equal(truehordes.save.LoadResult.Status.OK, SaveFile.read(env.stateFile).status, "last save readable");
+    }
+
+    /** Review Important #1: B42 hot-saves the world continuously; the mod follows at most every HOT_SAVE_MIN_MS. */
+    public static void testHotSaveIsRateLimitedButFullSaveIsNot() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        long[] now = {1_000_000L};
+        Core core = new Core(env, () -> now[0]);
+        core.tick();
+        Check.isTrue(core.hotSave(), "first hot save writes");
+        now[0] += 5_000;
+        Check.isTrue(!core.hotSave(), "hot save 5 s later is skipped");
+        now[0] += 1_000;
+        Check.isTrue(core.save(), "full save always writes");
+        now[0] += 4_000;
+        Check.isTrue(!core.hotSave(), "hot save 4 s after a full save is skipped");
+        now[0] += Core.HOT_SAVE_MIN_MS;
+        Check.isTrue(core.hotSave(), "hot save after the interval writes");
+        env.client = true;
+        now[0] += Core.HOT_SAVE_MIN_MS;
+        Check.isTrue(!core.hotSave(), "never on an MP client");
+    }
+
     public static void testSeedOnlyWhileRunning() throws Exception {
         FakeEnv env = new FakeEnv(file());
         Core core = new Core(env);

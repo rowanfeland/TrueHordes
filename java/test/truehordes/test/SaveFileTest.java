@@ -98,6 +98,24 @@ public final class SaveFileTest {
         Log.setSink(null);
     }
 
+    /** Review (re-graded Important): a read error that is not a format problem must not move the good save aside. */
+    public static void testUnreadableButNotCorruptFileIsNotSetAside() throws IOException {
+        Log.setSink(line -> {});
+        Path f = tempDir().resolve("state.bin");
+        Store s = sample();
+        SaveFile.write(f, s, 1.0);
+        SaveFile.write(f, s, 2.0);           // .bak now holds hour 1.0
+        Files.delete(f);
+        Files.createDirectory(f);            // reading it now fails with an I/O error, not a format error
+        LoadResult r = SaveFile.read(f);
+        Check.equal(LoadResult.Status.RECOVERED, r.status, "falls back to the backup");
+        Check.isTrue(Files.isDirectory(f), "the unreadable path is left where it is");
+        try (var listing = Files.list(f.getParent())) {
+            Check.isTrue(listing.noneMatch(p -> p.getFileName().toString().startsWith("state.bin.bad-")), "nothing set aside");
+        }
+        Log.setSink(null);
+    }
+
     public static void testNewerVersionIsSetAside() throws IOException {
         Log.setSink(line -> {});
         Path f = tempDir().resolve("state.bin");

@@ -26,4 +26,18 @@ public final class Patches {
         @Patch.OnEnter
         public static void enter() { Hooks.onStop(); }
     }
+
+    /** Single-player hot-save (ChunkSaveWorker gathers game time on the main thread between full saves). */
+    @Patch(className = HookTargets.GAMETIME, methodName = HookTargets.HOT_SAVE_SP)
+    public static class HotSaveSinglePlayer {
+        @Patch.OnExit
+        public static void exit() { Hooks.onHotSave(); }
+    }
+
+    /** Dedicated server: periodic game-time save from the main loop (ServerMap TIME_TICK). */
+    @Patch(className = HookTargets.SERVER_CHUNK_LOADER, methodName = HookTargets.HOT_SAVE_SERVER)
+    public static class HotSaveServer {
+        @Patch.OnExit
+        public static void exit() { Hooks.onHotSave(); }
+    }
 }

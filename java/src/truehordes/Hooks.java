@@ -33,6 +33,16 @@ public final class Hooks {
         }
     }
 
+    public static void onHotSave() {
+        Core c = core;
+        if (c == null) return;
+        try {
+            c.hotSave();
+        } catch (Throwable t) {
+            Log.errorOnce("hook:hotsave:" + t.getClass().getName(), "hot save failed", t);
+        }
+    }
+
     public static void onStop() {
         Core c = core;
         if (c == null) return;

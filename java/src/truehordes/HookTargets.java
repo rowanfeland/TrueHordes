@@ -12,11 +12,19 @@ public final class HookTargets {
     public static final String TICK = "updateMain";
     public static final String SAVE = "save";
     public static final String STOP = "stop";
+    /** Single-player hot-save: called on the main thread when B42 writes game time between full saves. */
+    public static final String GAMETIME = "zombie.GameTime";
+    public static final String HOT_SAVE_SP = "saveToBufferMap";
+    /** Dedicated server: game time is queued for saving on a timer from the main loop. */
+    public static final String SERVER_CHUNK_LOADER = "zombie.network.ServerChunkLoader";
+    public static final String HOT_SAVE_SERVER = "saveLater";
 
     public static final String[][] ALL = {
         {POPMAN, TICK},
         {MCD, SAVE},
         {POPMAN, STOP},
+        {GAMETIME, HOT_SAVE_SP},
+        {SERVER_CHUNK_LOADER, HOT_SAVE_SERVER},
     };
 
     private HookTargets() {}

@@ -68,7 +68,8 @@ classes live directly in `truehordes`; everything else can use sub-packages.
 **Ticking and saving.** The update is driven from the game's main loop and the save from the game's save path.
 Whether that is a ZombieBuddy patch on a game method or a Lua event calling into Java is settled in the plan, after
 checking the exact targets (`OnSave` fires from `GameWindow.java:1112`/`:1181`; `OnPostSave` from `:888`). Everything
-runs on the main thread in this sub-project; worker threads come later only if timings show they're needed.
+runs on the main thread, except a dedicated server's shutdown hook, which saves and stops on its own thread;
+the core's entry points are therefore synchronized.
 
 ## 3. Sandbox options
 
@@ -106,8 +107,15 @@ false). JSON translations in `Sandbox.json`.
 The mod will own every zombie's position, so its save must never disagree with the game's save, in single player or
 on a server.
 
-- **Saved with the world, not on its own schedule.** The mod writes its state in the same save cycle as the game
-  (autosave, manual save, quit, server save), so the game's save and the mod's save describe the same moment.
+- **Saved with the world, not on its own schedule.** The mod writes its state in the same save cycle as the game,
+  so the game's save and the mod's save describe the same moment. B42 has two kinds of world save (found in the
+  final review of sub-project 1):
+  - **full saves** (quit, exit to menu, sleep, Lua `saveGame()`, the server's "save world every N minutes"):
+    hooked at `MapCollisionData.save`, always written;
+  - **hot saves** between full saves (single player: after each batch of chunk saves, `ChunkSaveWorker`
+    gathers game time on the main thread via `GameTime.saveToBufferMap`; dedicated server: game time queued every
+    600 s via `ServerChunkLoader.saveLater`): written at most every 20 real seconds so the main thread does not hitch.
+  Sub-project 3 must still reconcile vanilla chunk saves (zombies inside saved chunks) with the mod's file on load.
 - **Only the machine that owns the simulation saves.** Single player: the player's game. Dedicated server: the
   server, into the server's save folder. MP clients never write simulation state.
 - **Atomic and recoverable.** Write to a temporary file, then rename over the old one; keep the previous file as a
