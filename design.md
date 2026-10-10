@@ -1,7 +1,8 @@
 # True Hordes: design
 
 Project Zomboid Build 42.21 mod. Single player first, then dedicated multiplayer.
-Status: **design brief, not yet approved for planning.** Executed after the user's in-game tests (section 9).
+Status: **approved by the user (2026-10-10). Sub-project 1 built and merged; its in-game acceptance and the user's
+tests (section 9) are pending. Sub-project 2 starts when the user says so.** Progress per sub-project: section 7.
 Each sub-project (section 7) gets its own design → plan → build cycle (Superpowers workflow, per the user's
 global CLAUDE.md).
 
@@ -10,6 +11,9 @@ Source documents in this folder:
 - `TrueHordes - Research 2 - Off-screen Simulation.md`: existing horde mods, map collision data, absorbing native
   zombies, thunder, lights, generators, off-screen damage, tests T13–T14.
 - `TrueHordes - Decisions.md`: dated decision log (this document supersedes it as the single reference).
+- `docs/superpowers/specs/` and `docs/superpowers/plans/`: each sub-project's spec and implementation plan
+  (sub-project 1: `2026-10-10-sp1-foundation-design.md`, `2026-10-10-sp1-foundation.md`).
+- `docs/TESTING.md`: in-game acceptance checklists.
 
 ---
 
@@ -54,6 +58,13 @@ Nowhere is safe, and none of it is scripted: it happens naturally from wandering
   must be installed server-side too.
 - Single player first; dedicated server after the single-player mod works.
 - Declared incompatible with Wandering Zombies (`WanderingZombies`, `WanderingZombiesWIP`).
+- **Git:** the TrueHordes folder is a git repository published to GitHub (`origin`, branch `main`). Each piece of work
+  goes on its own branch (one per sub-project, e.g. `sp1-foundation`). When work is done, Claude says so; the user
+  reviews and merges in GitHub Desktop. Claude does not merge or push on its own, and does not hand over merge steps.
+- **Build and test:** `tools\build.ps1` (compile with JDK 25, run the offline tests, package the jar; fails if any
+  test fails); `tools\deploy.ps1` copies `mod\` into the Workshop folder. In-game checks: `docs/TESTING.md`.
+- **Execution style:** foundations that offline tests can catch are built inline ("native"); actual gameplay systems
+  use subagent-driven development (a fresh implementer and reviewer per task), as the user prefers.
 
 ---
 
@@ -212,6 +223,27 @@ From the limitations report and Research 2 (42.21):
   `ZombiesCountBeforeDelete` (default 300) and deleted zombies are gone for good.
 - Existing mods (Hordes B41/B42, Living Hordes) use paper hordes and are single-player only.
 
+Learned while building sub-project 1 (verified against the decompiled 42.21 game and the final review):
+- **Hooks that work in single player and on a dedicated server** (all names unique, checked against the installed
+  jar by the offline tests and at start-up):
+  - every frame / server frame: `ZombiePopulationManager.updateMain` (exit);
+  - full saves (quit, exit to menu, sleep, Lua `saveGame()`, the server's "save world every N minutes"):
+    `MapCollisionData.save` (exit), the same moment the vanilla population saves;
+  - **B42 also hot-saves the world between full saves**: single player after each batch of chunk saves
+    (`ChunkSaveWorker` gathers game time on the main thread via `GameTime.saveToBufferMap`); dedicated server every
+    600 s (`ServerChunkLoader.saveLater`). The mod hooks both and writes at most every 20 real seconds;
+  - world unloading: `ZombiePopulationManager.stop` (enter). The save always runs before the stop.
+- **Threads:** everything runs on the main thread except a dedicated server's shutdown hook (Ctrl+C, panel stop),
+  which saves and stops on its own thread. The core's entry points are synchronized for that reason.
+- **Save folder:** `ZomboidFileSystem.getFileNameInCurrentSave` is correct at both start and save, including on a
+  server and on the game's crash-recovery save; the mod's file is `<save>\truehordes\state.bin` (+ `.bak`).
+- **Sub-project 3 must reconcile vanilla chunk saves** (zombies saved inside chunks continuously) with the mod's
+  own file on load; hot saves narrow the gap but do not remove it.
+- **Lua bridge:** ZombieBuddy exposes a Java class as a Lua table (`TrueHordesJ`, `@Exposer.LuaClass`); Lua calls its
+  static methods with a dot. Kahlua tables take `Double` keys and `Boolean` values.
+- **Lua can be syntax-checked offline** with the game's own compiler (`org.luaj.kahluafork.compiler.LexState` in
+  `projectzomboid.jar`); the build does this for every mod Lua file.
+
 ---
 
 ## 7. Sub-projects
@@ -221,7 +253,7 @@ From the limitations report and Research 2 (42.21):
 | 0 | **Tests (user)** | Results of T1, T4, T6–T11, T13, T14 (T2, T3, T5 optional) | — | — |
 | 1 | **Foundation and tools** | Mod skeleton (Lua + Java jar on ZombieBuddy), sandbox options scaffold, save data, logging, console commands, debug map/overlay of the mod's population, and an offline test bench that runs simulation logic outside the game | 0 | Build pipeline with JDK 25 |
 | 2 | **World knowledge** | Collision grid reader (map + save copies), zones and roads, water width, coarse cost grid and queries | 1 | Memory and load time for the whole map; keeping up with player changes |
-| 3 | **Population takeover** | Vanilla off-screen population switched off, mod population seeded, every real zombie caught and attributed | 1, (2) | **Spike first:** which takeover method is clean and safe (native internals) |
+| 3 | **Population takeover** | Vanilla off-screen population switched off, mod population seeded, every real zombie caught and attributed | 1, (2) | **Spike first:** which takeover method is clean and safe (native internals); reconciling vanilla chunk saves with the mod's file (section 6) |
 | 4 | **Simulation core** | Levels of detail, scheduling, wandering, local avoidance, encounters, join/merge/split, saving, conservation checks | 2, 3 | Q1 rules; tuning wandering so it looks natural |
 | 5 | **Stimuli and sound model** | Loudness falloff model, source capture (world sounds, helicopter, thunder), horde share rule, individual response; lights and generators as stimuli | 4 | Q2–Q4; MP thunder needs Java |
 | 6 | **Materialisation bridge** | Off-screen ↔ real conversion within budget, real wandering and columns, vanilla rally off, state kept both ways, crowd-scaled break-in speed for real zombies (D15) | 4 | Real-zombie budget (T10); pathfinder load; edge cases at the loaded boundary |
@@ -230,6 +262,25 @@ From the limitations report and Research 2 (42.21):
 | 9 | **Tuning and compatibility** | Sandbox options, performance scaling, Wandering Zombies incompatibility, Starving Zombies and Louder Gunshots behaviour, presets | all | — |
 
 Each sub-project's design starts by re-reading this document and the relevant research sections.
+
+### Progress
+
+| # | Status | Notes |
+|---|---|---|
+| 0 | **Pending (user)** | In-game tests from section 9 |
+| 1 | **Built and merged to `main` (2026-10-10); in-game acceptance pending** | 42 offline tests. Java core (lifecycle, game-time clock, scheduler with update buckets, entity store, crash-safe versioned save file matched to full and hot saves), ZombieBuddy hooks, Lua console commands (`TH_status`, `TH_stats`, `TH_debug`, `TH_save`, `TH_seedTest`, `TH_clearTest`, `TH_map`), debug map, build and deploy scripts. Acceptance: `docs/TESTING.md` rows 1–9 (and 7b). Deferred minor issues from its final review are listed below |
+| 2 | Not started; begins when the user says so | |
+| 3–9 | Not started | |
+
+Deferred minor issues from sub-project 1's final review (fix when the code they touch is next changed):
+- the scheduler's pending time is not reset between worlds (matters once systems run on an interval);
+- a save file with duplicate entity IDs makes start-up retry every frame instead of falling back;
+- the number of entities saved is not compared with the number loaded back;
+- no test for upgrading older save formats yet (only format version 1 exists);
+- if the game's `MapCollisionData.save` throws, the mod's full save is skipped (`@Patch.OnExit` default);
+- the debug map draws outside its panel and stops dragging when the mouse leaves it;
+- `TH_seedTest` has no upper limit;
+- `TH_status` shows the previous world's load result after exiting a world.
 
 ---
 
