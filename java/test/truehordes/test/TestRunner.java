@@ -16,6 +16,7 @@ import java.util.List;
 public final class TestRunner {
     static final Class<?>[] SUITES = {
         VersionTest.class,
+        LogStatsTest.class,
     };
 
     public static void main(String[] args) {
