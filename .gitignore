@@ -1,0 +1,10 @@
+# build output
+build/
+*.class
+mod/Contents/mods/TrueHordes/42/media/java/TrueHordes.jar
+# editor and OS clutter
+.idea/
+*.iml
+.vscode/
+Thumbs.db
+desktop.ini
