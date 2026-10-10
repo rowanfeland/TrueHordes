@@ -20,6 +20,7 @@ public final class TestRunner {
         ClockSchedulerTest.class,
         StoreTest.class,
         SaveFileTest.class,
+        CoreTest.class,
     };
 
     public static void main(String[] args) {

@@ -1,0 +1,142 @@
+package truehordes.core;
+
+import java.io.IOException;
+import java.util.Locale;
+import java.util.Random;
+import truehordes.Version;
+import truehordes.save.LoadResult;
+import truehordes.save.SaveFile;
+import truehordes.sim.Scheduler;
+import truehordes.sim.SimClock;
+import truehordes.store.Entity;
+import truehordes.store.Store;
+import truehordes.util.Log;
+import truehordes.util.Stats;
+
+/**
+ * Lifecycle of the simulation for one loaded world. Starts on the first tick after a world is ready, saves when the
+ * game saves, clears everything on stop. Only the machine that owns the simulation runs it (never an MP client).
+ */
+public final class Core {
+    public enum State { IDLE, RUNNING, OFF, DISABLED }
+
+    /** A mod save more than this many in-game hours away from the world's time is reported. */
+    public static final double MISMATCH_HOURS = 0.25;
+
+    private final GameEnv env;
+    private final Store store = new Store();
+    private final Stats stats = new Stats();
+    private final SimClock clock = new SimClock();
+    private final Scheduler scheduler = new Scheduler(stats);
+    private State state = State.IDLE;
+    private String disabledReason = "";
+    private String lastLoad = "";
+    private double lastSaveHours = Double.NaN;
+
+    public Core(GameEnv env) {
+        this.env = env;
+    }
+
+    public State state() { return state; }
+
+    public Store store() { return store; }
+
+    public Stats stats() { return stats; }
+
+    public Scheduler scheduler() { return scheduler; }
+
+    /** Permanently switches the mod off for this game session. */
+    public void disable(String reason) {
+        state = State.DISABLED;
+        disabledReason = reason;
+        Log.warn("disabled: " + reason);
+    }
+
+    public void tick() {
+        if (state == State.DISABLED || state == State.OFF || env.isClient() || !env.isWorldReady()) return;
+        if (state == State.IDLE && !start()) return;
+        long t0 = System.nanoTime();
+        scheduler.run(clock.advance(env.worldAgeHours()));
+        stats.count("entities", store.size());
+        stats.time("tick", System.nanoTime() - t0);
+    }
+
+    private boolean start() {
+        if (!env.enabled()) {
+            state = State.OFF;
+            Log.info("switched off in sandbox options for this world");
+            return false;
+        }
+        Log.setDebug("core", env.debugLogging());
+        LoadResult r = SaveFile.read(env.stateFile());
+        store.clear();
+        for (Entity e : r.entities) store.restore(e);
+        store.setNextId(r.nextId);
+        double now = env.worldAgeHours();
+        if (r.status == LoadResult.Status.OK || r.status == LoadResult.Status.RECOVERED) {
+            double diff = now - r.worldAgeHours;
+            if (Math.abs(diff) > MISMATCH_HOURS) {
+                Log.warn(String.format(Locale.ROOT,
+                    "mod save is from world hour %.2f but the world is at hour %.2f (%.2f h apart); using it anyway",
+                    r.worldAgeHours, now, diff));
+            }
+        }
+        lastLoad = r.status + ": " + r.message;
+        clock.reset(now);
+        state = State.RUNNING;
+        Log.info("started with " + store.size() + " entities (" + lastLoad + ")");
+        return true;
+    }
+
+    /** Writes the mod's state; called from the game's save. Returns true if a file was written. */
+    public boolean save() {
+        if (state != State.RUNNING || env.isClient()) return false;
+        try {
+            SaveFile.write(env.stateFile(), store, env.worldAgeHours());
+            lastSaveHours = env.worldAgeHours();
+            Log.debug("core", "saved " + store.size() + " entities");
+            return true;
+        } catch (IOException e) {
+            Log.error("could not write the mod's save file " + env.stateFile(), e);
+            return false;
+        }
+    }
+
+    /** World unloaded: forget everything (no save here; the game's save already ran). */
+    public void stop() {
+        if (state == State.RUNNING) Log.info("stopped");
+        if (state != State.DISABLED) state = State.IDLE;
+        store.clear();
+        clock.clear();
+        stats.clear();
+        lastSaveHours = Double.NaN;
+    }
+
+    public String status() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("True Hordes ").append(Version.VERSION).append(" | state ").append(state);
+        if (state == State.DISABLED) sb.append(" (").append(disabledReason).append(')');
+        sb.append(" | mode ").append(env.isClient() ? "MP client" : env.isServer() ? "dedicated server" : "single player");
+        sb.append(" | entities ").append(store.size());
+        sb.append(" | last load ").append(lastLoad.isEmpty() ? "-" : lastLoad);
+        sb.append(" | last save ").append(Double.isNaN(lastSaveHours) ? "-" : String.format(Locale.ROOT, "world hour %.2f", lastSaveHours));
+        return sb.toString();
+    }
+
+    /** Test only: adds placeholder entities scattered in a disc. Returns how many were added (0 if not running). */
+    public int seedTest(int count, float centerX, float centerY, float radius, Random random) {
+        if (state != State.RUNNING || count <= 0) return 0;
+        for (int i = 0; i < count; i++) {
+            double angle = random.nextDouble() * Math.PI * 2;
+            double dist = Math.sqrt(random.nextDouble()) * radius;
+            store.create(Entity.KIND_PLACEHOLDER, (float) (centerX + Math.cos(angle) * dist),
+                (float) (centerY + Math.sin(angle) * dist), (byte) 0);
+        }
+        return count;
+    }
+
+    /** Test only: removes placeholder entities. */
+    public int clearTest() {
+        return store.removeKind(Entity.KIND_PLACEHOLDER);
+    }
+}
