@@ -22,7 +22,8 @@ try {
     & (Join-Path $jdk 'javac.exe') --release 25 -encoding UTF-8 -Xlint:-options -cp "$(Join-Path $out 'classes');$cp" -d (Join-Path $out 'test') @tests
     if ($LASTEXITCODE -ne 0) { throw 'test compile failed' }
 
-    & (Join-Path $jdk 'java.exe') -cp "$(Join-Path $out 'test');$(Join-Path $out 'classes')" truehordes.test.TestRunner $gameJar
+    # The game jar is on the test classpath only for LuaSyntaxTest (Kahlua compiler); pure tests never load game classes.
+    & (Join-Path $jdk 'java.exe') -cp "$(Join-Path $out 'test');$(Join-Path $out 'classes');$cp" truehordes.test.TestRunner $gameJar
     if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
 
     New-Item -ItemType Directory -Force (Split-Path $jarOut) | Out-Null

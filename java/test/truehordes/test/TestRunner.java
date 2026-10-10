@@ -23,6 +23,7 @@ public final class TestRunner {
         CoreTest.class,
         VerifyTargetsTest.class,
         LuaArgsTest.class,
+        LuaSyntaxTest.class,
     };
 
     public static void main(String[] args) {
