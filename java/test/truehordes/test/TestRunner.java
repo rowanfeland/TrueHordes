@@ -19,6 +19,7 @@ public final class TestRunner {
         LogStatsTest.class,
         ClockSchedulerTest.class,
         StoreTest.class,
+        SaveFileTest.class,
     };
 
     public static void main(String[] args) {
