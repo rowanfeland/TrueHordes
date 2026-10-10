@@ -1,0 +1,12 @@
+name=True Hordes
+id=TrueHordes
+description=Walking Dead style hordes that form for real reasons and roam the whole map. Work in progress; requires ZombieBuddy.
+poster=poster.png
+icon=icon.png
+modversion=0.1.0
+versionMin=42.21
+require=\ZombieBuddy
+incompatible=\WanderingZombies,\WanderingZombiesWIP
+javaJarFile=media/java/TrueHordes.jar
+javaPkgName=truehordes
+ZBVersionMin=2.3.0

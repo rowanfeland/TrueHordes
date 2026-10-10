@@ -1,0 +1,7 @@
+{
+    "Sandbox_TrueHordes": "True Hordes",
+    "Sandbox_TrueHordes_Enabled": "Enabled",
+    "Sandbox_TrueHordes_Enabled_tooltip": "Turns the True Hordes simulation on or off for this world.",
+    "Sandbox_TrueHordes_DebugLogging": "Debug logging",
+    "Sandbox_TrueHordes_DebugLogging_tooltip": "Writes extra [TrueHordes] lines to console.txt. Leave off unless testing."
+}

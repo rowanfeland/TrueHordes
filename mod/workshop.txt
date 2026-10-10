@@ -1,0 +1,7 @@
+version=1
+title=True Hordes
+description=Walking Dead style hordes that form for real reasons and roam the whole map.
+description=
+description=Work in progress. Requires ZombieBuddy.
+tags=Build 42
+visibility=unlisted

@@ -1,0 +1,17 @@
+VERSION = 1,
+
+option TrueHordes.Enabled
+{
+	type = boolean,
+	default = true,
+	page = TrueHordes,
+	translation = TrueHordes_Enabled,
+}
+
+option TrueHordes.DebugLogging
+{
+	type = boolean,
+	default = false,
+	page = TrueHordes,
+	translation = TrueHordes_DebugLogging,
+}
