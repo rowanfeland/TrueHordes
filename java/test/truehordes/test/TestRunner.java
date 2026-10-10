@@ -18,6 +18,7 @@ public final class TestRunner {
         VersionTest.class,
         LogStatsTest.class,
         ClockSchedulerTest.class,
+        StoreTest.class,
     };
 
     public static void main(String[] args) {
