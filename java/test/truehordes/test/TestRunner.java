@@ -21,6 +21,7 @@ public final class TestRunner {
         StoreTest.class,
         SaveFileTest.class,
         CoreTest.class,
+        VerifyTargetsTest.class,
     };
 
     public static void main(String[] args) {
