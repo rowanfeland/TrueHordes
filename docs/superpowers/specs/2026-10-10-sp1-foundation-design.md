@@ -101,7 +101,26 @@ false). JSON translations in `Sandbox.json`.
 - `tools/deploy.ps1`: copies `mod/` to `%USERPROFILE%\Zomboid\Workshop\TrueHordes` (only when run, never
   automatically).
 
-## 6. Error handling
+## 6. Save consistency (user requirement)
+
+The mod will own every zombie's position, so its save must never disagree with the game's save, in single player or
+on a server.
+
+- **Saved with the world, not on its own schedule.** The mod writes its state in the same save cycle as the game
+  (autosave, manual save, quit, server save), so the game's save and the mod's save describe the same moment.
+- **Only the machine that owns the simulation saves.** Single player: the player's game. Dedicated server: the
+  server, into the server's save folder. MP clients never write simulation state.
+- **Atomic and recoverable.** Write to a temporary file, then rename over the old one; keep the previous file as a
+  backup. A half-written file can never replace a good one.
+- **Matched to the world save.** Each mod save records the game time it was taken at. On load, the mod compares it
+  with the world's game time and logs a warning if they differ (for example after a crash between the two writes).
+  The mod then uses the newest valid file instead of failing.
+- **Complete records.** Every entity is saved with its position and everything needed to restore it exactly; a
+  round-trip test checks that loading a save and saving it again gives identical data.
+- **Conservation check on load and save.** Entity counts are logged; any unexplained difference is reported.
+  Sub-project 4 extends this to zombie conservation.
+
+## 7. Error handling
 
 - Required hook target missing: the mod disables itself, logs why, and `TH_status()` shows it.
 - Java exception during an update: logged once per kind, that system is skipped for the tick, the game continues.
@@ -109,7 +128,7 @@ false). JSON translations in `Sandbox.json`.
 - Lua side without Java: one warning; the console commands print that Java isn't loaded.
 - On an MP client, the Java core stays idle (the simulation will be server-side; sub-project 8).
 
-## 7. Done when
+## 8. Done when
 
 1. `tools/build.ps1` passes its tests and produces the jar; `tools/deploy.ps1` copies the mod.
 2. In single player debug, with ZombieBuddy, `TH_status()` reports Java loaded, version and mode.
