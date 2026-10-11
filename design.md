@@ -1,8 +1,8 @@
 # True Hordes: design
 
 Project Zomboid Build 42.21 mod. Single player first, then dedicated multiplayer.
-Status: **approved by the user (2026-10-10). Sub-project 1 built and merged; its in-game acceptance and the user's
-tests (section 9) are pending. Sub-project 2 starts when the user says so.** Progress per sub-project: section 7.
+Status: **approved by the user (2026-10-10). Sub-project 1 built, merged and accepted in game. Sub-project 2 (world
+knowledge) is in progress. The user's research tests (section 9) are pending.** Progress per sub-project: section 7.
 Each sub-project (section 7) gets its own design → plan → build cycle (Superpowers workflow, per the user's
 global CLAUDE.md).
 
@@ -87,6 +87,7 @@ Nowhere is safe, and none of it is scripted: it happens naturally from wandering
 | D13 | Sandbox `FollowSoundDistance` = 1000 (affects only vanilla off-screen behaviour; mostly superseded by D1 and D11). | 2026-10-09 |
 | D14 | **Java core, Lua as helper.** The simulation lives in Java (ZombieBuddy): world knowledge, population store, update loop, saving, population takeover. Lua is the helper for game-facing glue: sandbox options, events, steering real zombies, debug UI, console commands, talking to Java through ZombieBuddy-exposed functions. Reason: performance at tens of thousands of zombies and whole-map terrain, and only Java can reach the save's collision data and the native population. The offline test bench is plain Java tests. | 2026-10-10 |
 | D15 | **Idea, not final: structure damage scales with crowd size.** A lone zombie is slow to break in; a crowd is fast; a huge horde crushes through. Example numbers (not final): 1 zombie ≈ 5 in-game hours for a window, 24 for a door; 10 together ≈ 1 hour for a window, 5 for a door; 1,000 ≈ 10 minutes, zombies crushing themselves against doors and windows. Applies to real zombies near players (sub-project 6) and to off-screen wear (sub-project 7). | 2026-10-10 |
+| D16 | **Water blocks zombies everywhere**, off-screen and near players alike, as for real zombies in vanilla. Rivers and streams are crossed only on bridges and roads, so a wide river can make the far bank safe. Supersedes "narrow water crossable at a cost". River and water behaviour may be revisited late, before the mod is finished. | 2026-10-10 |
 
 ---
 
@@ -125,7 +126,7 @@ Lua is the helper: sandbox options, events, steering real zombies, debug UI and 
   `Saves\...\chunkdata\` (solid, wall north, wall west, water, room bits per tile), plus map zones (`Nav` roads and
   streets, Forest, DeepForest, FarmLand, TownZone…), building definitions and the zombie density map.
 - Output: a coarse cost grid (for example 8×8-tile cells) for wandering and local avoidance, with tile-level detail
-  available near players. Water classified by width (narrow = crossable at a cost, wide = blocking).
+  available near players. Water blocks (D16); bridges are walkable.
 - Java reads the files (Lua can't read the save copies). Works on modded maps because they ship the same files.
 
 ### 4.2 Population store and simulation manager
@@ -252,7 +253,7 @@ Learned while building sub-project 1 (verified against the decompiled 42.21 game
 |---|---|---|---|---|
 | 0 | **Tests (user)** | Results of T1, T4, T6–T11, T13, T14 (T2, T3, T5 optional) | — | — |
 | 1 | **Foundation and tools** | Mod skeleton (Lua + Java jar on ZombieBuddy), sandbox options scaffold, save data, logging, console commands, debug map/overlay of the mod's population, and an offline test bench that runs simulation logic outside the game | 0 | Build pipeline with JDK 25 |
-| 2 | **World knowledge** | Collision grid reader (map + save copies), zones and roads, water width, coarse cost grid and queries | 1 | Memory and load time for the whole map; keeping up with player changes |
+| 2 | **World knowledge** | Collision grid reader (map + save copies), zones and roads, coarse cost grid and queries, live updates from player changes | 1 | Memory and load time for the whole map; keeping up with player changes |
 | 3 | **Population takeover** | Vanilla off-screen population switched off, mod population seeded, every real zombie caught and attributed | 1, (2) | **Spike first:** which takeover method is clean and safe (native internals); reconciling vanilla chunk saves with the mod's file (section 6) |
 | 4 | **Simulation core** | Levels of detail, scheduling, wandering, local avoidance, encounters, join/merge/split, saving, conservation checks | 2, 3 | Q1 rules; tuning wandering so it looks natural |
 | 5 | **Stimuli and sound model** | Loudness falloff model, source capture (world sounds, helicopter, thunder), horde share rule, individual response; lights and generators as stimuli | 4 | Q2–Q4; MP thunder needs Java |
@@ -269,7 +270,7 @@ Each sub-project's design starts by re-reading this document and the relevant re
 |---|---|---|
 | 0 | **Pending (user)** | In-game tests from section 9 |
 | 1 | **Built and merged to `main` (2026-10-10); in-game acceptance passed in single player (rows 1, 3–7b; row 2 blocked by a `TH_` name clash with the user's True Hits mod, so the commands were renamed to `Hordes_`; rows 8–10 skipped by the user)** | 42 offline tests. Java core (lifecycle, game-time clock, scheduler with update buckets, entity store, crash-safe versioned save file matched to full and hot saves), ZombieBuddy hooks, Lua console commands (`Hordes_status`, `Hordes_stats`, `Hordes_debug`, `Hordes_save`, `Hordes_seedTest`, `Hordes_clearTest`, `Hordes_map`), debug map, build and deploy scripts. Acceptance: `docs/TESTING.md` rows 1–9 (and 7b). Deferred minor issues from its final review are listed below |
-| 2 | Not started; begins when the user says so | |
+| 2 | **In progress (2026-10-10)** | Spec: `docs/superpowers/specs/2026-10-10-sp2-world-knowledge-design.md` |
 | 3–9 | Not started | |
 
 Deferred minor issues from sub-project 1's final review (fix when the code they touch is next changed):
