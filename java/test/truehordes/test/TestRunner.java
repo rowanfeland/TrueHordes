@@ -26,6 +26,7 @@ public final class TestRunner {
         LuaSyntaxTest.class,
         CellReaderTest.class,
         ChunkInfoTest.class,
+        ZoneRasterTest.class,
     };
 
     public static void main(String[] args) {
