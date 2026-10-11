@@ -30,6 +30,7 @@ public final class TestRunner {
         GridTest.class,
         GridBuilderTest.class,
         WorldTest.class,
+        RealMapTest.class,
     };
 
     public static void main(String[] args) {
