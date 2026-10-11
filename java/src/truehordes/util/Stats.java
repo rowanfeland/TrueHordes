@@ -4,7 +4,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
 
-/** Per-system timings (moving average, last, max, calls) and counters for TH_stats(). Main thread only. */
+/** Per-system timings (moving average, last, max, calls) and counters for Hordes_stats(). Main thread only. */
 public final class Stats {
     private static final double ALPHA = 0.1;
     private final Map<String, double[]> timings = new TreeMap<>(); // avgMs, lastMs, maxMs, calls

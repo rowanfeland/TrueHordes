@@ -1,6 +1,6 @@
 -- True Hordes: Lua helper.
 -- The Java core is exposed by ZombieBuddy as the table TrueHordesJ. It is nil when ZombieBuddy is missing or the
--- jar was not approved; the TH_* console commands then print that instead of failing.
+-- jar was not approved; the Hordes_* console commands then print that instead of failing.
 
 TrueHordes = TrueHordes or {}
 
@@ -26,16 +26,16 @@ local function call(name, ...)
     return result
 end
 
-function TH_status() return call("status") end
-function TH_stats() return call("stats") end
-function TH_debug(category, on) return call("debug", category, on) end
-function TH_save() return call("save") end
-function TH_clearTest() return call("clearTest") end
+function Hordes_status() return call("status") end
+function Hordes_stats() return call("stats") end
+function Hordes_debug(category, on) return call("debug", category, on) end
+function Hordes_save() return call("save") end
+function Hordes_clearTest() return call("clearTest") end
 
-function TH_seedTest(n)
+function Hordes_seedTest(n)
     local player = getPlayer()
     if not player then
-        print("TH_seedTest: no player")
+        print("Hordes_seedTest: no player")
         return "no player"
     end
     return call("seedTest", n or 100, player:getX(), player:getY())

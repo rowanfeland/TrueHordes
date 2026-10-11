@@ -1,5 +1,5 @@
 -- True Hordes debug map: draws the Java core's entities around a point.
--- Mouse wheel zooms, left-drag pans, right-click returns to following the player. TH_map() opens or closes it.
+-- Mouse wheel zooms, left-drag pans, right-click returns to following the player. Hordes_map() opens or closes it.
 
 require "ISUI/ISPanel"
 require "ISUI/ISCollapsableWindow"
@@ -7,9 +7,9 @@ require "ISUI/ISCollapsableWindow"
 local FETCH_MS = 300
 local MAX_POINTS = 4000
 
-TH_MapPanel = ISPanel:derive("TH_MapPanel")
+Hordes_MapPanel = ISPanel:derive("Hordes_MapPanel")
 
-function TH_MapPanel:new(x, y, width, height)
+function Hordes_MapPanel:new(x, y, width, height)
     local o = ISPanel.new(self, x, y, width, height)
     o.background = true
     o.backgroundColor = { r = 0.05, g = 0.05, b = 0.05, a = 0.95 }
@@ -23,11 +23,11 @@ function TH_MapPanel:new(x, y, width, height)
     return o
 end
 
-function TH_MapPanel:worldToScreen(wx, wy)
+function Hordes_MapPanel:worldToScreen(wx, wy)
     return (wx - self.centerX) * self.zoom + self.width / 2, (wy - self.centerY) * self.zoom + self.height / 2
 end
 
-function TH_MapPanel:fetch()
+function Hordes_MapPanel:fetch()
     local now = getTimestampMs()
     if self.snapshot and now - self.lastFetch < FETCH_MS then return end
     self.lastFetch = now
@@ -37,7 +37,7 @@ function TH_MapPanel:fetch()
         self.centerX + halfW, self.centerY + halfH, MAX_POINTS)
 end
 
-function TH_MapPanel:prerender()
+function Hordes_MapPanel:prerender()
     ISPanel.prerender(self)
     local player = getPlayer()
     if self.follow and player then
@@ -79,30 +79,30 @@ function TH_MapPanel:prerender()
         4, 4, 1, 1, 1, 1, UIFont.Small)
 end
 
-function TH_MapPanel:onMouseWheel(del)
+function Hordes_MapPanel:onMouseWheel(del)
     local factor = del > 0 and 0.8 or 1.25
     self.zoom = math.max(0.02, math.min(8, self.zoom * factor))
     self.snapshot = nil
     return true
 end
 
-function TH_MapPanel:onMouseDown(x, y)
+function Hordes_MapPanel:onMouseDown(x, y)
     self.dragging = true
     self.follow = false
     return true
 end
 
-function TH_MapPanel:onMouseUp(x, y)
+function Hordes_MapPanel:onMouseUp(x, y)
     self.dragging = false
     return true
 end
 
-function TH_MapPanel:onMouseUpOutside(x, y)
+function Hordes_MapPanel:onMouseUpOutside(x, y)
     self.dragging = false
     return true
 end
 
-function TH_MapPanel:onMouseMove(dx, dy)
+function Hordes_MapPanel:onMouseMove(dx, dy)
     if self.dragging and self.centerX then
         self.centerX = self.centerX - dx / self.zoom
         self.centerY = self.centerY - dy / self.zoom
@@ -111,40 +111,40 @@ function TH_MapPanel:onMouseMove(dx, dy)
     return true
 end
 
-function TH_MapPanel:onRightMouseDown(x, y)
+function Hordes_MapPanel:onRightMouseDown(x, y)
     self.follow = true
     self.snapshot = nil
     return true
 end
 
-TH_DebugMap = ISCollapsableWindow:derive("TH_DebugMap")
+Hordes_DebugMap = ISCollapsableWindow:derive("Hordes_DebugMap")
 
-function TH_DebugMap:createChildren()
+function Hordes_DebugMap:createChildren()
     ISCollapsableWindow.createChildren(self)
     local top = self:titleBarHeight()
-    self.map = TH_MapPanel:new(0, top, self.width, self.height - top)
+    self.map = Hordes_MapPanel:new(0, top, self.width, self.height - top)
     self.map:initialise()
     self:addChild(self.map)
 end
 
-function TH_DebugMap:close()
+function Hordes_DebugMap:close()
     ISCollapsableWindow.close(self)
     self:removeFromUIManager()
-    TH_DebugMap.instance = nil
+    Hordes_DebugMap.instance = nil
 end
 
-function TH_map()
-    if TH_DebugMap.instance then
-        TH_DebugMap.instance:close()
+function Hordes_map()
+    if Hordes_DebugMap.instance then
+        Hordes_DebugMap.instance:close()
         print("True Hordes map closed")
         return "closed"
     end
-    local window = TH_DebugMap:new(100, 100, 640, 640)
+    local window = Hordes_DebugMap:new(100, 100, 640, 640)
     window:setTitle("True Hordes debug map (wheel zoom, drag pan, right-click follow)")
     window:setResizable(false)
     window:initialise()
     window:addToUIManager()
-    TH_DebugMap.instance = window
+    Hordes_DebugMap.instance = window
     print("True Hordes map opened")
     return "opened"
 end

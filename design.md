@@ -268,7 +268,7 @@ Each sub-project's design starts by re-reading this document and the relevant re
 | # | Status | Notes |
 |---|---|---|
 | 0 | **Pending (user)** | In-game tests from section 9 |
-| 1 | **Built and merged to `main` (2026-10-10); in-game acceptance pending** | 42 offline tests. Java core (lifecycle, game-time clock, scheduler with update buckets, entity store, crash-safe versioned save file matched to full and hot saves), ZombieBuddy hooks, Lua console commands (`TH_status`, `TH_stats`, `TH_debug`, `TH_save`, `TH_seedTest`, `TH_clearTest`, `TH_map`), debug map, build and deploy scripts. Acceptance: `docs/TESTING.md` rows 1–9 (and 7b). Deferred minor issues from its final review are listed below |
+| 1 | **Built and merged to `main` (2026-10-10); in-game acceptance passed in single player (rows 1, 3–7b; row 2 blocked by a `TH_` name clash with the user's True Hits mod, so the commands were renamed to `Hordes_`; rows 8–10 skipped by the user)** | 42 offline tests. Java core (lifecycle, game-time clock, scheduler with update buckets, entity store, crash-safe versioned save file matched to full and hot saves), ZombieBuddy hooks, Lua console commands (`Hordes_status`, `Hordes_stats`, `Hordes_debug`, `Hordes_save`, `Hordes_seedTest`, `Hordes_clearTest`, `Hordes_map`), debug map, build and deploy scripts. Acceptance: `docs/TESTING.md` rows 1–9 (and 7b). Deferred minor issues from its final review are listed below |
 | 2 | Not started; begins when the user says so | |
 | 3–9 | Not started | |
 
@@ -279,8 +279,8 @@ Deferred minor issues from sub-project 1's final review (fix when the code they 
 - no test for upgrading older save formats yet (only format version 1 exists);
 - if the game's `MapCollisionData.save` throws, the mod's full save is skipped (`@Patch.OnExit` default);
 - the debug map draws outside its panel and stops dragging when the mouse leaves it;
-- `TH_seedTest` has no upper limit;
-- `TH_status` shows the previous world's load result after exiting a world.
+- `Hordes_seedTest` has no upper limit;
+- `Hordes_status` shows the previous world's load result after exiting a world.
 
 ---
 
