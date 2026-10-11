@@ -29,6 +29,7 @@ public final class TestRunner {
         ZoneRasterTest.class,
         GridTest.class,
         GridBuilderTest.class,
+        WorldTest.class,
     };
 
     public static void main(String[] args) {
