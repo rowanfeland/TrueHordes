@@ -25,6 +25,7 @@ public final class TestRunner {
         LuaArgsTest.class,
         LuaSyntaxTest.class,
         CellReaderTest.class,
+        ChunkInfoTest.class,
     };
 
     public static void main(String[] args) {
