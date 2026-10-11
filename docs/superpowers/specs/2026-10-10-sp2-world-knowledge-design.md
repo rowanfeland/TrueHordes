@@ -20,8 +20,10 @@ game's collision data is ground level only); the zombie density map (read by sub
 
 **Collision files.** One `chunkdata_X_Y.bin` per 256×256-tile cell in every map folder (4,065 for the vanilla map,
 22 MB). Format (`zombie.pot.POTChunkData`): a big-endian short version (1), then for each of the cell's 32×32 chunks
-(row-major, y outer) one type byte: 0 empty, 1 solid, 2 regular, 3 water, 4 room; a regular chunk is followed by 64
-tile bytes (8×8, row-major). Tile bits: 1 solid, 2 wall on the north edge, 4 wall on the west edge, 8 water, 16 room.
+(row-major, y outer) one type byte: 0 empty, 1 solid, 2 regular, 3 water, 4 room, 5 void; a regular chunk is
+followed by 64 tile bytes (8×8, row-major). Type 5 is not in the game's Java reader but occurs in the vanilla map's
+edge strips (165,716 chunks; every one of the 4,065 files parses exactly when 5 carries no tile bytes); it means "no
+map here" and is treated as no data (blocked). Tile bits: 1 solid, 2 wall on the north edge, 4 wall on the west edge, 8 water, 16 room.
 Uniform chunk types mean every tile has that one property (empty = all clear).
 
 **The game's rules for the bits** (`MapCollisionData.isSolid / isBlockedN / isBlockedW / isWater / isRoom`): solid
@@ -37,7 +39,8 @@ format), so player changes are in them after a save.
 
 **Zones.** `IsoWorld.instance.MetaGrid` holds every zone after load (from each map's `objects.lua`; modded maps the
 same way). Types used here: `Nav` (roads), `TownZone`, `Farm`, `FarmLand`, `Ranch`, `Forest`, `DeepForest`,
-`Vegitation`, `TrailerPark`. Zones can be rectangles, polygons or polylines (`Zone.contains(x, y)` handles all).
+`Vegitation`, `TrailerPark`. Zones can be rectangles, polygons or polylines (public `type`, `x/y/w/h`, `points`,
+`polylineWidth`, `z`).
 
 **Live changes.** The game feeds its own collision grid from two main-thread methods, which this sub-project hooks:
 `MapCollisionData.addChunkToWorld(IsoChunk)` (an area loads around a player) and
@@ -47,13 +50,15 @@ multiplayer client.
 ## 2. Data model
 
 **Coarse grid.** One entry per 8×8-tile chunk across the grid bounds (vanilla: about 2,464 × 1,984 ≈ 4.9 million
-chunks). Two bytes per chunk, held in flat arrays (about 10 MB):
+chunks), held in two flat arrays (about 30 MB):
 
-| Field | Bits | Meaning |
+| Array | Per chunk | Meaning |
 |---|---|---|
-| terrain | 4 | `UNKNOWN`, `ROAD`, `TOWN`, `FARM`, `FOREST`, `DEEP_FOREST`, `OPEN`, `BUILDING`, `WATER` |
-| edges | 4 | can a zombie cross into the north / east / south / west neighbour chunk |
-| open | 7 | walkable tiles out of 64 |
+| info | 2 bytes | walkable tiles out of 64 (7 bits); water, room and no-data majority flags; the covering zone's terrain (4 bits) |
+| border masks | 4 bytes | for each of the 8 border tiles on each side, whether a zombie can stand there and leave or enter across that side |
+
+Terrain (`UNKNOWN`, `ROAD`, `TOWN`, `FARM`, `OPEN`, `FOREST`, `DEEP_FOREST`, `BUILDING`, `WATER`) and the four edges
+are worked out from these on each query, so a live change only rewrites one chunk's two entries.
 
 - **Terrain** comes from zones first, then from the tiles:
   - more than half its 64 tiles are water → `WATER`;
@@ -84,8 +89,8 @@ recomputed.
 
 **At world start** (after the core starts; single player and dedicated server only):
 1. On the main thread, take a snapshot: grid bounds, the list of map folders with their collision file paths, the
-   save's `chunkdata` folder, and the zones of the types above (copied to plain immutable records: type, bounds, and
-   the game's `Zone` object for `contains` on polygons and polylines; zones are not changed by the game after load).
+   save's `chunkdata` folder, and the ground-level zones of the types above (copied to plain immutable records:
+   terrain, shape kind, bounds, points, polyline width; see "Zones off the main thread" below).
 2. A background daemon thread (`TrueHordes-World`) builds the coarse grid cell by cell. For each cell: the save copy if
    it exists, otherwise the first map folder (lowest index) that has the file; no file → every chunk `UNKNOWN` and
    blocked. Then terrain from the zone snapshot.
@@ -93,17 +98,26 @@ recomputed.
    are logged. Before that, `ready()` is false and every query answers "unknown / blocked".
 4. Exiting the world (or a new world starting) cancels a build still running and drops all data.
 
-The build is measured on the full vanilla map. If it takes more than about 5 seconds, a cache file in the save
+The finished grid is published on the main thread (the core's tick), so the grid is only ever written by one thread
+at a time. The build is measured on the full vanilla map. If it takes more than about 5 seconds, a cache file in the save
 folder is added in a follow-up; not before.
 
-**While playing** (main thread): the two hooks compute the tile bits with the game's own rule methods (called by
-reflection on `MapCollisionData.instance`, so the mod never disagrees with the game; resolved once at start-up and
-checked by the hook-target self-check), record them in the live overlay, and recompute the chunk's coarse entry.
-Changes that arrive while the build is still running are queued and applied once it publishes.
+**While playing** (main thread): after `addChunkToWorld` the game has just computed the chunk's 64 tile bits in its
+own private `squares` array, which the hook copies; after `squareChanged` the hook computes that tile's bits with the
+game's own rule methods (`isSolid`, `isBlockedN`, `isBlockedW`, `isWater`, `isRoom`). Both are reached by reflection
+on `MapCollisionData.instance`, resolved once at start-up, so the mod never disagrees with the game. The bits go into
+the live overlay and the chunk's coarse entry is recomputed. Changes that arrive while the build is still running wait
+in the overlay and are applied when the grid is published (on the main thread, in the core's tick).
 
 **Threads.** The grid is written only by the build thread (before publishing) and then only by the main thread.
 Queries come from the main thread now (the simulation's own thread in later sub-projects): entries are single array
-elements, so a reader sees the old or the new value, never a torn one. The tile cache is synchronized.
+elements, so a reader sees the old or the new value, never a torn one. The tile cache is synchronized; the live overlay
+is a concurrent map whose chunk arrays are replaced, never changed in place.
+
+**Zones off the main thread.** The game's own zone geometry shares a static helper that is not thread-safe, so the
+snapshot copies each zone's type and points, and the mod's own geometry (rectangle, polygon by crossing count,
+polyline by distance to its segments) does the work on the build thread. Big polygons are filled by scanlines, one per
+chunk row.
 
 ## 4. Queries (Java, `truehordes.world.World`)
 
