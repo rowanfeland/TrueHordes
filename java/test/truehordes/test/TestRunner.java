@@ -27,6 +27,8 @@ public final class TestRunner {
         CellReaderTest.class,
         ChunkInfoTest.class,
         ZoneRasterTest.class,
+        GridTest.class,
+        GridBuilderTest.class,
     };
 
     public static void main(String[] args) {
