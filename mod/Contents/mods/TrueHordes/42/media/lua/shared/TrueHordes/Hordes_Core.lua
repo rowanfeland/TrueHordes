@@ -31,6 +31,7 @@ function Hordes_stats() return call("stats") end
 function Hordes_debug(category, on) return call("debug", category, on) end
 function Hordes_save() return call("save") end
 function Hordes_clearTest() return call("clearTest") end
+function Hordes_world() return call("world") end
 
 function Hordes_seedTest(n)
     local player = getPlayer()
@@ -46,6 +47,20 @@ function TrueHordes.snapshot(minX, minY, maxX, maxY, maxPoints)
     local j = J()
     if not j then return nil end
     return j.snapshot(minX, minY, maxX, maxY, maxPoints)
+end
+
+--- Debug-map terrain codes for a rectangle (see LuaApi.terrain), or nil when the world map is not ready.
+function TrueHordes.terrain(minX, minY, maxX, maxY, step)
+    local j = J()
+    if not j then return nil end
+    return j.terrain(minX, minY, maxX, maxY, step)
+end
+
+--- Debug-map collision tiles for a small rectangle (see LuaApi.tiles), or nil.
+function TrueHordes.tiles(minX, minY, maxX, maxY, max)
+    local j = J()
+    if not j then return nil end
+    return j.tiles(minX, minY, maxX, maxY, max)
 end
 
 if Events and Events.OnGameStart then

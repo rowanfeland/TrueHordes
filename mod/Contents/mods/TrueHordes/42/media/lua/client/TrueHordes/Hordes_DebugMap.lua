@@ -3,9 +3,23 @@
 
 require "ISUI/ISPanel"
 require "ISUI/ISCollapsableWindow"
+require "ISUI/ISButton"
 
 local FETCH_MS = 300
 local MAX_POINTS = 4000
+local TERRAIN_MS = 1000
+local TILE_ZOOM = 4 -- px per tile at which walls are drawn
+-- Terrain codes (Java truehordes.world.Terrain) to colours.
+local TERRAIN_COLOURS = {
+    [1] = { 0.45, 0.45, 0.45 }, -- road
+    [2] = { 0.55, 0.45, 0.30 }, -- town
+    [3] = { 0.60, 0.55, 0.20 }, -- farm
+    [4] = { 0.30, 0.42, 0.25 }, -- open
+    [5] = { 0.15, 0.40, 0.15 }, -- forest
+    [6] = { 0.05, 0.25, 0.08 }, -- deep forest
+    [7] = { 0.00, 0.00, 0.00 }, -- building
+    [8] = { 0.15, 0.30, 0.70 }, -- water
+}
 
 Hordes_MapPanel = ISPanel:derive("Hordes_MapPanel")
 
@@ -20,6 +34,10 @@ function Hordes_MapPanel:new(x, y, width, height)
     o.snapshot = nil
     o.lastFetch = 0
     o.dragging = false
+    o.showTerrain = true
+    o.terrain = nil
+    o.tiles = nil
+    o.lastTerrain = 0
     return o
 end
 
@@ -37,6 +55,60 @@ function Hordes_MapPanel:fetch()
         self.centerX + halfW, self.centerY + halfH, MAX_POINTS)
 end
 
+function Hordes_MapPanel:createChildren()
+    ISPanel.createChildren(self)
+    self.terrainButton = ISButton:new(self.width - 90, 2, 86, 18, "Terrain: on", self, Hordes_MapPanel.onToggleTerrain)
+    self.terrainButton:initialise()
+    self:addChild(self.terrainButton)
+end
+
+function Hordes_MapPanel:onToggleTerrain()
+    self.showTerrain = not self.showTerrain
+    self.terrainButton:setTitle(self.showTerrain and "Terrain: on" or "Terrain: off")
+end
+
+function Hordes_MapPanel:fetchTerrain()
+    local now = getTimestampMs()
+    if self.terrain and now - self.lastTerrain < TERRAIN_MS then return end
+    self.lastTerrain = now
+    local halfW = self.width / 2 / self.zoom
+    local halfH = self.height / 2 / self.zoom
+    local step = math.max(8, math.ceil(8 / self.zoom))
+    self.terrain = TrueHordes.terrain(self.centerX - halfW, self.centerY - halfH,
+        self.centerX + halfW, self.centerY + halfH, step)
+    if self.zoom >= TILE_ZOOM then
+        self.tiles = TrueHordes.tiles(math.floor(self.centerX - halfW), math.floor(self.centerY - halfH),
+            math.ceil(self.centerX + halfW), math.ceil(self.centerY + halfH), 20000)
+    else
+        self.tiles = nil
+    end
+end
+
+function Hordes_MapPanel:drawTerrain()
+    local t = self.terrain
+    if not t then return end
+    local size = t.step * self.zoom
+    for r = 0, t.rows - 1 do
+        for c = 0, t.cols - 1 do
+            local colour = TERRAIN_COLOURS[t[r * t.cols + c + 1]]
+            if colour then
+                local sx, sy = self:worldToScreen(t.x0 + c * t.step, t.y0 + r * t.step)
+                self:drawRect(sx, sy, size + 1, size + 1, 0.85, colour[1], colour[2], colour[3])
+            end
+        end
+    end
+    local tiles = self.tiles
+    if not tiles then return end
+    local z = self.zoom
+    for i = 1, tiles.n * 3, 3 do
+        local sx, sy = self:worldToScreen(tiles[i], tiles[i + 1])
+        local bits = tiles[i + 2]
+        if bits % 2 == 1 then self:drawRect(sx, sy, z, z, 0.9, 0.1, 0.1, 0.1) end -- solid
+        if math.floor(bits / 2) % 2 == 1 then self:drawRect(sx, sy, z, 2, 1, 0.95, 0.95, 0.95) end -- wall north
+        if math.floor(bits / 4) % 2 == 1 then self:drawRect(sx, sy, 2, z, 1, 0.95, 0.95, 0.95) end -- wall west
+    end
+end
+
 function Hordes_MapPanel:prerender()
     ISPanel.prerender(self)
     local player = getPlayer()
@@ -45,6 +117,10 @@ function Hordes_MapPanel:prerender()
     end
     if not self.centerX then return end
     self:fetch()
+    if self.showTerrain then
+        self:fetchTerrain()
+        self:drawTerrain()
+    end
     local s = self.snapshot
     if s then
         local n = s.n or 0
@@ -83,6 +159,7 @@ function Hordes_MapPanel:onMouseWheel(del)
     local factor = del > 0 and 0.8 or 1.25
     self.zoom = math.max(0.02, math.min(8, self.zoom * factor))
     self.snapshot = nil
+    self.terrain = nil
     return true
 end
 
@@ -107,6 +184,7 @@ function Hordes_MapPanel:onMouseMove(dx, dy)
         self.centerX = self.centerX - dx / self.zoom
         self.centerY = self.centerY - dy / self.zoom
         self.snapshot = nil
+        self.terrain = nil
     end
     return true
 end
@@ -114,6 +192,7 @@ end
 function Hordes_MapPanel:onRightMouseDown(x, y)
     self.follow = true
     self.snapshot = nil
+    self.terrain = nil
     return true
 end
 
