@@ -24,6 +24,7 @@ public final class TestRunner {
         VerifyTargetsTest.class,
         LuaArgsTest.class,
         LuaSyntaxTest.class,
+        CellReaderTest.class,
     };
 
     public static void main(String[] args) {
