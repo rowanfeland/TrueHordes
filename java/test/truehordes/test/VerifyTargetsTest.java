@@ -35,4 +35,21 @@ public final class VerifyTargetsTest {
         Check.equal(HookTargets.ALL.length, missing.size(), "every target reported");
         Check.isTrue(missing.contains(HookTargets.POPMAN + "." + HookTargets.TICK), "names class.method");
     }
+
+    public static void testLiveTargetsAndRulesExistInGameJar() throws Exception {
+        String jarPath = System.getProperty("truehordes.gameJar");
+        Check.isTrue(jarPath != null, "build passes the game jar path to the test runner");
+        try (ZipFile jar = new ZipFile(jarPath)) {
+            List<String> missing = HookTargets.missing(HookTargets.LIVE, cls -> {
+                try {
+                    return ClassFileMethods.methodNames(jar, cls);
+                } catch (Exception e) {
+                    return Set.of();
+                }
+            });
+            Check.equal(List.of(), missing, "missing live hook targets");
+            Set<String> mcd = ClassFileMethods.methodNames(jar, HookTargets.MCD);
+            for (String rule : HookTargets.RULES) Check.isTrue(mcd.contains(rule), "rule method " + rule);
+        }
+    }
 }

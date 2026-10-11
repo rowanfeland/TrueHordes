@@ -2,11 +2,19 @@ package truehordes;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import truehordes.core.GameEnv;
+import truehordes.world.WorldSource;
 import zombie.GameTime;
 import zombie.SandboxOptions;
 import zombie.ZomboidFileSystem;
+import zombie.iso.IsoLot;
+import zombie.iso.IsoMetaGrid;
 import zombie.iso.IsoWorld;
+import zombie.iso.MapFiles;
 import zombie.network.GameClient;
 import zombie.network.GameServer;
 
@@ -34,6 +42,17 @@ final class GameEnvImpl implements GameEnv {
 
     @Override
     public boolean debugLogging() { return sandboxBool("TrueHordes.DebugLogging", false); }
+
+    @Override
+    public WorldSource worldSource() {
+        IsoMetaGrid grid = IsoWorld.instance == null ? null : IsoWorld.instance.getMetaGrid();
+        if (grid == null || grid.maxX < grid.minX) return null;
+        List<Map<String, String>> folders = new ArrayList<>();
+        for (MapFiles mf : IsoLot.MapFiles) folders.add(new HashMap<>(mf.infoFileNames));
+        Path saveDir = Paths.get(ZomboidFileSystem.instance.getFileNameInCurrentSave("chunkdata"));
+        return new WorldSource(grid.minX, grid.minY, grid.maxX, grid.maxY, WorldSource.resolveMapFiles(folders),
+            saveDir, ZoneSnapshot.copy(grid.zones));
+    }
 
     private static boolean sandboxBool(String name, boolean fallback) {
         try {

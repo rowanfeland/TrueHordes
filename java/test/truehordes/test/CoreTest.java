@@ -175,4 +175,37 @@ public final class CoreTest {
         Check.equal(5, core.seedTest(5, 0, 0, 10, new Random(4)), "running");
         Check.isTrue(Files.notExists(SaveFile.backupOf(env.stateFile)), "seeding does not save");
     }
+
+    public static void testCoreStartsAndStopsTheWorldMap() throws Exception {
+        truehordes.util.Log.setSink(line -> {});
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("th-core-world");
+            FakeEnv env = new FakeEnv(dir.resolve("state.bin"));
+            env.worldSource = new truehordes.world.WorldSource(0, 0, 0, 0, new java.util.HashMap<>(), null, java.util.List.of());
+            truehordes.core.Core core = new truehordes.core.Core(env);
+            core.tick();
+            Check.isTrue(core.world().state() != truehordes.world.World.State.OFF, "build started by the first tick");
+            Check.isTrue(core.world().awaitBuilt(10_000), "built");
+            core.tick();
+            Check.equal(truehordes.world.World.State.READY, core.world().state(), "published by a later tick");
+            core.stop();
+            Check.equal(truehordes.world.World.State.OFF, core.world().state(), "dropped on stop");
+        } finally {
+            truehordes.util.Log.setSink(null);
+        }
+    }
+
+    public static void testNoWorldSourceStillRuns() throws Exception {
+        truehordes.util.Log.setSink(line -> {});
+        try {
+            java.nio.file.Path dir = java.nio.file.Files.createTempDirectory("th-core-world");
+            FakeEnv env = new FakeEnv(dir.resolve("state.bin"));
+            truehordes.core.Core core = new truehordes.core.Core(env);
+            core.tick();
+            Check.equal(truehordes.core.Core.State.RUNNING, core.state(), "core runs without a map");
+            Check.equal(truehordes.world.World.State.OFF, core.world().state(), "no map");
+        } finally {
+            truehordes.util.Log.setSink(null);
+        }
+    }
 }

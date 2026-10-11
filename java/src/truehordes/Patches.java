@@ -1,6 +1,8 @@
 package truehordes;
 
 import me.zed_0xff.zombie_buddy.Patch;
+import zombie.iso.IsoChunk;
+import zombie.iso.IsoGridSquare;
 
 /** ZombieBuddy patches. Must stay directly in package truehordes (ZombieBuddy does not scan sub-packages). */
 public final class Patches {
@@ -39,5 +41,19 @@ public final class Patches {
     public static class HotSaveServer {
         @Patch.OnExit
         public static void exit() { Hooks.onHotSave(); }
+    }
+
+    /** An area loaded around a player; the game has just computed its collision bits. */
+    @Patch(className = HookTargets.MCD, methodName = HookTargets.CHUNK_LOADED)
+    public static class ChunkLoaded {
+        @Patch.OnExit
+        public static void exit(@Patch.Argument(0) IsoChunk chunk) { Hooks.onChunkLoaded(chunk); }
+    }
+
+    /** One tile changed (building, breaking, burning). */
+    @Patch(className = HookTargets.MCD, methodName = HookTargets.SQUARE_CHANGED)
+    public static class SquareChanged {
+        @Patch.OnExit
+        public static void exit(@Patch.Argument(0) IsoGridSquare square) { Hooks.onSquareChanged(square); }
     }
 }

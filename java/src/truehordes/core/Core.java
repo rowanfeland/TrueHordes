@@ -13,6 +13,8 @@ import truehordes.store.Entity;
 import truehordes.store.Store;
 import truehordes.util.Log;
 import truehordes.util.Stats;
+import truehordes.world.World;
+import truehordes.world.WorldSource;
 
 /**
  * Lifecycle of the simulation for one loaded world. Starts on the first tick after a world is ready, saves when the
@@ -34,6 +36,7 @@ public final class Core {
     private final Stats stats = new Stats();
     private final SimClock clock = new SimClock();
     private final Scheduler scheduler = new Scheduler(stats);
+    private final World world = new World();
     private State state = State.IDLE;
     private String disabledReason = "";
     private String lastLoad = "";
@@ -57,6 +60,8 @@ public final class Core {
 
     public Scheduler scheduler() { return scheduler; }
 
+    public World world() { return world; }
+
     /** Permanently switches the mod off for this game session. */
     public synchronized void disable(String reason) {
         state = State.DISABLED;
@@ -67,6 +72,7 @@ public final class Core {
     public synchronized void tick() {
         if (state == State.DISABLED || state == State.OFF || env.isClient() || !env.isWorldReady()) return;
         if (state == State.IDLE && !start()) return;
+        world.tick();
         long t0 = System.nanoTime();
         scheduler.run(clock.advance(env.worldAgeHours()));
         stats.count("entities", store.size());
@@ -97,6 +103,13 @@ public final class Core {
         clock.reset(now);
         state = State.RUNNING;
         Log.info("started with " + store.size() + " entities (" + lastLoad + ")");
+        try {
+            WorldSource src = env.worldSource();
+            if (src != null) world.start(src);
+            else Log.warn("map data unavailable; terrain knowledge is off");
+        } catch (Throwable t) {
+            Log.error("could not read the map data; terrain knowledge is off", t);
+        }
         return true;
     }
 
@@ -131,6 +144,7 @@ public final class Core {
         if (state == State.RUNNING) Log.info("stopped");
         if (state != State.DISABLED) state = State.IDLE;
         store.clear();
+        world.stop();
         clock.clear();
         stats.clear();
         lastSaveHours = Double.NaN;

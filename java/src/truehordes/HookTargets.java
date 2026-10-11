@@ -18,6 +18,10 @@ public final class HookTargets {
     /** Dedicated server: game time is queued for saving on a timer from the main loop. */
     public static final String SERVER_CHUNK_LOADER = "zombie.network.ServerChunkLoader";
     public static final String HOT_SAVE_SERVER = "saveLater";
+    /** An area loaded around a player (MapCollisionData has just computed its 64 tile bits). */
+    public static final String CHUNK_LOADED = "addChunkToWorld";
+    /** One tile changed (building, breaking, burning). */
+    public static final String SQUARE_CHANGED = "squareChanged";
 
     public static final String[][] ALL = {
         {POPMAN, TICK},
@@ -27,12 +31,25 @@ public final class HookTargets {
         {SERVER_CHUNK_LOADER, HOT_SAVE_SERVER},
     };
 
+    /** Live map updates. Optional: if missing, the world map still builds from the files. */
+    public static final String[][] LIVE = {
+        {MCD, CHUNK_LOADED},
+        {MCD, SQUARE_CHANGED},
+    };
+
+    /** MapCollisionData's private per-tile rule methods, called by LiveBits. */
+    public static final String[] RULES = {"isSolid", "isBlockedN", "isBlockedW", "isWater", "isRoom"};
+
     private HookTargets() {}
 
-    /** Returns "class.method" for every target the lookup does not report. */
+    /** Returns "class.method" for every required target the lookup does not report. */
     public static List<String> missing(Function<String, Set<String>> methodsOfClass) {
+        return missing(ALL, methodsOfClass);
+    }
+
+    public static List<String> missing(String[][] targets, Function<String, Set<String>> methodsOfClass) {
         List<String> out = new ArrayList<>();
-        for (String[] t : ALL) {
+        for (String[] t : targets) {
             Set<String> names = methodsOfClass.apply(t[0]);
             if (names == null || !names.contains(t[1])) out.add(t[0] + "." + t[1]);
         }

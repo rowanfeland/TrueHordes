@@ -2,6 +2,7 @@ package truehordes.test;
 
 import java.nio.file.Path;
 import truehordes.core.GameEnv;
+import truehordes.world.WorldSource;
 
 /** Test stand-in for the game. */
 public final class FakeEnv implements GameEnv {
@@ -12,6 +13,7 @@ public final class FakeEnv implements GameEnv {
     public Path stateFile;
     public boolean enabled = true;
     public boolean debugLogging;
+    public WorldSource worldSource;
 
     public FakeEnv(Path stateFile) { this.stateFile = stateFile; }
 
@@ -22,4 +24,5 @@ public final class FakeEnv implements GameEnv {
     @Override public Path stateFile() { return stateFile; }
     @Override public boolean enabled() { return enabled; }
     @Override public boolean debugLogging() { return debugLogging; }
+    @Override public WorldSource worldSource() { return worldSource; }
 }

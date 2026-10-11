@@ -1,6 +1,7 @@
 package truehordes.core;
 
 import java.nio.file.Path;
+import truehordes.world.WorldSource;
 
 /** What the core needs from the game. The game-backed implementation is truehordes.GameEnvImpl. */
 public interface GameEnv {
@@ -21,4 +22,7 @@ public interface GameEnv {
 
     /** Sandbox TrueHordes.DebugLogging. */
     boolean debugLogging();
+
+    /** Snapshot of the loaded world's map files, save folder and zones (main thread); null if unavailable. */
+    WorldSource worldSource();
 }

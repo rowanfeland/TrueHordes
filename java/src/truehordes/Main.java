@@ -22,6 +22,10 @@ public class Main {
             } else {
                 core.disable("game methods missing (game update?): " + missing);
             }
+            List<String> liveMissing = HookTargets.missing(HookTargets.LIVE, Main::declaredMethodNames);
+            String why = liveMissing.isEmpty() ? LiveBits.init() : "game methods missing: " + liveMissing;
+            if (why == null) Log.info("live map updates on");
+            else Log.warn("live map updates off (" + why + "); the world map still builds from the map files");
         } catch (Throwable t) {
             core.disable("self-check failed: " + t);
         }
