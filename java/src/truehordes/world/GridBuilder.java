@@ -1,6 +1,9 @@
 package truehordes.world;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.function.BooleanSupplier;
+import truehordes.util.Log;
 
 /** Builds the coarse grid for a whole map from its collision files and zones. Runs on the build thread. */
 public final class GridBuilder {
@@ -12,7 +15,19 @@ public final class GridBuilder {
         int originX = src.minCellX * 32, originY = src.minCellY * 32;
         int width = (src.maxCellX - src.minCellX + 1) * 32, height = (src.maxCellY - src.minCellY + 1) * 32;
         Grid g = new Grid(originX, originY, width, height);
-        byte[] zones = ZoneRaster.rasterise(src.zones, originX, originY, width, height);
+        List<ZoneShape> shapes = src.zones;
+        if (!src.mapFolders.isEmpty()) {
+            RoadFiles.Result roads = RoadFiles.read(src.mapFolders);
+            shapes = new ArrayList<>(src.zones);
+            shapes.addAll(roads.shapes);
+            report.streets = roads.streets;
+            report.worldRoads = roads.worldRoads;
+            report.trails = roads.trails;
+            report.roadProblems.addAll(roads.problems);
+            for (String p : roads.problems) Log.warn("road file " + p);
+        }
+        if (cancelled.getAsBoolean()) return null;
+        byte[] zones = ZoneRaster.rasterise(shapes, originX, originY, width, height);
         for (int cy = 0; cy < height; cy++) {
             for (int cx = 0; cx < width; cx++) {
                 int z = zones[cy * width + cx];

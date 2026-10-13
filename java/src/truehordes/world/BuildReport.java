@@ -16,6 +16,12 @@ public final class BuildReport {
     public long millis;
     public long memoryBytes;
     public int[] terrainCounts = new int[16];
+    /** Roads and trails read from the map folders' streets.xml and worldmap.xml. */
+    public int streets;
+    public int worldRoads;
+    public int trails;
+    /** Road files skipped or only partly read. */
+    public final List<String> roadProblems = new ArrayList<>();
 
     public void damaged(Path file, String error) {
         filesDamaged++;

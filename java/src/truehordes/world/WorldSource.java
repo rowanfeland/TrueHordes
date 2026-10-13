@@ -18,9 +18,16 @@ public final class WorldSource {
     /** The save's chunkdata folder; null when there is none (tests, no save). */
     public final Path saveChunkDir;
     public final List<ZoneShape> zones;
+    /** Map folders in the game's priority order; their streets.xml and worldmap.xml add roads and trails. */
+    public final List<Path> mapFolders;
 
     public WorldSource(int minCellX, int minCellY, int maxCellX, int maxCellY, Map<Long, Path> mapFiles,
                        Path saveChunkDir, List<ZoneShape> zones) {
+        this(minCellX, minCellY, maxCellX, maxCellY, mapFiles, saveChunkDir, zones, List.of());
+    }
+
+    public WorldSource(int minCellX, int minCellY, int maxCellX, int maxCellY, Map<Long, Path> mapFiles,
+                       Path saveChunkDir, List<ZoneShape> zones, List<Path> mapFolders) {
         this.minCellX = minCellX;
         this.minCellY = minCellY;
         this.maxCellX = maxCellX;
@@ -28,6 +35,7 @@ public final class WorldSource {
         this.mapFiles = Map.copyOf(mapFiles);
         this.saveChunkDir = saveChunkDir;
         this.zones = List.copyOf(zones);
+        this.mapFolders = List.copyOf(mapFolders);
     }
 
     public static long key(int a, int b) { return ((long) a << 32) | (b & 0xFFFFFFFFL); }

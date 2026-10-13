@@ -102,4 +102,29 @@ public final class GridBuilderTest {
         WorldSource src = new WorldSource(0, 0, 3, 3, new HashMap<>(), null, List.of());
         Check.equal(null, GridBuilder.build(src, () -> true, new BuildReport()), "cancelled");
     }
+
+    public static void testRoadsFromMapFolder() throws Exception {
+        Path dir = Files.createTempDirectory("th-map");
+        Path cell = FakeCells.cell().write(dir, "chunkdata_0_0.bin");
+        Files.writeString(dir.resolve("streets.xml"), "<streets><street name=\"A\" width=\"2\"><points>"
+            + "<point x=\"16.0\" y=\"20.0\"/><point x=\"23.0\" y=\"20.0\"/></points></street></streets>");
+        BuildReport r = new BuildReport();
+        Grid g = GridBuilder.build(new WorldSource(0, 0, 0, 0, files(0, 0, cell), null, List.of(), List.of(dir)), () -> false, r);
+        Check.equal(Terrain.ROAD, g.terrain(2, 2), "street chunk");
+        Check.equal(Terrain.OPEN, g.terrain(4, 2), "beyond the street");
+        Check.equal(1, r.streets, "counted");
+    }
+
+    public static void testTrailFromWorldMap() throws Exception {
+        Path dir = Files.createTempDirectory("th-map");
+        Path cell = FakeCells.cell().write(dir, "chunkdata_0_0.bin");
+        Files.writeString(dir.resolve("worldmap.xml"), "<world><cell x=\"0\" y=\"0\"><feature><geometry type=\"Polygon\">"
+            + "<coordinates><point x=\"40\" y=\"40\"/><point x=\"44\" y=\"40\"/><point x=\"44\" y=\"44\"/>"
+            + "<point x=\"40\" y=\"44\"/></coordinates></geometry><properties><property name=\"highway\" value=\"trail\"/>"
+            + "</properties></feature></cell></world>");
+        BuildReport r = new BuildReport();
+        Grid g = GridBuilder.build(new WorldSource(0, 0, 0, 0, files(0, 0, cell), null, List.of(), List.of(dir)), () -> false, r);
+        Check.equal(Terrain.TRAIL, g.terrain(5, 5), "trail chunk");
+        Check.equal(1, r.trails, "counted");
+    }
 }

@@ -218,6 +218,9 @@ public final class World {
             sb.append(" | cells: ").append(r.cellsFromSave).append(" from save, ").append(r.cellsFromMap).append(" from map, ")
                 .append(r.cellsMissing).append(" missing, ").append(r.filesDamaged).append(" damaged");
             if (!r.damaged.isEmpty()) sb.append(" (").append(String.join("; ", r.damaged)).append(')');
+            sb.append(" | roads from files: ").append(r.streets).append(" streets, ").append(r.worldRoads)
+                .append(" world-map roads, ").append(r.trails).append(" trails");
+            if (!r.roadProblems.isEmpty()) sb.append(" (").append(String.join("; ", r.roadProblems)).append(')');
         }
         sb.append(" | live: ").append(live.size()).append(" chunks, ").append(tileChanges).append(" tile changes");
         return sb.toString();

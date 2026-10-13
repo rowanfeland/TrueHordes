@@ -199,4 +199,26 @@ public final class WorldTest {
             Log.setSink(null);
         }
     }
+
+    public static void testReportListsRoadFiles() throws Exception {
+        Log.setSink(line -> {});
+        try {
+            Path dir = Files.createTempDirectory("th-world-roads");
+            Path cell = FakeCells.cell().write(dir, "chunkdata_0_0.bin");
+            Files.writeString(dir.resolve("streets.xml"), "<streets><street name=\"A\" width=\"4\"><points>"
+                + "<point x=\"0.0\" y=\"4.0\"/><point x=\"30.0\" y=\"4.0\"/></points></street></streets>");
+            Files.write(dir.resolve("worldmap.xml.bin"), new byte[] {1});
+            Map<Long, Path> files = new HashMap<>();
+            files.put(WorldSource.key(0, 0), cell);
+            World w = new World();
+            w.start(new WorldSource(0, 0, 0, 0, files, null, List.of(), List.of(dir)));
+            Check.isTrue(w.awaitBuilt(10_000), "built");
+            w.tick();
+            String r = w.report();
+            Check.isTrue(r.contains("roads from files: 1 streets, 0 world-map roads, 0 trails"), r);
+            Check.isTrue(r.contains("binary world map only"), "skipped file reported: " + r);
+        } finally {
+            Log.setSink(null);
+        }
+    }
 }
