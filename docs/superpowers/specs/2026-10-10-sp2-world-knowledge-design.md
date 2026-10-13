@@ -178,3 +178,27 @@ detail on first use (a file read of about 25 KB).
 
 All offline tests pass (including the real-map test); the in-game checks above pass in single player; the build time
 on the vanilla map is recorded in `design.md`.
+
+## 9. Addendum (2026-10-12): roads and trails from `streets.xml` and the world map
+
+In-game check: the terrain map was right, but some rural roads ended short because the `Nav` zones do not cover
+them. Measured on the vanilla map against the Nav zones: `streets.xml` adds about 28,000 road chunks; the world map's
+primary, secondary and tertiary roads about 36,500; its trails about 13,000 (almost none in Nav). Approved by the user
+(trails as their own terrain: option A).
+
+- **Sources** (each map folder, in the game's `IsoLot.MapFiles` order; every folder's roads are used, not just the
+  first): `streets.xml` (`<street width>` with `<point x y>` centre lines, tile coordinates) and `worldmap.xml`
+  (`<cell x y>` in the game's old 300-tile cells; `<feature>` with `<geometry type="Polygon|LineString">` points local
+  to the cell, then `<properties>`; `highway` = `primary` / `secondary` / `tertiary` / `trail`, optional `width`).
+- **Shapes:** a street is a polyline of its width; a world-map Polygon is a polygon; a LineString is a polyline of its
+  `width` property, or 4 tiles without one. World-map coordinates become tiles as `cell * 300 + local`.
+- **Terrain:** new kind `TRAIL` (code 9, placeholder base cost 1.5, drawn brown). Zone priority becomes ROAD > TOWN >
+  TRAIL > FARM > DEEP_FOREST > FOREST > OPEN. Trails, like roads, mark a chunk if they cover any of its tiles. Water
+  and buildings still win, and blocking still comes only from the tiles.
+- **When:** read on the build thread with a streaming XML reader (the files are up to 6 MB), so loading is not blocked.
+  A missing or unreadable file is reported and skipped; a folder with only `worldmap.xml.bin` is counted as "binary
+  world map only, skipped".
+- **Report:** `Hordes_world()` adds `roads from files: N streets, M world-map roads, T trails` and any files skipped.
+- **Tests:** fake `streets.xml` / `worldmap.xml` (coordinate conversion, polygon vs line, default width, trail, unknown
+  highway kinds ignored, missing and broken files); the real-map test checks a streets-only road chunk (548, 9244), a
+  world-map-only road chunk (92, 9436) and a trail-only chunk (332, 9596), plus the build time with the files.
