@@ -66,7 +66,7 @@ public final class RoadFiles {
         try {
             x = reader(in);
             int width = DEFAULT_WIDTH;
-            List<Integer> pts = null;
+            List<Double> pts = null;
             while (x.hasNext()) {
                 int ev = x.next();
                 if (ev == XMLStreamConstants.START_ELEMENT) {
@@ -97,7 +97,7 @@ public final class RoadFiles {
         try {
             x = reader(in);
             int ox = 0, oy = 0;
-            List<Integer> pts = null;
+            List<Double> pts = null;
             String type = null, highway = null, width = null;
             while (x.hasNext()) {
                 int ev = x.next();
@@ -136,7 +136,7 @@ public final class RoadFiles {
         }
     }
 
-    private static void addFeature(Result r, String type, String highway, String width, List<Integer> pts) {
+    private static void addFeature(Result r, String type, String highway, String width, List<Double> pts) {
         Terrain t = highwayTerrain(highway);
         if (t == null) return;
         if ("Polygon".equals(type) && pts.size() >= 6) {
@@ -177,11 +177,11 @@ public final class RoadFiles {
         }
     }
 
-    private static void addPoint(List<Integer> pts, String xs, String ys, int ox, int oy) {
+    private static void addPoint(List<Double> pts, String xs, String ys, int ox, int oy) {
         double px = number(xs, Double.NaN), py = number(ys, Double.NaN);
         if (Double.isNaN(px) || Double.isNaN(py)) return;
-        pts.add(ox + (int) Math.round(px));
-        pts.add(oy + (int) Math.round(py));
+        pts.add(ox + px);
+        pts.add(oy + py);
     }
 
     private static int width(String s) {
@@ -198,8 +198,8 @@ public final class RoadFiles {
         }
     }
 
-    private static int[] toArray(List<Integer> pts) {
-        int[] a = new int[pts.size()];
+    private static double[] toArray(List<Double> pts) {
+        double[] a = new double[pts.size()];
         for (int i = 0; i < a.length; i++) a[i] = pts.get(i);
         return a;
     }

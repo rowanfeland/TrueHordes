@@ -19,6 +19,7 @@ local TERRAIN_COLOURS = {
     [6] = { 0.05, 0.25, 0.08 }, -- deep forest
     [7] = { 0.00, 0.00, 0.00 }, -- building
     [8] = { 0.15, 0.30, 0.70 }, -- water
+    [9] = { 0.50, 0.35, 0.20 }, -- trail
 }
 
 Hordes_MapPanel = ISPanel:derive("Hordes_MapPanel")
@@ -88,13 +89,20 @@ function Hordes_MapPanel:drawTerrain()
     local t = self.terrain
     if not t then return end
     local size = t.step * self.zoom
+    -- One rectangle per run of same-terrain samples in a row (terrain is mostly uniform, so this draws far fewer).
     for r = 0, t.rows - 1 do
-        for c = 0, t.cols - 1 do
-            local colour = TERRAIN_COLOURS[t[r * t.cols + c + 1]]
+        local row = r * t.cols
+        local c = 0
+        while c < t.cols do
+            local code = t[row + c + 1]
+            local run = 1
+            while c + run < t.cols and t[row + c + run + 1] == code do run = run + 1 end
+            local colour = TERRAIN_COLOURS[code]
             if colour then
                 local sx, sy = self:worldToScreen(t.x0 + c * t.step, t.y0 + r * t.step)
-                self:drawRect(sx, sy, size + 1, size + 1, 0.85, colour[1], colour[2], colour[3])
+                self:drawRect(sx, sy, size * run + 1, size + 1, 0.85, colour[1], colour[2], colour[3])
             end
+            c = c + run
         end
     end
     local tiles = self.tiles

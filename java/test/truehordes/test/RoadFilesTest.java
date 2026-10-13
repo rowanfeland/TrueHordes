@@ -95,4 +95,13 @@ public final class RoadFilesTest {
         Check.equal(2, r.shapes.size(), "both shapes");
         Check.equal(0, r.problems.size(), "clean: " + r.problems);
     }
+
+    public static void testHalfTilePointsAreKept() throws Exception {
+        // A 1-tile-wide street along y = 200.5 runs through the centres of row 200; rounding would move it to row 201.
+        RoadFiles.Result r = new RoadFiles.Result();
+        RoadFiles.readStreets(xml("<streets><street name=\"A\" width=\"1\"><points><point x=\"100.0\" y=\"200.5\"/>"
+            + "<point x=\"140.0\" y=\"200.5\"/></points></street></streets>"), r);
+        Check.isTrue(r.shapes.get(0).contains(120, 200), "row 200 is on the street");
+        Check.isTrue(!r.shapes.get(0).contains(120, 201), "row 201 is not");
+    }
 }

@@ -18,3 +18,18 @@ new or existing save. ZombieBuddy may ask to approve the True Hordes jar the fir
 | 8 | Sandbox: set True Hordes > Enabled off on a new world | `switched off in sandbox options`; `Hordes_status()` shows `state OFF` |
 | 9 | Without ZombieBuddy (or jar not approved): `Hordes_status()` | `True Hordes Java core is NOT loaded`, no Lua errors |
 | 10 (optional) | Dedicated server with ZombieBuddy and the jar | Server `console.txt` shows `loading (dedicated server)` and `started`; no errors |
+
+## Sub-project 2 acceptance: world knowledge (single player, debug)
+
+Setup: `tools\deploy.ps1` (Claude runs it), then load a save with True Hordes and ZombieBuddy.
+
+| # | Do | Expect |
+|---|---|---|
+| 1 | Load the save; open `console.txt` | `live map updates on`, then a few seconds after `started`: `world map READY \| built in ... s \| ... MB \| chunks: ...` |
+| 2 | Lua console: `Hordes_world()` | `READY`, the build time, chunk counts per terrain, `cells: ... from save, ... from map, ... missing, 0 damaged`, and `roads from files: ... streets, ... world-map roads, ... trails` |
+| 3 | `Hordes_map()`, zoom out | Coloured terrain: roads grey, trails brown, towns tan, farms yellow, forest green (darker deep forest), water blue, buildings black; it matches the in-game world map, and rural roads no longer stop short |
+| 4 | Find a river with a road bridge (for example around tile 12316, 6718, north-east of Muldraugh) | River blue, the bridge grey across it (not blue) |
+| 5 | Zoom in until walls appear (4 px per tile or more) | White lines on wall edges, dark squares on solid tiles, around the buildings near you |
+| 6 | Build a wall (or break a window, or chop a tree) next to you, then look at the map zoomed in | The wall appears (or the window gap / tree spot changes) within a second; `Hordes_world()` shows more `tile changes` |
+| 7 | Save and quit, reload, `Hordes_world()` and the map | The wall is still there; `from save` is above 0 |
+| 8 (optional) | Dedicated server | Server `console.txt` shows the `world map READY` line |

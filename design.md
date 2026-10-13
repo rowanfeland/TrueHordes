@@ -245,6 +245,19 @@ Learned while building sub-project 1 (verified against the decompiled 42.21 game
 - **Lua can be syntax-checked offline** with the game's own compiler (`org.luaj.kahluafork.compiler.LexState` in
   `projectzomboid.jar`); the build does this for every mod Lua file.
 
+Learned while building sub-project 2:
+- Collision chunk type 5 ("no map here") exists in the vanilla files' edge strips; the game's Java reader does not know
+  it. Every one of the 4,065 vanilla files parses exactly with it read as a uniform chunk.
+- The whole vanilla map (4,065 files, 5,104 road zones, plus `streets.xml` and `worldmap.xml` roads) builds into the
+  coarse grid in about 2 s using about 29 MB, so no cache file is needed.
+- `Nav` zones miss many rural roads; `streets.xml` (centre lines with widths) and `worldmap.xml` (300-tile cells,
+  `highway` = primary/secondary/tertiary/trail polygons) fill them. Long road lines must be rasterised segment by
+  segment: testing their whole bounding box made the build take 20 s.
+- Live changes: after `MapCollisionData.addChunkToWorld` the chunk's 64 tile bits sit in its private `squares` array;
+  for `squareChanged` the game's private `isSolid` / `isBlockedN` / `isBlockedW` / `isWater` / `isRoom` give the bits.
+- The game's `Zone` geometry shares a static `Clipper`, so zones are copied on the main thread and the mod does its own
+  geometry off it.
+
 ---
 
 ## 7. Sub-projects
@@ -270,7 +283,7 @@ Each sub-project's design starts by re-reading this document and the relevant re
 |---|---|---|
 | 0 | **Pending (user)** | In-game tests from section 9 |
 | 1 | **Built and merged to `main` (2026-10-10); in-game acceptance passed in single player (rows 1, 3–7b; row 2 blocked by a `TH_` name clash with the user's True Hits mod, so the commands were renamed to `Hordes_`; rows 8–10 skipped by the user)** | 42 offline tests. Java core (lifecycle, game-time clock, scheduler with update buckets, entity store, crash-safe versioned save file matched to full and hot saves), ZombieBuddy hooks, Lua console commands (`Hordes_status`, `Hordes_stats`, `Hordes_debug`, `Hordes_save`, `Hordes_seedTest`, `Hordes_clearTest`, `Hordes_map`), debug map, build and deploy scripts. Acceptance: `docs/TESTING.md` rows 1–9 (and 7b). Deferred minor issues from its final review are listed below |
-| 2 | **In progress (2026-10-10)** | Spec: `docs/superpowers/specs/2026-10-10-sp2-world-knowledge-design.md` |
+| 2 | **Built on branch `sp2-world-knowledge` (2026-10-10); in-game acceptance pending** | Coarse 8×8-tile grid of the whole map (about 30 MB) built on a background thread from the collision files (save copy first), zones, and the roads and trails in each map folder's `streets.xml` and `worldmap.xml` (new `TRAIL` terrain); tile detail on request; live updates from `MapCollisionData.addChunkToWorld` / `squareChanged`; `Hordes_world()`; terrain and wall layer on the debug map. Vanilla map build: 2.0 s, 28.8 MB with 1,098 streets, 2,867 world-map roads and 502 trails (RealMapTest). Spec and plan: `docs/superpowers/specs|plans/2026-10-10-sp2-world-knowledge*`. Acceptance: `docs/TESTING.md` sub-project 2 rows 1–7 |
 | 3–9 | Not started | |
 
 Deferred minor issues from sub-project 1's final review (fix when the code they touch is next changed):

@@ -13,10 +13,11 @@ public final class ZoneShape {
     public final Kind kind;
     /** Bounds in tiles: [x, x + w) by [y, y + h). */
     public final int x, y, w, h;
-    private final int[] points;
+    /** Polygon corners or polyline points (x0, y0, x1, y1, ...) in tiles; decimals kept (streets use half tiles). */
+    private final double[] points;
     private final double halfWidth;
 
-    private ZoneShape(Terrain terrain, Kind kind, int x, int y, int w, int h, int[] points, double halfWidth) {
+    private ZoneShape(Terrain terrain, Kind kind, int x, int y, int w, int h, double[] points, double halfWidth) {
         this.terrain = terrain;
         this.kind = kind;
         this.x = x;
@@ -32,20 +33,33 @@ public final class ZoneShape {
     }
 
     /** Corners as x0, y0, x1, y1, ... (closed implicitly). */
-    public static ZoneShape polygon(Terrain terrain, int[] points) {
+    public static ZoneShape polygon(Terrain terrain, int[] points) { return polygon(terrain, toDoubles(points)); }
+
+    public static ZoneShape polygon(Terrain terrain, double[] points) {
         int[] b = bounds(points, 0);
         return new ZoneShape(terrain, Kind.POLYGON, b[0], b[1], b[2], b[3], points.clone(), 0);
     }
 
     /** A line through x0, y0, x1, y1, ... covering everything within width / 2 of it. */
     public static ZoneShape polyline(Terrain terrain, int[] points, int width) {
+        return polyline(terrain, toDoubles(points), width);
+    }
+
+    public static ZoneShape polyline(Terrain terrain, double[] points, int width) {
         double half = width / 2.0;
-        int[] b = bounds(points, (int) Math.ceil(half));
+        int[] b = bounds(points, half);
         return new ZoneShape(terrain, Kind.POLYLINE, b[0], b[1], b[2], b[3], points.clone(), half);
     }
 
-    private static int[] bounds(int[] pts, int pad) {
-        int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
+    private static double[] toDoubles(int[] pts) {
+        double[] d = new double[pts.length];
+        for (int i = 0; i < pts.length; i++) d[i] = pts[i];
+        return d;
+    }
+
+    /** Every tile whose centre can be inside: floor(min - pad) .. ceil(max + pad), inclusive. */
+    private static int[] bounds(double[] pts, double pad) {
+        double minX = Double.MAX_VALUE, minY = Double.MAX_VALUE, maxX = -Double.MAX_VALUE, maxY = -Double.MAX_VALUE;
         for (int i = 0; i + 1 < pts.length; i += 2) {
             minX = Math.min(minX, pts[i]);
             maxX = Math.max(maxX, pts[i]);
@@ -53,7 +67,8 @@ public final class ZoneShape {
             maxY = Math.max(maxY, pts[i + 1]);
         }
         if (minX > maxX) return new int[] {0, 0, 0, 0};
-        return new int[] {minX - pad, minY - pad, maxX - minX + 2 * pad + 1, maxY - minY + 2 * pad + 1};
+        int x0 = (int) Math.floor(minX - pad), y0 = (int) Math.floor(minY - pad);
+        return new int[] {x0, y0, (int) Math.ceil(maxX + pad) - x0 + 1, (int) Math.ceil(maxY + pad) - y0 + 1};
     }
 
     public boolean contains(int tx, int ty) {
@@ -95,7 +110,7 @@ public final class ZoneShape {
     }
 
     /** Polyline only: the points (x0, y0, x1, y1, ...); shared, never modified. */
-    int[] points() { return points; }
+    double[] points() { return points; }
 
     /** Polyline only: half the line's width. */
     double halfWidth() { return halfWidth; }

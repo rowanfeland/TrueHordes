@@ -74,7 +74,7 @@ public final class ZoneRaster {
      * map). Same result as testing every tile with ZoneShape.contains.
      */
     private static void polyline(ZoneShape z, byte[] codes, int ox, int oy, int width, int height) {
-        int[] p = z.points();
+        double[] p = z.points();
         double half = z.halfWidth(), limit = half * half;
         int last = p.length >= 4 ? p.length - 4 : 0;
         for (int i = 0; i <= last; i += 2) {
