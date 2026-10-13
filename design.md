@@ -1,8 +1,9 @@
 # True Hordes: design
 
 Project Zomboid Build 42.21 mod. Single player first, then dedicated multiplayer.
-Status: **approved by the user (2026-10-10). Sub-project 1 built, merged and accepted in game. Sub-project 2 (world
-knowledge) is in progress. The user's research tests (section 9) are pending.** Progress per sub-project: section 7.
+Status: **approved by the user (2026-10-10). Sub-projects 1 and 2 built, merged and accepted in game. Sub-project 3
+(population takeover) built on branch `sp3-population-takeover` (2026-10-13), in-game acceptance pending. Before
+sub-project 4 the user decides Q1 (joining rules) and Q8 (towns never fully safe).** Progress per sub-project: section 7.
 Each sub-project (section 7) gets its own design → plan → build cycle (Superpowers workflow, per the user's
 global CLAUDE.md).
 
@@ -36,6 +37,21 @@ fields and towns. Nowhere is safe. Hordes are not placed or scripted: they **hap
 > give up. You didn't make too much noise. The herd passes, and you live to fight another day.
 
 Nowhere is safe, and none of it is scripted: it happens naturally from wandering, stimuli and hordes forming.
+
+### Stated goals: cities and highways over months (user, 2026-10-13)
+
+These are goals the simulation should be able to produce **naturally**, from wandering, pathfinding, joining and
+merging, never from a director or a script:
+- **A city as a moving threat.** At the start Louisville is a nightmare, zombies everywhere. Over an in-game year a
+  horde wanders the city and gathers up nearly every zombie in it. The city becomes like a day-night cycle: the parts
+  where the horde is right now are deadly, and the horde keeps moving through the city.
+- **A city emptying onto the highway.** That 10,000+ horde may, on its own, find the highway out of Louisville and
+  leave the city nearly empty, tear down the military checkpoint, and head down the highway towards Muldraugh and
+  West Point.
+- **And the reverse.** A horde from Ekron may follow the Muldraugh highway all the way up to Louisville.
+- **Smaller towns work the same way.** West Point's 2,000 zombies might merge into a horde and leave town with about
+  100 staying behind in alleys and buildings; or the horde might stay in town. Sooner or later another horde passes
+  through, because that is just probability.
 
 ### Success looks like
 - A player in a quiet house sees a horde come down the road with nothing scripted bringing it there.
@@ -88,6 +104,9 @@ Nowhere is safe, and none of it is scripted: it happens naturally from wandering
 | D14 | **Java core, Lua as helper.** The simulation lives in Java (ZombieBuddy): world knowledge, population store, update loop, saving, population takeover. Lua is the helper for game-facing glue: sandbox options, events, steering real zombies, debug UI, console commands, talking to Java through ZombieBuddy-exposed functions. Reason: performance at tens of thousands of zombies and whole-map terrain, and only Java can reach the save's collision data and the native population. The offline test bench is plain Java tests. | 2026-10-10 |
 | D15 | **Idea, not final: structure damage scales with crowd size.** A lone zombie is slow to break in; a crowd is fast; a huge horde crushes through. Example numbers (not final): 1 zombie ≈ 5 in-game hours for a window, 24 for a door; 10 together ≈ 1 hour for a window, 5 for a door; 1,000 ≈ 10 minutes, zombies crushing themselves against doors and windows. Applies to real zombies near players (sub-project 6) and to off-screen wear (sub-project 7). | 2026-10-10 |
 | D16 | **Water blocks zombies everywhere**, off-screen and near players alike, as for real zombies in vanilla. Rivers and streams are crossed only on bridges and roads, so a wide river can make the far bank safe. Supersedes "narrow water crossable at a cost". River and water behaviour may be revisited late, before the mod is finished. | 2026-10-10 |
+| D17 | **Zombies cross the real/simulated boundary by wandering, both ways.** A real zombie near a player can wander out of the loaded area on its own and become simulated, carrying on its way off-screen; a simulated zombie or horde can wander into the loaded area and become real. Crossing is not only caused by the player moving: the population flows in and out around the player continuously, so the edge of the loaded area is never a wall or a spawn line. | 2026-10-13 |
+| D18 | **Built for the "Urban focused" zombie distribution** (the sandbox default): hordes form in towns, then leave them or wander around them. "Uniform" is supported as an afterthought only (its mapping is read from the DLL, not tuned or tested). | 2026-10-13 |
+| D19 | **Hordes form anywhere there are enough zombies, then leave or roam by their own wandering, never by a director.** A horde forms wherever enough zombies come together (D3; the minimum size, about 10 or maybe 5, is part of Q1). The most populated places, the towns, produce the biggest hordes. Every horde follows the same joining and wandering rules: **only through its own wandering and pathfinding** it either leaves along highways, roads and trails (and may meet and join a bigger horde out there) or keeps roaming the area it is in, mostly through its own pathfinding, meeting other hordes there and merging with them. Nothing sends a horde anywhere (D5). See the stated goals in section 1 and Q8. | 2026-10-13 |
 
 ---
 
@@ -156,6 +175,10 @@ See section 5.
 - Real zombies get the mod's wandering through path orders (`pathToLocation`, integer version), within a per-tick
   budget; real hordes walk as a column behind their leader. Vanilla rally groups are switched off.
 - Leaving range turns a real zombie back into the mod's data, keeping its outfit, state and heading.
+- **Both directions by wandering (D17):** real zombies wander out across the loaded area's edge and become simulated,
+  continuing the same heading and destination off-screen; simulated zombies and hordes wander in and become real at
+  the edge, already walking. Neither side treats the edge as a wall or a spawn line, and a horde that straddles the
+  edge stays one horde (part real, part simulated) until it is wholly on one side.
 
 ### 4.5 Population takeover
 - The vanilla off-screen population (`PZPopMan64.dll`) is switched off or emptied, and the mod seeds its own
@@ -245,6 +268,19 @@ Learned while building sub-project 1 (verified against the decompiled 42.21 game
 - **Lua can be syntax-checked offline** with the game's own compiler (`org.luaj.kahluafork.compiler.LexState` in
   `projectzomboid.jar`); the build does this for every mod Lua file.
 
+Learned while building sub-project 3 (formulas in the sub-project 3 spec, section 5):
+- The native population only creates zombies from the values `ZombiePopulationManager.onConfigReloaded` sends it;
+  sending zeros (population, start, peak, respawn multiplier and hours) switches native spawning off without touching
+  the sandbox.
+- Zombies leave the loaded area through `removeChunkFromWorld` (area unloads) and `virtualizeZombie` (one zombie walks
+  onto an unloaded square); they come back through `addChunkToWorld` and the private `addZombieStanding/Moving`.
+  ZombieBuddy's `@Patch.OnEnter(skipOn = true)` skips a game method when the advice returns true.
+- Building zombies are created only when a room is first seen (`VirtualZombieManager.roomSpotted`); Wake Them Up just
+  spots every room of loaded cells. Seeding rooms and skipping that spawn makes such mods unnecessary.
+- B42's zombie Voronoi noise is applied to each chunk's intensity at map load; `LotHeader.getZombieIntensityForChunk`
+  already returns the masked value.
+- Vanilla respawn creates moving groups of at least 10 zombies, not single ones.
+
 Learned while building sub-project 2:
 - Collision chunk type 5 ("no map here") exists in the vanilla files' edge strips; the game's Java reader does not know
   it. Every one of the 4,065 vanilla files parses exactly with it read as a uniform chunk.
@@ -270,7 +306,7 @@ Learned while building sub-project 2:
 | 3 | **Population takeover** | Vanilla off-screen population switched off, mod population seeded, every real zombie caught and attributed | 1, (2) | **Spike first:** which takeover method is clean and safe (native internals); reconciling vanilla chunk saves with the mod's file (section 6) |
 | 4 | **Simulation core** | Levels of detail, scheduling, wandering, local avoidance, encounters, join/merge/split, saving, conservation checks | 2, 3 | Q1 rules; tuning wandering so it looks natural |
 | 5 | **Stimuli and sound model** | Loudness falloff model, source capture (world sounds, helicopter, thunder), horde share rule, individual response; lights and generators as stimuli | 4 | Q2–Q4; MP thunder needs Java |
-| 6 | **Materialisation bridge** | Off-screen ↔ real conversion within budget, real wandering and columns, vanilla rally off, state kept both ways, crowd-scaled break-in speed for real zombies (D15) | 4 | Real-zombie budget (T10); pathfinder load; edge cases at the loaded boundary |
+| 6 | **Materialisation bridge** | Off-screen ↔ real conversion within budget, both ways by wandering across the loaded edge (D17), real wandering and columns, vanilla rally off, state kept both ways, crowd-scaled break-in speed for real zombies (D15) | 4 | Real-zombie budget (T10); pathfinder load; edge cases at the loaded boundary |
 | 7 | **Consequences while away** | Damage ledger applied on load (crowd-scaled wear, D15), generator run-out, corpses | 4, 6 | Knowing player structures off-screen |
 | 8 | **Multiplayer** | Server-side manager, owner-client steering, server ZombieBuddy install, cull settings, dedicated-server tests | 1–7 | Ownership changes; bandwidth |
 | 9 | **Tuning and compatibility** | Sandbox options, performance scaling, Wandering Zombies incompatibility, Starving Zombies and Louder Gunshots behaviour, presets | all | — |
@@ -283,8 +319,9 @@ Each sub-project's design starts by re-reading this document and the relevant re
 |---|---|---|
 | 0 | **Pending (user)** | In-game tests from section 9 |
 | 1 | **Built and merged to `main` (2026-10-10); in-game acceptance passed in single player (rows 1, 3–7b; row 2 blocked by a `TH_` name clash with the user's True Hits mod, so the commands were renamed to `Hordes_`; rows 8–10 skipped by the user)** | 42 offline tests. Java core (lifecycle, game-time clock, scheduler with update buckets, entity store, crash-safe versioned save file matched to full and hot saves), ZombieBuddy hooks, Lua console commands (`Hordes_status`, `Hordes_stats`, `Hordes_debug`, `Hordes_save`, `Hordes_seedTest`, `Hordes_clearTest`, `Hordes_map`), debug map, build and deploy scripts. Acceptance: `docs/TESTING.md` rows 1–9 (and 7b). Deferred minor issues from its final review are listed below |
-| 2 | **Built on branch `sp2-world-knowledge` (2026-10-10); in-game acceptance pending** | Coarse 8×8-tile grid of the whole map (about 30 MB) built on a background thread from the collision files (save copy first), zones, and the roads and trails in each map folder's `streets.xml` and `worldmap.xml` (new `TRAIL` terrain); tile detail on request; live updates from `MapCollisionData.addChunkToWorld` / `squareChanged`; `Hordes_world()`; terrain and wall layer on the debug map. Vanilla map build: 2.0 s, 28.8 MB with 1,098 streets, 2,867 world-map roads and 502 trails (RealMapTest). Spec and plan: `docs/superpowers/specs|plans/2026-10-10-sp2-world-knowledge*`. Acceptance: `docs/TESTING.md` sub-project 2 rows 1–7 |
-| 3–9 | Not started | |
+| 2 | **Built and merged (2026-10-12); accepted in game (terrain map; live-change rows deferred to the full end test)** | Coarse 8×8-tile grid of the whole map (about 30 MB) built on a background thread from the collision files (save copy first), zones, and the roads and trails in each map folder's `streets.xml` and `worldmap.xml` (new `TRAIL` terrain); tile detail on request; live updates from `MapCollisionData.addChunkToWorld` / `squareChanged`; `Hordes_world()`; terrain and wall layer on the debug map. Vanilla map build: 2.0 s, 28.8 MB with 1,098 streets, 2,867 world-map roads and 502 trails (RealMapTest). Spec and plan: `docs/superpowers/specs|plans/2026-10-10-sp2-world-knowledge*`. Acceptance: `docs/TESTING.md` sub-project 2 rows 1–7 |
+| 3 | **Built on branch `sp3-population-takeover` (2026-10-13); in-game acceptance pending** | Native off-screen spawning switched off; zombies leaving the loaded area (unloading or walking off) held by the mod with outfit, state flags, ID, target and ModData; held zombies spawned back through the game's own spawn code when their area loads; duplicates resolved by persistent ID; a new game seeded across the whole map on a background thread with vanilla's formulas (Voronoi-masked chunk intensity, Population, start/peak curve, rooms by option `BuildingZombiesSeeded`); hourly growth for unvisited cells and respawn groups moving from unseen chunks to the map's edges over `EdgeArrivalMonths`; existing saves taken over gradually; save format 2. Spec and plan: `docs/superpowers/specs|plans/2026-10-13-sp3-population-takeover*`. Acceptance: `docs/TESTING.md` sub-project 3 rows |
+| 4–9 | Not started | |
 
 Deferred minor issues from sub-project 1's final review (fix when the code they touch is next changed):
 - the scheduler's pending time is not reset between worlds (matters once systems run on an interval);
@@ -302,13 +339,14 @@ Deferred minor issues from sub-project 1's final review (fix when the code they 
 
 | # | Question | Needed by |
 |---|---|---|
-| Q1 | Joining and merging rules: bump distance; how far an individual can see a horde and the minimum size (about 10+); merge rules; what makes a horde split. **Left open on purpose:** the user adds these before sub-project 4 starts; do not invent them. | Sub-project 4 |
+| Q1 | Joining and merging rules: bump distance; how far an individual can see a horde; the minimum horde size (about 10, or maybe 5: user to decide); merge rules; what makes a horde split. **Left open on purpose:** the user adds these before sub-project 4 starts; do not invent them. User's idea to include (2026-10-13): a small share of zombies (about 1 in 100 to 1 in 1,000) **refuse to join** hordes and stay behind, sitting or lingering in or outside buildings, so a town whose horde is on the far side (looting feels safe for 4–6 in-game hours) can still surprise the player (see Q8). | Sub-project 4 |
 | Q2 | Stimuli other than sound, and their weights: thunder or lightning, base lights after the power goes off, players seen, other hordes | Sub-project 5 |
 | Q3 | Sound numbers: loudness per source, falloff rate, hearing threshold, horde share curve, "switch to a louder sound" rule | Sub-project 5 (tuning) |
 | Q4 | Do real zombies near players keep vanilla hearing, or use the mod's sound model? | Sub-project 5/6 |
 | Q5 | Population start: how many zombies, where, and whether any arrive from the map edges over time | Sub-project 3 |
 | Q6 | Is "real only if the player could see it" wanted near players, or distance only? | Sub-project 6 |
 | Q7 | Crowd-scaled structure damage (D15): final numbers, the curve between 1, 10 and 1,000 zombies, and how it works for real zombies (vanilla thumping changed in Java) versus off-screen wear | Sub-projects 6, 7 |
+| Q8 | **Towns can empty out, but it should be hard and it must always be emergent (needs more iteration by the user).** There is **no fixed rule** such as "x zombies can never leave town": whether a town empties, partly empties or keeps its horde is decided by horde wandering and pathfinding, so it is effectively random. Example: West Point's 2,000 zombies merge into a horde and leave, while about 100 stay behind in alleys and buildings; or the horde stays in town. Another horde will eventually pass through any town, by probability. Mechanisms that make emptying hard without forbidding it (all to tune; rates and triggers are the user's): (1) **stragglers / leftovers**: a small share of zombies (about 1 in 100 to 1 in 1,000) refuse to join hordes and stay behind, sitting or lingering in or outside buildings (also noted under Q1); (2) **break-aways**: zombies occasionally drop out of a moving horde, not many but enough that a town keeps some; possible triggers to explore: an in-game meta event, a zombie getting stuck on a door or window, a horde squeezing through an alley and leaving a few behind in it. | Sub-project 4 |
 
 ---
 
