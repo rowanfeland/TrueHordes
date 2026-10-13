@@ -32,6 +32,7 @@ public final class TestRunner {
         WorldTest.class,
         RealMapTest.class,
         RoadFilesTest.class,
+        FormulaTest.class,
     };
 
     public static void main(String[] args) {
