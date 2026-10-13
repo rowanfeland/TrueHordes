@@ -13,9 +13,16 @@ are until sub-project 4, and the arrival step here is a basic one until sub-proj
 
 ## Decisions made in conversation
 
-- **New games are the target.** Existing saves get option A: the native population stops creating zombies, and the
-  native zombies it already holds join the mod as areas are explored (they arrive real, then are taken when they
-  leave). No bulk absorption.
+- **The mod takes over the population in every game.** A new game is seeded at creation. An existing save is taken
+  over gradually (option A): no seeding, the native population stops creating zombies, and the native zombies it
+  already holds join the mod as areas are explored (they arrive real, then are taken when they leave). No bulk
+  absorption. New games are the intended way to play.
+- **Building zombies part of the population from the start** (new sandbox option `TrueHordes.BuildingZombiesSeeded`,
+  default on): a new game also seeds every building's zombies, room by room with vanilla's room formula, held inside
+  their buildings; the game's own spawn when a room is first seen is skipped (only the zombie spawn; generators and
+  `OnSeeNewRoom` still run), so there is never a second set. Building zombies exist everywhere from day one and can
+  leave buildings once wandering exists. This makes mods like Wake Them Up unnecessary in new games (still harmless).
+  Off: vanilla, building zombies are created real when a room is first seen and join the population when they leave.
 - **Start = vanilla.** Same numbers and distribution as vanilla, from the same settings. Hordes are not placed: they
   form over weeks once wandering exists.
 - **The vanilla population settings feed the mod** instead of the native spawner (Population multiplier, start and
@@ -56,6 +63,10 @@ are until sub-project 4, and the arrival step here is a basic one until sub-proj
   that stored value.
 - **Story and scripted zombies** (vehicle stories, survivor-in-horde rooms, trigger hordes, Lua spawns) are created
   real directly; they reach the mod through the same out-hooks when they leave.
+- **Building zombies** are created only when a player first sees a room: `IsoCell.ProcessSpottedRooms` → (once per
+  room, `RoomDef.doneSpawn`) `OnSeeNewRoom` event, `VirtualZombieManager.roomSpotted(IsoRoom)` (the zombie spawn),
+  then generator spawning in sheds and garages. Wake Them Up only calls `IsoCell.roomSpotted` for every room of loaded
+  cells, one per tick.
 - ZombieBuddy `@Patch.OnEnter(skipOn = true)` can skip the original method; `@Patch.Argument(n)` passes arguments.
 - `KahluaTableImpl.save(ByteBuffer)` / `load(ByteBuffer, int)` serialise a Lua table (used for `ModData`).
 
@@ -93,8 +104,9 @@ are until sub-project 4, and the arrival step here is a basic one until sub-proj
 
 ## 3. Seeding, growth and respawn
 
-- **When**: on the core's first start in a world with no mod save **and** a freshly created world (the exact signal
-  is chosen in the plan from the game code; a mod added to an older save does not seed).
+- **When (new game)**: on the core's first start in a world with **no True Hordes save file and no saved native
+  population** (the save's `zpop` data was never written), i.e. a freshly created world. Otherwise the takeover is
+  gradual (no seeding). The exact check is pinned in the plan from the game code.
 - **Per-chunk target**: vanilla's formula, read out of `PZPopMan64.dll` by the first plan task (from the chunk
   intensity, the population and start/peak multipliers, min/max per chunk and the uniform per-chunk value), checked
   against the game's own per-cell targets in the debug population view.
@@ -102,6 +114,12 @@ are until sub-project 4, and the arrival step here is a basic one until sub-proj
   chunk (sub-project 2's tile queries, which exclude rooms; vanilla also drops held zombies inside rooms of newly
   created chunks). Zombies inside buildings come, as in vanilla, from the game's own building spawns when a chunk is
   first created; they are real and join the population like any other. Outfit 0, no `persistentId` yet.
+- **Building zombies** (option on): for every room of every building on the map (`IsoMetaGrid` building and room
+  definitions, available for the whole map at load), the number vanilla's `VirtualZombieManager.roomSpotted` would
+  create (formula read in the plan), placed on that room's floor tiles at the room's level, held like any other
+  record. A patch on `VirtualZombieManager.roomSpotted` (enter, skip) then stops the game creating them again, only
+  while the option is on and the world was seeded by the mod; rooms of a gradually taken-over save keep the vanilla
+  spawn. Held building zombies arrive like other records when their area loads.
 - **Growth**: the target follows the start → peak curve to the peak day as the DLL computes it; the mod adds the
   difference over time.
 - **Respawn**: every `RespawnHours` (if above 0), cells (256×256) unseen by any player for `RespawnUnseenHours` that
@@ -117,9 +135,11 @@ are until sub-project 4, and the arrival step here is a basic one until sub-proj
   the hand-over counts; `Hordes_seedTest` / `Hordes_clearTest` are retired.
 - Offline tests: records and the 1 → 2 upgrade; chunk and ID indexes; duplicate dropping; seeding counts against the
   formula (with a fake intensity map including Voronoi-zero chunks); growth curve; respawn timing, unseen test and
-  edge share; mod-data blob round trip; hook targets and reflected methods exist in the game jar.
+  edge share; building seeding counts per room and the skip only applying to mod-seeded worlds; the new-game check;
+  mod-data blob round trip; hook targets and reflected methods exist in the game jar.
 - In game (`docs/TESTING.md`): new game → `console.txt` seeded total; the game's population debug view shows native
-  targets at 0; walk into a town → zombies appear (outfits by area); walk away → dots on the map; save, reload →
+  targets at 0; walk into a town → zombies appear (outfits by area), indoors too
+  without opening rooms (building option on), and no second set appears when you look into a room; walk away → dots on the map; save, reload →
   same totals, no duplicates; kill some → total drops; True Hits states survive (when True Hits uses ModData);
   optional dedicated server.
 
