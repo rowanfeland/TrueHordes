@@ -33,6 +33,8 @@ public final class TestRunner {
         RealMapTest.class,
         RoadFilesTest.class,
         FormulaTest.class,
+        RoomCountTest.class,
+        SeederTest.class,
     };
 
     public static void main(String[] args) {
