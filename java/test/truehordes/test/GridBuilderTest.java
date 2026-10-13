@@ -26,16 +26,17 @@ public final class GridBuilderTest {
     public static void testBuildsFromMapFilesAndZones() throws Exception {
         Path dir = Files.createTempDirectory("th-map");
         Path a = FakeCells.cell().chunk(0, 0, CollisionBits.CHUNK_WATER).write(dir, "chunkdata_10_20.bin");
-        WorldSource src = new WorldSource(10, 20, 11, 20, files(10, 20, a), null,
+        Path b = FakeCells.cell().write(dir, "chunkdata_12_20.bin");
+        WorldSource src = new WorldSource(10, 20, 13, 20, java.util.Map.of(WorldSource.key(10, 20), a, WorldSource.key(12, 20), b), null,
             List.of(ZoneShape.rect(Terrain.FOREST, 10 * 256, 20 * 256, 512, 256)));
         BuildReport r = new BuildReport();
         Grid g = GridBuilder.build(src, () -> false, r);
         Check.equal(Terrain.WATER, g.terrain(320, 640), "water chunk at the cell's first chunk");
         Check.equal(Terrain.FOREST, g.terrain(321, 640), "forest zone on empty ground");
         Check.equal(Terrain.UNKNOWN, g.terrain(352, 640), "cell 11 has no file");
-        Check.equal(1, r.cellsFromMap, "one map file");
-        Check.equal(1, r.cellsMissing, "one missing");
-        Check.equal(64L * 32 * 6, g.memoryBytes(), "2 cells of 32x32 chunks, 6 bytes each");
+        Check.equal(2, r.cellsFromMap, "two map files");
+        Check.equal(1, r.cellsMissing, "one missing (cell 13, past the last map file, is clamped off)");
+        Check.equal(96L * 32 * 6, g.memoryBytes(), "3 cells of 32x32 chunks, 6 bytes each");
         Check.isTrue(r.terrainCounts[Terrain.FOREST.code] > 0, "counts filled");
     }
 
