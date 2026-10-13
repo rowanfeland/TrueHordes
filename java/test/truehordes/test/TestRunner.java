@@ -31,6 +31,7 @@ public final class TestRunner {
         GridBuilderTest.class,
         WorldTest.class,
         RealMapTest.class,
+        RoadFilesTest.class,
     };
 
     public static void main(String[] args) {
