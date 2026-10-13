@@ -147,3 +147,35 @@ are until sub-project 4, and the arrival step here is a basic one until sub-proj
 
 Wandering (4), sound (5), the full arrival bridge with budget, columns and walking in across the edge (6),
 consequences (7), multiplayer clients (8), a True Hits hook beyond ModData.
+
+## 5. Vanilla's population formulas (read from `PZPopMan64.dll` and the 42.21 Java, 2026-10-13)
+
+Settings slots in the native config object: `0x168` PopulationMultiplier, `0x16c` PopulationPeakMultiplier, `0x170`
+PopulationStartMultiplier, `0x174` PopulationPeakDay, `0x178` RespawnUnseenHours, `0x17c` RespawnHours, `0x180`
+RespawnMultiplier, `0x184` FollowSoundDistance, `0x188` MinZombiesPerChunk, `0x18c` MaxZombiesPerChunk, `0x190`
+UniformZombiesPerChunk.
+
+- **Per-chunk target** (`0x18000c0c0` → `0x18000c200`): `v = min + (I × PopulationMultiplier / 255) × (max − min)`, where
+  `I` is the chunk intensity (0–255; Voronoi already applied), or `UniformZombiesPerChunk` instead of `I` when the
+  sandbox distribution is "uniform" (mode 2); `v = 0` (target 0) when `I` is 0 or the chunk is excluded. Then:
+  `v < 1` → 1 with probability `v` (`rand(100) < v × 100`), else 0; `trunc(v) == 1` → 1 with probability 50 %;
+  otherwise `trunc(v)`.
+- **Cell fill** (`0x180008b30`): `T` = sum of the 1,024 chunk targets; `N = curve(T, day)`; each chunk with target `t > 0`
+  gets `trunc(t / T × N)` zombies (at least 1 when `N ≥ T`); the remaining `N − placed` go to random chunks with a
+  target (up to 900 tries each). `MinZombiesPerChunk` / `MaxZombiesPerChunk` come from the game's Java fields
+  (`setZombiesMinPerChunk` / `Max`).
+- **Curve** (`0x18000b470`): `day = worldAgeHours / 24`; before `PopulationPeakDay`:
+  `N = trunc(T × start + (T × peak − T × start) × day / peakDay)`; from the peak day on: `N = trunc(T × peak)`.
+- **Respawn** (`0x180020e70`, per loaded native cell): only if `RespawnHours > 0`, and no player is near the cell.
+  `deficit = curve(T, day) − population − pending`; under 10 → nothing (timer reset). Otherwise, once `RespawnHours`
+  have passed since the cell's last respawn, eligible chunks are those not near a player, unseen for
+  `RespawnUnseenHours`, below their own target, and not refilled for `RespawnHours`; `amount = trunc(curve(T, day) ×
+  RespawnMultiplier / 100)` per elapsed period; one **group** of `clamp(amount / 36, 10, deficit)` zombies is placed
+  at a random valid tile of a random eligible chunk and sent walking toward a destination.
+- **Rooms** (`VirtualZombieManager.getZombieCountForRoom`, Java): from the sandbox Zombies setting, the chunk's loot
+  zombie intensity, the room's area and the building's room count; ported as-is (with its randomness).
+
+The mod follows these. The mod's additions, as approved: rooms seeded from the start (option); the whole map seeded at
+once with the curve at the start day; cells nobody has loaded yet grow to the current curve target over time (as
+vanilla fills an untouched cell at the curve value of the day it is first touched); visited cells only regain zombies
+through respawn; respawn groups are placed in unseen chunks or, with the edge share, at the map's edge.
