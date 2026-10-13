@@ -48,10 +48,14 @@ final class GameEnvImpl implements GameEnv {
         IsoMetaGrid grid = IsoWorld.instance == null ? null : IsoWorld.instance.getMetaGrid();
         if (grid == null || grid.maxX < grid.minX) return null;
         List<Map<String, String>> folders = new ArrayList<>();
-        for (MapFiles mf : IsoLot.MapFiles) folders.add(new HashMap<>(mf.infoFileNames));
+        List<Path> mapFolders = new ArrayList<>();
+        for (MapFiles mf : IsoLot.MapFiles) {
+            folders.add(new HashMap<>(mf.infoFileNames));
+            mapFolders.add(Paths.get(mf.mapDirectoryAbsolutePath));
+        }
         Path saveDir = Paths.get(ZomboidFileSystem.instance.getFileNameInCurrentSave("chunkdata"));
         return new WorldSource(grid.minX, grid.minY, grid.maxX, grid.maxY, WorldSource.resolveMapFiles(folders),
-            saveDir, ZoneSnapshot.copy(grid.zones));
+            saveDir, ZoneSnapshot.copy(grid.zones), mapFolders);
     }
 
     private static boolean sandboxBool(String name, boolean fallback) {

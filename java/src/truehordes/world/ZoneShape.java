@@ -94,7 +94,13 @@ public final class ZoneShape {
         return points.length == 2 && distSq(px, py, points[0], points[1], points[0], points[1]) <= limit;
     }
 
-    private static double distSq(double px, double py, double ax, double ay, double bx, double by) {
+    /** Polyline only: the points (x0, y0, x1, y1, ...); shared, never modified. */
+    int[] points() { return points; }
+
+    /** Polyline only: half the line's width. */
+    double halfWidth() { return halfWidth; }
+
+    static double distSq(double px, double py, double ax, double ay, double bx, double by) {
         double dx = bx - ax, dy = by - ay;
         double len = dx * dx + dy * dy;
         double t = len == 0 ? 0 : Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / len));

@@ -85,4 +85,49 @@ public final class ZoneRasterTest {
         byte[] inForest = ZoneRaster.rasterise(List.of(ZoneShape.rect(Terrain.FOREST, 0, 0, 32, 32), trail), 0, 0, 4, 4);
         Check.equal(Terrain.TRAIL.code, code(inForest, 1, 0), "a trail through forest is trail");
     }
+
+    /** Brute force: a chunk is marked when any tile centre (any-tile kinds) or the centre tile (others) is inside. */
+    private static byte[] bruteForce(ZoneShape z, int w, int h) {
+        byte[] out = new byte[w * h];
+        for (int cy = 0; cy < h; cy++) {
+            for (int cx = 0; cx < w; cx++) {
+                boolean hit = false;
+                if (z.terrain.anyTile) {
+                    for (int t = 0; t < 64 && !hit; t++) hit = z.contains(cx * 8 + t % 8, cy * 8 + t / 8);
+                } else {
+                    hit = z.contains(cx * 8 + 4, cy * 8 + 4);
+                }
+                if (hit) out[cy * w + cx] = (byte) z.terrain.code;
+            }
+        }
+        return out;
+    }
+
+    public static void testPolylinesMatchBruteForce() {
+        java.util.Random rnd = new java.util.Random(42);
+        for (int i = 0; i < 60; i++) {
+            int n = 2 + rnd.nextInt(5);
+            int[] pts = new int[n * 2];
+            for (int k = 0; k < pts.length; k++) pts[k] = rnd.nextInt(160);
+            Terrain t = i % 3 == 0 ? Terrain.FOREST : (i % 3 == 1 ? Terrain.ROAD : Terrain.TRAIL);
+            ZoneShape z = ZoneShape.polyline(t, pts, 1 + rnd.nextInt(9));
+            byte[] fast = ZoneRaster.rasterise(List.of(z), 0, 0, 20, 20);
+            Check.isTrue(java.util.Arrays.equals(bruteForce(z, 20, 20), fast), "polyline " + i + " " + java.util.Arrays.toString(pts));
+        }
+    }
+
+    public static void testLongPolylineIsFast() {
+        // One long diagonal street with many segments across a 1000x1000-chunk area (the vanilla map is about 2464x1984).
+        int[] pts = new int[202];
+        for (int k = 0; k <= 100; k++) {
+            pts[2 * k] = k * 79;
+            pts[2 * k + 1] = k * 79 + (k % 2) * 5;
+        }
+        ZoneShape street = ZoneShape.polyline(Terrain.ROAD, pts, 6);
+        long t0 = System.nanoTime();
+        byte[] c = ZoneRaster.rasterise(List.of(street), 0, 0, 1000, 1000);
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+        Check.equal(Terrain.ROAD.code, (int) c[500 * 1000 + 500], "on the line");
+        Check.isTrue(ms < 200, "rasterised in " + ms + " ms");
+    }
 }

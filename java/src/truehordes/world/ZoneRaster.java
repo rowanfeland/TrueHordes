@@ -32,13 +32,7 @@ public final class ZoneRaster {
                     else polygonCentres(z, codes, originX, originY, width, cy0, cy1);
                     break;
                 default:
-                    for (int cy = cy0; cy <= cy1; cy++) {
-                        for (int cx = cx0; cx <= cx1; cx++) {
-                            if (road ? anyTile(z, cx, cy) : z.contains(cx * 8 + 4, cy * 8 + 4)) {
-                                mark(codes, originX, originY, width, cx, cy, z.terrain);
-                            }
-                        }
-                    }
+                    polyline(z, codes, originX, originY, width, height);
             }
         }
         return codes;
@@ -72,11 +66,41 @@ public final class ZoneRaster {
         }
     }
 
-    private static boolean anyTile(ZoneShape z, int cx, int cy) {
-        for (int ty = 0; ty < 8; ty++) {
-            for (int tx = 0; tx < 8; tx++) if (z.contains(cx * 8 + tx, cy * 8 + ty)) return true;
+    /** Chunk centre to its farthest tile centre: 3.5 * sqrt(2). */
+    private static final double CHUNK_REACH = 3.5 * Math.sqrt(2);
+
+    /**
+     * Segment by segment, only over the chunks around each segment (a long street's bounding box can span the whole
+     * map). Same result as testing every tile with ZoneShape.contains.
+     */
+    private static void polyline(ZoneShape z, byte[] codes, int ox, int oy, int width, int height) {
+        int[] p = z.points();
+        double half = z.halfWidth(), limit = half * half;
+        int last = p.length >= 4 ? p.length - 4 : 0;
+        for (int i = 0; i <= last; i += 2) {
+            double ax = p[i], ay = p[i + 1];
+            double bx = p.length >= 4 ? p[i + 2] : ax, by = p.length >= 4 ? p[i + 3] : ay;
+            int cx0 = Math.max(Math.floorDiv((int) Math.floor(Math.min(ax, bx) - half - 1), 8), ox);
+            int cx1 = Math.min(Math.floorDiv((int) Math.ceil(Math.max(ax, bx) + half), 8), ox + width - 1);
+            int cy0 = Math.max(Math.floorDiv((int) Math.floor(Math.min(ay, by) - half - 1), 8), oy);
+            int cy1 = Math.min(Math.floorDiv((int) Math.ceil(Math.max(ay, by) + half), 8), oy + height - 1);
+            double reach = (half + CHUNK_REACH) * (half + CHUNK_REACH);
+            for (int cy = cy0; cy <= cy1; cy++) {
+                for (int cx = cx0; cx <= cx1; cx++) {
+                    boolean hit;
+                    if (z.terrain.anyTile) {
+                        if (ZoneShape.distSq(cx * 8 + 4, cy * 8 + 4, ax, ay, bx, by) > reach) continue;
+                        hit = false;
+                        for (int t = 0; t < 64 && !hit; t++) {
+                            hit = ZoneShape.distSq(cx * 8 + t % 8 + 0.5, cy * 8 + t / 8 + 0.5, ax, ay, bx, by) <= limit;
+                        }
+                    } else {
+                        hit = ZoneShape.distSq(cx * 8 + 4.5, cy * 8 + 4.5, ax, ay, bx, by) <= limit;
+                    }
+                    if (hit) mark(codes, ox, oy, width, cx, cy, z.terrain);
+                }
+            }
         }
-        return false;
     }
 
     private static void mark(byte[] codes, int ox, int oy, int width, int cx, int cy, Terrain t) {

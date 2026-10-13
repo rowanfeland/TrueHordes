@@ -53,7 +53,7 @@ public final class RealMapTest {
         Log.setSink(log::add);
         World w = new World();
         try {
-            w.start(new WorldSource(minX, minY, maxX, maxY, files, null, roads));
+            w.start(new WorldSource(minX, minY, maxX, maxY, files, null, roads, List.of(dir)));
             Check.isTrue(w.awaitBuilt(120_000), "built within 2 minutes");
             w.tick();
             String report = w.report();
@@ -67,6 +67,10 @@ public final class RealMapTest {
             Check.isTrue(w.blockedAt(12330, 6722), "water blocks (D16)");
             Check.isTrue(w.canStep(12316, 6716, 12316, 6717), "walk along the bridge");
             Check.isTrue(!w.blockedAt(12316, 6718), "bridge chunk connects");
+            // Spots no Nav zone covers (found by scanning the 42.21 files): only the map's road files make them road.
+            Check.equal(Terrain.ROAD, w.terrainAt(548, 9244), "streets.xml-only road");
+            Check.equal(Terrain.ROAD, w.terrainAt(92, 9436), "world-map-only road");
+            Check.equal(Terrain.TRAIL, w.terrainAt(332, 9596), "world-map trail");
         } finally {
             w.stop();
             Log.setSink(null);
