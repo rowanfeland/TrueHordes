@@ -14,6 +14,11 @@ public final class CoreTest {
         return Files.createTempDirectory("th-core-test").resolve("truehordes/state.bin");
     }
 
+    /** Records scattered around (1000, 2000), standing, no outfit or ID. */
+    private static void addRecords(Core core, int n, Random rnd) {
+        for (int i = 0; i < n; i++) StoreTest.add(core.store(), 1000 + rnd.nextInt(300), 2000 + rnd.nextInt(300));
+    }
+
     public static void testStartsOnFirstTickAndRunsSystems() throws Exception {
         FakeEnv env = new FakeEnv(file());
         Core core = new Core(env);
@@ -40,20 +45,19 @@ public final class CoreTest {
         FakeEnv env = new FakeEnv(file());
         Core core = new Core(env);
         core.tick();
-        Check.equal(500, core.seedTest(500, 1000, 2000, 300, new Random(1)), "seeded");
+        addRecords(core, 500, new Random(1));
         Check.isTrue(core.save(), "saved");
         core.stop();
         Check.equal(0, core.store().size(), "store cleared on stop");
         core.tick();
         Check.equal(500, core.store().size(), "restored after restart");
-        Check.equal(500, core.clearTest(), "cleared placeholders");
     }
 
     public static void testStopThenStartOtherSaveDoesNotLeak() throws Exception {
         FakeEnv env = new FakeEnv(file());
         Core core = new Core(env);
         core.tick();
-        core.seedTest(10, 0, 0, 50, new Random(2));
+        addRecords(core, 10, new Random(2));
         core.save();
         core.stop();
         env.stateFile = file();          // a different save
@@ -73,7 +77,7 @@ public final class CoreTest {
         FakeEnv env = new FakeEnv(file());
         Core core = new Core(env);
         core.tick();
-        core.seedTest(3, 0, 0, 10, new Random(3));
+        addRecords(core, 3, new Random(3));
         core.save();               // mod save at hour 100
         core.stop();
         env.worldAgeHours = 104.0; // world save from 4 hours later (e.g. crash between the two writes)
@@ -124,8 +128,9 @@ public final class CoreTest {
         Core core = new Core(env);
         core.tick();
         core.scheduler().register("churn", 0, dt -> {
-            for (int i = 0; i < 2000; i++) core.store().create((byte) 0, i, i, (byte) 0);
-            core.clearTest();
+            List<Long> ids = new ArrayList<>();
+            for (int i = 0; i < 2000; i++) ids.add(StoreTest.add(core.store(), i, i).id);
+            for (long id : ids) core.store().remove(id);
         });
         List<Throwable> errors = java.util.Collections.synchronizedList(new ArrayList<>());
         Thread saver = new Thread(() -> {
@@ -165,15 +170,6 @@ public final class CoreTest {
         env.client = true;
         now[0] += Core.HOT_SAVE_MIN_MS;
         Check.isTrue(!core.hotSave(), "never on an MP client");
-    }
-
-    public static void testSeedOnlyWhileRunning() throws Exception {
-        FakeEnv env = new FakeEnv(file());
-        Core core = new Core(env);
-        Check.equal(0, core.seedTest(5, 0, 0, 10, new Random(4)), "not running yet");
-        core.tick();
-        Check.equal(5, core.seedTest(5, 0, 0, 10, new Random(4)), "running");
-        Check.isTrue(Files.notExists(SaveFile.backupOf(env.stateFile)), "seeding does not save");
     }
 
     public static void testCoreStartsAndStopsTheWorldMap() throws Exception {

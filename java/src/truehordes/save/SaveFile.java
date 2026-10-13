@@ -14,8 +14,8 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.CRC32;
-import truehordes.store.Entity;
 import truehordes.store.Store;
+import truehordes.store.ZombieRecord;
 import truehordes.util.Log;
 
 /**
@@ -25,9 +25,10 @@ import truehordes.util.Log;
  */
 public final class SaveFile {
     public static final int MAGIC = 0x54485244; // "THRD"
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
+    /** The smallest header of any version (version 1). */
     private static final int HEADER_BYTES = 4 + 4 + 8 + 8 + 8 + 4;
-    private static final int ENTITY_BYTES = 8 + 1 + 4 + 4 + 1;
+    private static final int RECORD_BYTES = 8 + 4 * 3 + 1 + 4 * 5 + 1 + 4;
 
     private SaveFile() {}
 
@@ -43,22 +44,43 @@ public final class SaveFile {
     }
 
     public static void write(Path file, Store store, double worldAgeHours) throws IOException {
+        write(file, store, worldAgeHours, false, new byte[0]);
+    }
+
+    /** Version 2: header, seeded flag, population bookkeeping blob, then every record. */
+    public static void write(Path file, Store store, double worldAgeHours, boolean seeded, byte[] population)
+            throws IOException {
         Path dir = file.toAbsolutePath().getParent();
         if (dir != null) Files.createDirectories(dir);
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream(HEADER_BYTES + store.size() * ENTITY_BYTES + 8);
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream(64 + population.length + store.size() * RECORD_BYTES);
         DataOutputStream out = new DataOutputStream(bytes);
         out.writeInt(MAGIC);
         out.writeInt(VERSION);
         out.writeDouble(worldAgeHours);
         out.writeLong(System.currentTimeMillis());
         out.writeLong(store.nextId());
+        out.writeBoolean(seeded);
+        out.writeInt(population.length);
+        out.write(population);
         out.writeInt(store.size());
-        for (Entity e : store.all()) {
-            out.writeLong(e.id);
-            out.writeByte(e.kind);
-            out.writeFloat(e.x);
-            out.writeFloat(e.y);
-            out.writeByte(e.z);
+        for (ZombieRecord r : store.all()) {
+            out.writeLong(r.id);
+            out.writeFloat(r.x());
+            out.writeFloat(r.y());
+            out.writeFloat(r.z);
+            out.writeByte(r.dir);
+            out.writeInt(r.outfitId);
+            out.writeInt(r.stateFlags);
+            out.writeInt(r.persistentId);
+            out.writeInt(r.targetX);
+            out.writeInt(r.targetY);
+            out.writeBoolean(r.building);
+            if (r.modData == null) {
+                out.writeInt(-1);
+            } else {
+                out.writeInt(r.modData.length);
+                out.write(r.modData);
+            }
         }
         out.flush();
         CRC32 crc = new CRC32();
@@ -98,7 +120,7 @@ public final class SaveFile {
             try {
                 LoadResult r = decode(bak, LoadResult.Status.RECOVERED);
                 Log.warn(problem + "; loaded the backup instead");
-                return new LoadResult(r.status, r.worldAgeHours, r.nextId, r.entities, problem + "; loaded backup");
+                return r.withStatus(r.status, problem + "; loaded backup");
             } catch (IOException | RuntimeException e) {
                 problem += "; backup unreadable too (" + e.getMessage() + ")";
             }
@@ -121,23 +143,52 @@ public final class SaveFile {
         switch (version) {
             case 1:
                 return decodeV1(in, okStatus);
+            case 2:
+                return decodeV2(in, okStatus);
             default:
                 throw new FormatException("unsupported save version " + version);
         }
     }
 
+    /** Version 1 (sub-project 1) held only test placeholders: they are discarded. */
     private static LoadResult decodeV1(DataInputStream in, LoadResult.Status okStatus) throws IOException {
         double worldAge = in.readDouble();
         in.readLong(); // savedAtMillis: informational
         long nextId = in.readLong();
         int count = in.readInt();
         if (count < 0) throw new FormatException("negative entity count");
-        List<Entity> entities = new ArrayList<>(count);
+        in.skipNBytes((long) count * (8 + 1 + 4 + 4 + 1));
+        if (in.available() != 0) throw new FormatException("unexpected trailing data");
+        Log.info("save file version 1: " + count + " test placeholders discarded");
+        return new LoadResult(okStatus, worldAge, nextId, List.of(), false, new byte[0],
+            "version 1 placeholders discarded");
+    }
+
+    private static LoadResult decodeV2(DataInputStream in, LoadResult.Status okStatus) throws IOException {
+        double worldAge = in.readDouble();
+        in.readLong(); // savedAtMillis: informational
+        long nextId = in.readLong();
+        boolean seeded = in.readBoolean();
+        int popLength = in.readInt();
+        if (popLength < 0 || popLength > in.available()) throw new FormatException("bad population length " + popLength);
+        byte[] population = in.readNBytes(popLength);
+        int count = in.readInt();
+        if (count < 0) throw new FormatException("negative record count");
+        List<ZombieRecord> records = new ArrayList<>(Math.min(count, 1 << 20));
         for (int i = 0; i < count; i++) {
-            entities.add(new Entity(in.readLong(), in.readByte(), in.readFloat(), in.readFloat(), in.readByte()));
+            long id = in.readLong();
+            float x = in.readFloat(), y = in.readFloat(), z = in.readFloat();
+            byte dir = in.readByte();
+            int outfit = in.readInt(), flags = in.readInt(), pid = in.readInt(), tx = in.readInt(), ty = in.readInt();
+            boolean building = in.readBoolean();
+            int mdLength = in.readInt();
+            if (mdLength < -1 || mdLength > in.available()) throw new FormatException("bad mod data length " + mdLength);
+            byte[] modData = mdLength < 0 ? null : in.readNBytes(mdLength);
+            records.add(new ZombieRecord(id, x, y, z, dir, outfit, flags, pid, tx, ty, modData, building));
         }
         if (in.available() != 0) throw new FormatException("unexpected trailing data");
-        return new LoadResult(okStatus, worldAge, nextId, entities, okStatus == LoadResult.Status.OK ? "loaded" : "loaded backup");
+        return new LoadResult(okStatus, worldAge, nextId, records, seeded, population,
+            okStatus == LoadResult.Status.OK ? "loaded" : "loaded backup");
     }
 
     private static void setAside(Path file) {

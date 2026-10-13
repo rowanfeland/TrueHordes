@@ -30,17 +30,7 @@ function Hordes_status() return call("status") end
 function Hordes_stats() return call("stats") end
 function Hordes_debug(category, on) return call("debug", category, on) end
 function Hordes_save() return call("save") end
-function Hordes_clearTest() return call("clearTest") end
 function Hordes_world() return call("world") end
-
-function Hordes_seedTest(n)
-    local player = getPlayer()
-    if not player then
-        print("Hordes_seedTest: no player")
-        return "no player"
-    end
-    return call("seedTest", n or 100, player:getX(), player:getY())
-end
 
 --- Debug-map data for a rectangle (see LuaApi.snapshot), or nil when the Java core is not running.
 function TrueHordes.snapshot(minX, minY, maxX, maxY, maxPoints)

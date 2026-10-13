@@ -2,15 +2,14 @@ package truehordes.core;
 
 import java.io.IOException;
 import java.util.Locale;
-import java.util.Random;
 import java.util.function.LongSupplier;
 import truehordes.Version;
 import truehordes.save.LoadResult;
 import truehordes.save.SaveFile;
 import truehordes.sim.Scheduler;
 import truehordes.sim.SimClock;
-import truehordes.store.Entity;
 import truehordes.store.Store;
+import truehordes.store.ZombieRecord;
 import truehordes.util.Log;
 import truehordes.util.Stats;
 import truehordes.world.World;
@@ -42,6 +41,10 @@ public final class Core {
     private String lastLoad = "";
     private double lastSaveHours = Double.NaN;
     private long lastWriteMillis = Long.MIN_VALUE;
+    /** This world's population was seeded by the mod (a new game). Kept across saves. */
+    private boolean seeded;
+    /** Population bookkeeping blob, kept across saves (filled from sub-project 3 task 7). */
+    private byte[] population = new byte[0];
 
     public Core(GameEnv env) {
         this(env, System::currentTimeMillis);
@@ -75,7 +78,7 @@ public final class Core {
         world.tick();
         long t0 = System.nanoTime();
         scheduler.run(clock.advance(env.worldAgeHours()));
-        stats.count("entities", store.size());
+        stats.count("held", store.size());
         stats.time("tick", System.nanoTime() - t0);
     }
 
@@ -88,7 +91,9 @@ public final class Core {
         Log.setDebug("core", env.debugLogging());
         LoadResult r = SaveFile.read(env.stateFile());
         store.clear();
-        for (Entity e : r.entities) store.restore(e);
+        for (ZombieRecord e : r.records) store.restore(e);
+        seeded = r.seeded;
+        population = r.population;
         store.setNextId(r.nextId);
         double now = env.worldAgeHours();
         if (r.status == LoadResult.Status.OK || r.status == LoadResult.Status.RECOVERED) {
@@ -102,7 +107,7 @@ public final class Core {
         lastLoad = r.status + ": " + r.message;
         clock.reset(now);
         state = State.RUNNING;
-        Log.info("started with " + store.size() + " entities (" + lastLoad + ")");
+        Log.info("started with " + store.size() + " held zombies (" + lastLoad + ")");
         try {
             WorldSource src = env.worldSource();
             if (src != null) world.start(src);
@@ -117,10 +122,10 @@ public final class Core {
     public synchronized boolean save() {
         if (state != State.RUNNING || env.isClient()) return false;
         try {
-            SaveFile.write(env.stateFile(), store, env.worldAgeHours());
+            SaveFile.write(env.stateFile(), store, env.worldAgeHours(), seeded, population);
             lastSaveHours = env.worldAgeHours();
             lastWriteMillis = wallClockMillis.getAsLong();
-            Log.debug("core", "saved " + store.size() + " entities");
+            Log.debug("core", "saved " + store.size() + " held zombies");
             return true;
         } catch (IOException e) {
             Log.error("could not write the mod's save file " + env.stateFile(), e);
@@ -149,6 +154,8 @@ public final class Core {
         stats.clear();
         lastSaveHours = Double.NaN;
         lastWriteMillis = Long.MIN_VALUE;
+        seeded = false;
+        population = new byte[0];
     }
 
     public synchronized String status() {
@@ -156,26 +163,9 @@ public final class Core {
         sb.append("True Hordes ").append(Version.VERSION).append(" | state ").append(state);
         if (state == State.DISABLED) sb.append(" (").append(disabledReason).append(')');
         sb.append(" | mode ").append(env.isClient() ? "MP client" : env.isServer() ? "dedicated server" : "single player");
-        sb.append(" | entities ").append(store.size());
+        sb.append(" | held ").append(store.size());
         sb.append(" | last load ").append(lastLoad.isEmpty() ? "-" : lastLoad);
         sb.append(" | last save ").append(Double.isNaN(lastSaveHours) ? "-" : String.format(Locale.ROOT, "world hour %.2f", lastSaveHours));
         return sb.toString();
-    }
-
-    /** Test only: adds placeholder entities scattered in a disc. Returns how many were added (0 if not running). */
-    public synchronized int seedTest(int count, float centerX, float centerY, float radius, Random random) {
-        if (state != State.RUNNING || count <= 0) return 0;
-        for (int i = 0; i < count; i++) {
-            double angle = random.nextDouble() * Math.PI * 2;
-            double dist = Math.sqrt(random.nextDouble()) * radius;
-            store.create(Entity.KIND_PLACEHOLDER, (float) (centerX + Math.cos(angle) * dist),
-                (float) (centerY + Math.sin(angle) * dist), (byte) 0);
-        }
-        return count;
-    }
-
-    /** Test only: removes placeholder entities. */
-    public synchronized int clearTest() {
-        return store.removeKind(Entity.KIND_PLACEHOLDER);
     }
 }

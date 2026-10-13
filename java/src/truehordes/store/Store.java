@@ -8,31 +8,92 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Registry of simulated entities with stable IDs. Main thread only. */
+/**
+ * The zombies the mod holds, with stable IDs and three indexes: by chunk (arrivals, respawn), by the game's
+ * persistent ID (duplicates) and a count per 256x256 cell (population targets). Main thread only (the core is
+ * synchronized for the dedicated server's shutdown thread).
+ */
 public final class Store {
-    private final Map<Long, Entity> byId = new LinkedHashMap<>();
+    private final Map<Long, ZombieRecord> byId = new LinkedHashMap<>();
+    private final Map<Long, List<ZombieRecord>> byChunk = new HashMap<>();
+    private final Map<Integer, ZombieRecord> byPersistentId = new HashMap<>();
+    private final Map<Long, int[]> perCell = new HashMap<>();
     private long nextId = 1;
 
-    public Entity create(byte kind, float x, float y, byte z) {
-        Entity e = new Entity(nextId++, kind, x, y, z);
-        byId.put(e.id, e);
-        return e;
+    public ZombieRecord add(float x, float y, float z, byte dir, int outfitId, int stateFlags, int persistentId,
+                            int targetX, int targetY, byte[] modData, boolean building) {
+        ZombieRecord r = new ZombieRecord(nextId++, x, y, z, dir, outfitId, stateFlags, persistentId, targetX, targetY,
+            modData, building);
+        index(r);
+        return r;
     }
 
-    /** Re-adds a loaded entity with its saved ID. */
-    public void restore(Entity e) {
-        if (byId.putIfAbsent(e.id, e) != null) throw new IllegalStateException("duplicate entity id " + e.id);
-        if (e.id >= nextId) nextId = e.id + 1;
+    /** Re-adds a loaded record with its saved ID. */
+    public void restore(ZombieRecord r) {
+        if (byId.containsKey(r.id)) throw new IllegalStateException("duplicate record id " + r.id);
+        index(r);
+        if (r.id >= nextId) nextId = r.id + 1;
     }
 
-    public Entity get(long id) { return byId.get(id); }
+    private void index(ZombieRecord r) {
+        byId.put(r.id, r);
+        byChunk.computeIfAbsent(key(r.chunkX(), r.chunkY()), k -> new ArrayList<>()).add(r);
+        if (r.persistentId != 0) byPersistentId.put(r.persistentId, r);
+        cellCount(r, 1);
+    }
 
-    public boolean remove(long id) { return byId.remove(id) != null; }
+    private void unindexPosition(ZombieRecord r) {
+        long k = key(r.chunkX(), r.chunkY());
+        List<ZombieRecord> list = byChunk.get(k);
+        if (list != null) {
+            list.remove(r);
+            if (list.isEmpty()) byChunk.remove(k);
+        }
+        cellCount(r, -1);
+    }
 
-    public int removeKind(byte kind) {
-        int before = byId.size();
-        byId.values().removeIf(e -> e.kind == kind);
-        return before - byId.size();
+    private void cellCount(ZombieRecord r, int delta) {
+        long k = key(Math.floorDiv(r.chunkX(), 32), Math.floorDiv(r.chunkY(), 32));
+        int[] c = perCell.computeIfAbsent(k, x -> new int[1]);
+        c[0] += delta;
+        if (c[0] == 0) perCell.remove(k);
+    }
+
+    private static long key(int a, int b) { return ((long) a << 32) | (b & 0xFFFFFFFFL); }
+
+    public ZombieRecord get(long id) { return byId.get(id); }
+
+    public boolean remove(long id) {
+        ZombieRecord r = byId.remove(id);
+        if (r == null) return false;
+        unindexPosition(r);
+        if (r.persistentId != 0 && byPersistentId.get(r.persistentId) == r) byPersistentId.remove(r.persistentId);
+        return true;
+    }
+
+    /** The records in a chunk (a copy). */
+    public List<ZombieRecord> inChunk(int chunkX, int chunkY) {
+        List<ZombieRecord> list = byChunk.get(key(chunkX, chunkY));
+        return list == null ? new ArrayList<>() : new ArrayList<>(list);
+    }
+
+    public ZombieRecord byPersistentId(int persistentId) {
+        return persistentId == 0 ? null : byPersistentId.get(persistentId);
+    }
+
+    /** Moves a record and keeps the indexes right. */
+    public void moved(ZombieRecord r, float x, float y) {
+        unindexPosition(r);
+        r.x = x;
+        r.y = y;
+        byChunk.computeIfAbsent(key(r.chunkX(), r.chunkY()), k -> new ArrayList<>()).add(r);
+        cellCount(r, 1);
+    }
+
+    /** Records held in a 256x256 cell. */
+    public int countInCell(int cellX, int cellY) {
+        int[] c = perCell.get(key(cellX, cellY));
+        return c == null ? 0 : c[0];
     }
 
     public int size() { return byId.size(); }
@@ -42,18 +103,21 @@ public final class Store {
     /** Raises the ID counter (from a save file); never lowers it. */
     public void setNextId(long n) { nextId = Math.max(nextId, n); }
 
-    public Collection<Entity> all() { return Collections.unmodifiableCollection(byId.values()); }
+    public Collection<ZombieRecord> all() { return Collections.unmodifiableCollection(byId.values()); }
 
     public void clear() {
         byId.clear();
+        byChunk.clear();
+        byPersistentId.clear();
+        perCell.clear();
         nextId = 1;
     }
 
-    /** Entities inside [minX,maxX) x [minY,maxY): as points if there are at most maxPoints, else counts per cell. */
+    /** Records inside [minX,maxX) x [minY,maxY): as points if there are at most maxPoints, else counts per cell. */
     public Snapshot snapshot(float minX, float minY, float maxX, float maxY, int maxPoints) {
         int limit = Math.max(1, maxPoints);
-        List<Entity> in = new ArrayList<>();
-        for (Entity e : byId.values()) {
+        List<ZombieRecord> in = new ArrayList<>();
+        for (ZombieRecord e : byId.values()) {
             if (e.x >= minX && e.x < maxX && e.y >= minY && e.y < maxY) in.add(e);
         }
         if (in.size() <= limit) {
@@ -69,7 +133,7 @@ public final class Store {
         double h = Math.max(1, maxY - minY);
         while ((Math.ceil(w / cell) + 1) * (Math.ceil(h / cell) + 1) > limit) cell *= 2;
         Map<Long, int[]> counts = new HashMap<>();
-        for (Entity e : in) {
+        for (ZombieRecord e : in) {
             int cx = (int) Math.floor(e.x / cell);
             int cy = (int) Math.floor(e.y / cell);
             long key = ((long) cx << 32) ^ (cy & 0xffffffffL);
