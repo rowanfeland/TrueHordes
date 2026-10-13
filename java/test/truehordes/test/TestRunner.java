@@ -36,6 +36,7 @@ public final class TestRunner {
         RoomCountTest.class,
         SeederTest.class,
         RespawnerTest.class,
+        TakeoverTest.class,
     };
 
     public static void main(String[] args) {
