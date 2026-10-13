@@ -91,4 +91,13 @@ public final class ChunkInfoTest {
         Check.near(2.0, Terrain.cost(ChunkInfo.summarise(half, 0, 8, Terrain.ROAD.code)), 1e-6, "half open doubles");
         Check.isTrue(Float.isInfinite(Terrain.cost(ChunkInfo.UNLOADED)), "unknown is infinite");
     }
+
+    public static void testTrailTerrain() {
+        short s = ChunkInfo.summarise(FakeCells.fill(0), 0, 8, Terrain.TRAIL.code);
+        Check.equal(Terrain.TRAIL, Terrain.classify(s), "trail zone");
+        Check.near(1.5, Terrain.cost(s), 1e-6, "open trail cost");
+        Check.isTrue(Terrain.TOWN.zonePriority > Terrain.TRAIL.zonePriority, "town beats trail");
+        Check.isTrue(Terrain.TRAIL.zonePriority > Terrain.FARM.zonePriority, "trail beats farm");
+        Check.isTrue(Terrain.TRAIL.anyTile && Terrain.ROAD.anyTile && !Terrain.FOREST.anyTile, "any-tile kinds");
+    }
 }

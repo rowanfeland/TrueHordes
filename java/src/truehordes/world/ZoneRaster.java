@@ -3,8 +3,8 @@ package truehordes.world;
 import java.util.List;
 
 /**
- * Zones to one Terrain code per chunk. A road marks a chunk if it covers any of its tiles (narrow roads are never lost);
- * every other zone needs the chunk's centre tile (cx * 8 + 4, cy * 8 + 4). Where zones overlap, the higher
+ * Zones to one Terrain code per chunk. A road or trail marks a chunk if it covers any of its tiles (narrow ones are
+ * never lost); every other zone needs the chunk's centre tile (cx * 8 + 4, cy * 8 + 4). Where zones overlap, the higher
  * Terrain.zonePriority wins. Polygons are filled by scanlines, so big forests cost one pass per chunk row.
  */
 public final class ZoneRaster {
@@ -18,7 +18,7 @@ public final class ZoneRaster {
             int cy0 = Math.max(Math.floorDiv(z.y, 8), originY);
             int cy1 = Math.min(Math.floorDiv(z.y + z.h - 1, 8), originY + height - 1);
             if (cx0 > cx1 || cy0 > cy1) continue;
-            boolean road = z.terrain == Terrain.ROAD;
+            boolean road = z.terrain.anyTile;
             switch (z.kind) {
                 case RECT:
                     for (int cy = cy0; cy <= cy1; cy++) {

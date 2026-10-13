@@ -2,20 +2,24 @@ package truehordes.world;
 
 /** What a chunk is, for walking. Codes are stored in ChunkInfo (4 bits). Costs are placeholders until sub-project 4. */
 public enum Terrain {
-    UNKNOWN(0, 0, Float.POSITIVE_INFINITY),
-    ROAD(1, 6, 1f),
-    TOWN(2, 5, 2f),
-    FARM(3, 4, 3f),
-    OPEN(4, 1, 3f),
-    FOREST(5, 2, 4f),
-    DEEP_FOREST(6, 3, 6f),
-    BUILDING(7, 0, Float.POSITIVE_INFINITY),
-    WATER(8, 0, Float.POSITIVE_INFINITY);
+    UNKNOWN(0, 0, Float.POSITIVE_INFINITY, false),
+    ROAD(1, 7, 1f, true),
+    TOWN(2, 6, 2f, false),
+    FARM(3, 4, 3f, false),
+    OPEN(4, 1, 3f, false),
+    FOREST(5, 2, 4f, false),
+    DEEP_FOREST(6, 3, 6f, false),
+    BUILDING(7, 0, Float.POSITIVE_INFINITY, false),
+    WATER(8, 0, Float.POSITIVE_INFINITY, false),
+    /** Dirt paths and forest tracks (the world map's highway=trail). */
+    TRAIL(9, 5, 1.5f, true);
 
     public final int code;
     /** Which zone wins where zones overlap (higher wins); 0 for kinds that never come from a zone. */
     public final int zonePriority;
     public final float baseCost;
+    /** Marks a chunk if it covers any of its tiles (narrow roads and trails are never lost); others need the centre. */
+    public final boolean anyTile;
 
     private static final Terrain[] BY_CODE = new Terrain[16];
 
@@ -23,10 +27,11 @@ public enum Terrain {
         for (Terrain t : values()) BY_CODE[t.code] = t;
     }
 
-    Terrain(int code, int zonePriority, float baseCost) {
+    Terrain(int code, int zonePriority, float baseCost, boolean anyTile) {
         this.code = code;
         this.zonePriority = zonePriority;
         this.baseCost = baseCost;
+        this.anyTile = anyTile;
     }
 
     public static Terrain ofCode(int code) {

@@ -75,4 +75,14 @@ public final class ZoneRasterTest {
         Check.isTrue(r.contains(5, 5) && r.contains(6, 6), "inside");
         Check.isTrue(!r.contains(7, 5) && !r.contains(4, 5), "outside");
     }
+
+    public static void testTrailPriorityAndAnyTile() {
+        ZoneShape trail = ZoneShape.rect(Terrain.TRAIL, 14, 0, 2, 32);
+        byte[] alone = ZoneRaster.rasterise(List.of(trail), 0, 0, 4, 4);
+        Check.equal(Terrain.TRAIL.code, code(alone, 1, 0), "any tile counts for trails");
+        byte[] inTown = ZoneRaster.rasterise(List.of(ZoneShape.rect(Terrain.TOWN, 0, 0, 32, 32), trail), 0, 0, 4, 4);
+        Check.equal(Terrain.TOWN.code, code(inTown, 1, 0), "a trail in town stays town");
+        byte[] inForest = ZoneRaster.rasterise(List.of(ZoneShape.rect(Terrain.FOREST, 0, 0, 32, 32), trail), 0, 0, 4, 4);
+        Check.equal(Terrain.TRAIL.code, code(inForest, 1, 0), "a trail through forest is trail");
+    }
 }
