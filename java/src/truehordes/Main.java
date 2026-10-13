@@ -22,6 +22,8 @@ public class Main {
             } else {
                 core.disable("game methods missing (game update?): " + missing);
             }
+            String spawner = Spawner.init();
+            if (spawner != null) core.disable("population takeover unavailable (game update?): " + spawner);
             List<String> liveMissing = HookTargets.missing(HookTargets.LIVE, Main::declaredMethodNames);
             String why = liveMissing.isEmpty() ? LiveBits.init() : "game methods missing: " + liveMissing;
             if (why == null) Log.info("live map updates on");

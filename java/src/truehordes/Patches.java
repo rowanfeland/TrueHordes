@@ -1,8 +1,10 @@
 package truehordes;
 
 import me.zed_0xff.zombie_buddy.Patch;
+import zombie.characters.IsoZombie;
 import zombie.iso.IsoChunk;
 import zombie.iso.IsoGridSquare;
+import zombie.iso.areas.IsoRoom;
 
 /** ZombieBuddy patches. Must stay directly in package truehordes (ZombieBuddy does not scan sub-packages). */
 public final class Patches {
@@ -55,5 +57,40 @@ public final class Patches {
     public static class SquareChanged {
         @Patch.OnExit
         public static void exit(@Patch.Argument(0) IsoGridSquare square) { Hooks.onSquareChanged(square); }
+    }
+
+    /** The game sent its population settings to the native spawner: send zeros instead (the mod spawns). */
+    @Patch(className = HookTargets.POPMAN, methodName = HookTargets.CONFIG_RELOADED)
+    public static class ConfigReloaded {
+        @Patch.OnExit
+        public static void exit() { Hooks.onConfigReloaded(); }
+    }
+
+    /** An area is unloading: the mod takes its zombies before the game hands them to the native population. */
+    @Patch(className = HookTargets.POPMAN, methodName = HookTargets.CHUNK_UNLOADING)
+    public static class ChunkUnloading {
+        @Patch.OnEnter
+        public static void enter(@Patch.Argument(0) IsoChunk chunk) { Hooks.onChunkUnloading(chunk); }
+    }
+
+    /** A zombie walked off the loaded area: the mod takes it instead of the native population (true = skip). */
+    @Patch(className = HookTargets.POPMAN, methodName = HookTargets.WALKED_OFF)
+    public static class WalkedOff {
+        @Patch.OnEnter(skipOn = true)
+        public static boolean enter(@Patch.Argument(0) IsoZombie zombie) { return Hooks.onZombieWalkedOff(zombie); }
+    }
+
+    /** An area loaded: the mod's zombies held there come back real. */
+    @Patch(className = HookTargets.POPMAN, methodName = HookTargets.POP_CHUNK_LOADED)
+    public static class PopulationChunkLoaded {
+        @Patch.OnExit
+        public static void exit(@Patch.Argument(0) IsoChunk chunk) { Hooks.onPopulationChunkLoaded(chunk); }
+    }
+
+    /** A room is seen for the first time: skip the game's zombie spawn when the mod seeded the buildings (true = skip). */
+    @Patch(className = HookTargets.VZM, methodName = HookTargets.ROOM_SPOTTED)
+    public static class RoomSpotted {
+        @Patch.OnEnter(skipOn = true)
+        public static boolean enter(@Patch.Argument(0) IsoRoom room) { return Hooks.onRoomSpotted(room); }
     }
 }

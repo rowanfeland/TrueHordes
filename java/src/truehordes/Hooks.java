@@ -4,7 +4,9 @@ import truehordes.core.Core;
 import truehordes.util.Log;
 import truehordes.world.World;
 import zombie.iso.IsoChunk;
+import zombie.characters.IsoZombie;
 import zombie.iso.IsoGridSquare;
+import zombie.iso.areas.IsoRoom;
 
 /** The only methods patch advice calls. Every call is wrapped so nothing throws into the game. */
 public final class Hooks {
@@ -70,7 +72,52 @@ public final class Hooks {
         }
     }
 
+    public static void onConfigReloaded() {
+        try {
+            PopulationBridge.onConfigReloaded(core);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:config:" + t.getClass().getName(), "population config hook failed", t);
+        }
+    }
+
+    public static void onChunkUnloading(IsoChunk chunk) {
+        try {
+            PopulationBridge.onChunkUnloading(core, chunk);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:unload:" + t.getClass().getName(), "taking zombies from an unloading area failed", t);
+        }
+    }
+
+    /** True when the mod took the zombie and the game's own hand-over must be skipped. */
+    public static boolean onZombieWalkedOff(IsoZombie zombie) {
+        try {
+            return PopulationBridge.onZombieWalkedOff(core, zombie);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:walkoff:" + t.getClass().getName(), "taking a zombie that walked off failed", t);
+            return false;
+        }
+    }
+
+    public static void onPopulationChunkLoaded(IsoChunk chunk) {
+        try {
+            PopulationBridge.onPopulationChunkLoaded(core, chunk);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:arrive:" + t.getClass().getName(), "bringing held zombies into a loaded area failed", t);
+        }
+    }
+
+    /** True when the game's room zombie spawn must be skipped (the mod seeded the buildings). */
+    public static boolean onRoomSpotted(IsoRoom room) {
+        try {
+            return PopulationBridge.onRoomSpotted(core);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:room:" + t.getClass().getName(), "room spawn hook failed", t);
+            return false;
+        }
+    }
+
     public static void onStop() {
+        PopulationBridge.clearLoaded();
         Core c = core;
         if (c == null) return;
         try {

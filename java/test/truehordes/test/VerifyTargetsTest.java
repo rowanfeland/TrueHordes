@@ -52,4 +52,28 @@ public final class VerifyTargetsTest {
             for (String rule : HookTargets.RULES) Check.isTrue(mcd.contains(rule), "rule method " + rule);
         }
     }
+
+    /** Sub-project 3: the takeover's hook targets are required, and the private members it reflects on must exist. */
+    public static void testTakeoverTargetsAndReflectedMembersExist() throws Exception {
+        List<String> all = new java.util.ArrayList<>();
+        for (String[] t : HookTargets.ALL) all.add(t[0] + "." + t[1]);
+        for (String need : List.of("zombie.popman.ZombiePopulationManager.onConfigReloaded",
+                "zombie.popman.ZombiePopulationManager.removeChunkFromWorld",
+                "zombie.popman.ZombiePopulationManager.virtualizeZombie",
+                "zombie.popman.ZombiePopulationManager.addChunkToWorld",
+                "zombie.VirtualZombieManager.roomSpotted")) {
+            Check.isTrue(all.contains(need), "required hook target " + need);
+        }
+        ClassLoader loader = VerifyTargetsTest.class.getClassLoader();
+        Class<?> popman = Class.forName(HookTargets.POPMAN, false, loader);
+        Class<?> dirs = Class.forName("zombie.iso.IsoDirections", false, loader);
+        Class<?> flags = Class.forName("zombie.popman.ZombieStateFlags", false, loader);
+        popman.getDeclaredMethod(HookTargets.ADD_STANDING, float.class, float.class, float.class, dirs, int.class, flags, int.class);
+        popman.getDeclaredMethod(HookTargets.ADD_MOVING, float.class, float.class, float.class, dirs, int.class, flags,
+            int.class, int.class, int.class);
+        popman.getDeclaredMethod(HookTargets.CONFIG_FLOAT, String.class, float.class);
+        for (String f : HookTargets.REFLECTED_FIELDS) popman.getDeclaredField(f);
+        Class<?> rzm = Class.forName("zombie.popman.RealZombieMap", false, loader);
+        rzm.getDeclaredMethod("isLive", int.class);
+    }
 }

@@ -7,6 +7,9 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import truehordes.core.GameEnv;
+import truehordes.population.MapSource;
+import truehordes.population.PlayerNearby;
+import truehordes.population.PopulationSettings;
 import truehordes.world.WorldSource;
 import zombie.GameTime;
 import zombie.SandboxOptions;
@@ -56,6 +59,65 @@ final class GameEnvImpl implements GameEnv {
         Path saveDir = Paths.get(ZomboidFileSystem.instance.getFileNameInCurrentSave("chunkdata"));
         return new WorldSource(grid.minX, grid.minY, grid.maxX, grid.maxY, WorldSource.resolveMapFiles(folders),
             saveDir, ZoneSnapshot.copy(grid.zones), mapFolders);
+    }
+
+    @Override
+    public PopulationSettings populationSettings() {
+        SandboxOptions.ZombieConfig z = SandboxOptions.instance.zombieConfig;
+        PopulationSettings.Builder b = PopulationSettings.vanillaDefaults().toBuilder()
+            .multiplier((float) z.populationMultiplier.getValue())
+            .startMultiplier((float) z.populationStartMultiplier.getValue())
+            .peakMultiplier((float) z.populationPeakMultiplier.getValue())
+            .peakDay(z.populationPeakDay.getValue())
+            .respawnHours((float) z.respawnHours.getValue())
+            .respawnUnseenHours((float) z.respawnUnseenHours.getValue())
+            .respawnMultiplier((float) z.respawnMultiplier.getValue())
+            .zombiesSetting(SandboxOptions.instance.zombies.getValue())
+            .uniformDistribution(SandboxOptions.instance.distribution.getValue() == 2)
+            .buildingZombiesSeeded(sandboxBool("TrueHordes.BuildingZombiesSeeded", true))
+            .edgeArrivalMonths((float) sandboxDouble("TrueHordes.EdgeArrivalMonths", 12.0));
+        try {
+            b.minPerChunk(Spawner.minPerChunk()).maxPerChunk(Spawner.maxPerChunk());
+        } catch (Throwable t) {
+            // keep the game's defaults (0 and 255)
+        }
+        return b.build();
+    }
+
+    @Override
+    public boolean newWorld() {
+        if (java.nio.file.Files.exists(stateFile())) return false;
+        Path zpop = Paths.get(ZomboidFileSystem.instance.getFileNameInCurrentSave("zpop"));
+        if (!java.nio.file.Files.isDirectory(zpop)) return true;
+        try (var listing = java.nio.file.Files.list(zpop)) {
+            return listing.findAny().isEmpty();
+        } catch (java.io.IOException e) {
+            return false;
+        }
+    }
+
+    @Override
+    public MapSource mapSource() { return new GameMapSource(IsoWorld.instance.getMetaGrid()); }
+
+    @Override
+    public void spawnLoadedChunks() { PopulationBridge.spawnLoadedChunks(Hooks.core()); }
+
+    @Override
+    public long[] loadedChunks() { return PopulationBridge.loadedChunks(); }
+
+    @Override
+    public PlayerNearby playerNearby() { return PopulationBridge.playerNearby(); }
+
+    @Override
+    public Map<Long, Integer> realZombiesPerCell() { return PopulationBridge.realZombiesPerCell(); }
+
+    private static double sandboxDouble(String name, double fallback) {
+        try {
+            SandboxOptions.SandboxOption option = SandboxOptions.instance.getOptionByName(name);
+            return option == null ? fallback : Double.parseDouble(option.asConfigOption().getValueAsString());
+        } catch (Throwable t) {
+            return fallback;
+        }
     }
 
     private static boolean sandboxBool(String name, boolean fallback) {

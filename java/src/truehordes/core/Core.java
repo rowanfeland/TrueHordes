@@ -8,6 +8,7 @@ import truehordes.save.LoadResult;
 import truehordes.save.SaveFile;
 import truehordes.sim.Scheduler;
 import truehordes.sim.SimClock;
+import truehordes.population.Takeover;
 import truehordes.store.Store;
 import truehordes.store.ZombieRecord;
 import truehordes.util.Log;
@@ -36,6 +37,7 @@ public final class Core {
     private final SimClock clock = new SimClock();
     private final Scheduler scheduler = new Scheduler(stats);
     private final World world = new World();
+    private final Takeover takeover = new Takeover(store);
     private State state = State.IDLE;
     private String disabledReason = "";
     private String lastLoad = "";
@@ -64,6 +66,22 @@ public final class Core {
     public Scheduler scheduler() { return scheduler; }
 
     public World world() { return world; }
+
+    /** Hand-over bookkeeping; changed only under this core's lock. */
+    public Takeover takeover() { return takeover; }
+
+    /** The mod owns the zombies right now: running on the machine that owns the simulation. */
+    public synchronized boolean ownsPopulation() { return state == State.RUNNING && !env.isClient(); }
+
+    /** The native spawner must stay switched off (even before the core starts, at world load). */
+    public synchronized boolean takesOverPopulation() {
+        return state != State.DISABLED && !env.isClient() && env.enabled();
+    }
+
+    /** The game's room zombie spawn is skipped: the mod seeded this world's buildings. */
+    public synchronized boolean skipRoomSpawns() {
+        return state == State.RUNNING && seeded && env.populationSettings().buildingZombiesSeeded;
+    }
 
     /** Permanently switches the mod off for this game session. */
     public synchronized void disable(String reason) {
@@ -149,6 +167,7 @@ public final class Core {
         if (state == State.RUNNING) Log.info("stopped");
         if (state != State.DISABLED) state = State.IDLE;
         store.clear();
+        takeover.reset();
         world.stop();
         clock.clear();
         stats.clear();

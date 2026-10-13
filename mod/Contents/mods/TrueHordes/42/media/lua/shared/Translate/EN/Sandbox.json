@@ -3,5 +3,9 @@
     "Sandbox_TrueHordes_Enabled": "Enabled",
     "Sandbox_TrueHordes_Enabled_tooltip": "Turns the True Hordes simulation on or off for this world.",
     "Sandbox_TrueHordes_DebugLogging": "Debug logging",
-    "Sandbox_TrueHordes_DebugLogging_tooltip": "Writes extra [TrueHordes] lines to console.txt. Leave off unless testing."
+    "Sandbox_TrueHordes_DebugLogging_tooltip": "Writes extra [TrueHordes] lines to console.txt. Leave off unless testing.",
+    "Sandbox_TrueHordes_BuildingZombiesSeeded": "Building zombies from the start",
+    "Sandbox_TrueHordes_BuildingZombiesSeeded_tooltip": "New games: every building's zombies exist from day one (held by the mod, able to leave buildings), instead of appearing when a room is first seen. Makes mods like Wake Them Up unnecessary.",
+    "Sandbox_TrueHordes_EdgeArrivalMonths": "Months until newcomers arrive from the map edges",
+    "Sandbox_TrueHordes_EdgeArrivalMonths_tooltip": "Respawned zombies first appear in long-unseen areas; over this many months a growing share walks in from the map's edges instead. 0 = always from the edges."
 }

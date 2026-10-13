@@ -18,6 +18,18 @@ public final class HookTargets {
     /** Dedicated server: game time is queued for saving on a timer from the main loop. */
     public static final String SERVER_CHUNK_LOADER = "zombie.network.ServerChunkLoader";
     public static final String HOT_SAVE_SERVER = "saveLater";
+    /** Population takeover (sub-project 3). */
+    public static final String VZM = "zombie.VirtualZombieManager";
+    public static final String CONFIG_RELOADED = "onConfigReloaded";
+    public static final String CHUNK_UNLOADING = "removeChunkFromWorld";
+    public static final String WALKED_OFF = "virtualizeZombie";
+    public static final String POP_CHUNK_LOADED = "addChunkToWorld";
+    public static final String ROOM_SPOTTED = "roomSpotted";
+    /** Private ZombiePopulationManager members the takeover calls or reads by reflection. */
+    public static final String ADD_STANDING = "addZombieStanding";
+    public static final String ADD_MOVING = "addZombieMoving";
+    public static final String CONFIG_FLOAT = "n_configFloat";
+    public static final String[] REFLECTED_FIELDS = {"realZombies", "zombiesMinPerChunk", "zombiesMaxPerChunk"};
     /** An area loaded around a player (MapCollisionData has just computed its 64 tile bits). */
     public static final String CHUNK_LOADED = "addChunkToWorld";
     /** One tile changed (building, breaking, burning). */
@@ -29,6 +41,11 @@ public final class HookTargets {
         {POPMAN, STOP},
         {GAMETIME, HOT_SAVE_SP},
         {SERVER_CHUNK_LOADER, HOT_SAVE_SERVER},
+        {POPMAN, CONFIG_RELOADED},
+        {POPMAN, CHUNK_UNLOADING},
+        {POPMAN, WALKED_OFF},
+        {POPMAN, POP_CHUNK_LOADED},
+        {VZM, ROOM_SPOTTED},
     };
 
     /** Live map updates. Optional: if missing, the world map still builds from the files. */
