@@ -204,4 +204,129 @@ public final class CoreTest {
             truehordes.util.Log.setSink(null);
         }
     }
+
+    /** Two all-walkable cells of collision files and a matching map source (intensity 4: about 2 per chunk). */
+    private static FakeEnv seedEnv() throws Exception {
+        Path dir = Files.createTempDirectory("th-core-seed");
+        java.util.Map<Long, Path> files = new java.util.HashMap<>();
+        files.put(truehordes.world.WorldSource.key(0, 0), FakeCells.cell().write(dir, "chunkdata_0_0.bin"));
+        files.put(truehordes.world.WorldSource.key(1, 0), FakeCells.cell().write(dir, "chunkdata_1_0.bin"));
+        FakeEnv env = new FakeEnv(dir.resolve("truehordes/state.bin"));
+        env.worldSource = new truehordes.world.WorldSource(0, 0, 1, 0, files, null, List.of());
+        env.map = new SeederTest.FakeMap(4);
+        env.worldAgeHours = 0.0;
+        return env;
+    }
+
+    private static void runUntilSeeded(Core core, FakeEnv env) throws Exception {
+        long end = System.currentTimeMillis() + 20_000;
+        while (System.currentTimeMillis() < end && !core.status().contains("population seeded")) {
+            core.tick();
+            Thread.sleep(5);
+        }
+        Check.isTrue(core.status().contains("population seeded"), "seeded in time: " + core.status());
+    }
+
+    public static void testNewWorldSeedsOnceWorldMapReady() throws Exception {
+        Log.setSink(line -> {});
+        try {
+            FakeEnv env = seedEnv();
+            env.newWorld = true;
+            Core core = new Core(env);
+            core.tick();
+            Check.equal(0, core.store().size(), "nothing before the world map is ready");
+            Check.isTrue(core.skipRoomSpawns(), "room spawns already skipped while seeding (no double sets)");
+            runUntilSeeded(core, env);
+            Check.isTrue(core.store().size() > 1000, "seeded: " + core.store().size());
+            Check.isTrue(core.skipRoomSpawns(), "room spawns skipped with the option on");
+        } finally {
+            Log.setSink(null);
+        }
+    }
+
+    public static void testSeedingSpawnsLoadedChunksAfterwards() throws Exception {
+        Log.setSink(line -> {});
+        try {
+            FakeEnv env = seedEnv();
+            env.newWorld = true;
+            Core core = new Core(env);
+            core.tick();
+            Check.equal(1, env.spawnLoadedCalls, "arrivals for chunks loaded at start");
+            runUntilSeeded(core, env);
+            Check.equal(2, env.spawnLoadedCalls, "and again once the seeded zombies exist");
+        } finally {
+            Log.setSink(null);
+        }
+    }
+
+    public static void testExistingSaveIsTakenOverGradually() throws Exception {
+        Log.setSink(line -> {});
+        try {
+            FakeEnv env = seedEnv();
+            env.newWorld = false;
+            Core core = new Core(env);
+            for (int i = 0; i < 50; i++) {
+                core.tick();
+                Thread.sleep(5);
+            }
+            Check.equal(0, core.store().size(), "no seeding in an existing save");
+            Check.isTrue(!core.skipRoomSpawns(), "rooms keep the vanilla spawn");
+            Check.isTrue(core.status().contains("population gradual"), core.status());
+        } finally {
+            Log.setSink(null);
+        }
+    }
+
+    public static void testSeededFlagSurvivesReload() throws Exception {
+        Log.setSink(line -> {});
+        try {
+            FakeEnv env = seedEnv();
+            env.newWorld = true;
+            Core core = new Core(env);
+            core.tick();
+            runUntilSeeded(core, env);
+            int seeded = core.store().size();
+            Check.isTrue(core.save(), "saved");
+            core.stop();
+            env.newWorld = false; // the save exists now
+            core.tick();
+            Check.equal(seeded, core.store().size(), "same population, no second seeding");
+            Check.isTrue(core.status().contains("population seeded"), core.status());
+            Check.isTrue(core.skipRoomSpawns(), "still a mod-seeded world");
+        } finally {
+            Log.setSink(null);
+        }
+    }
+
+    public static void testHourlyUpdateGrowsUnvisitedCells() throws Exception {
+        Log.setSink(line -> {});
+        try {
+            FakeEnv env = seedEnv();
+            env.newWorld = true;
+            Core core = new Core(env);
+            core.tick();
+            runUntilSeeded(core, env);
+            int before = core.store().size();
+            env.worldAgeHours = 40 * 24.0; // past the peak day (peak 1.5x)
+            core.tick();
+            Check.isTrue(core.store().size() > before * 1.3, "grew toward the peak: " + before + " -> " + core.store().size());
+        } finally {
+            Log.setSink(null);
+        }
+    }
+
+    public static void testStatusShowsCounts() throws Exception {
+        Log.setSink(line -> {});
+        try {
+            FakeEnv env = seedEnv();
+            env.newWorld = true;
+            Core core = new Core(env);
+            core.tick();
+            runUntilSeeded(core, env);
+            String s = core.status();
+            for (String part : List.of("held ", "real ", "target ", "hand-over: out ")) Check.isTrue(s.contains(part), part + " in: " + s);
+        } finally {
+            Log.setSink(null);
+        }
+    }
 }

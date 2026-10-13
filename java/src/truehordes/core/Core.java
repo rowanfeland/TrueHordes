@@ -43,10 +43,7 @@ public final class Core {
     private String lastLoad = "";
     private double lastSaveHours = Double.NaN;
     private long lastWriteMillis = Long.MIN_VALUE;
-    /** This world's population was seeded by the mod (a new game). Kept across saves. */
-    private boolean seeded;
-    /** Population bookkeeping blob, kept across saves (filled from sub-project 3 task 7). */
-    private byte[] population = new byte[0];
+    private final PopulationRunner population;
 
     public Core(GameEnv env) {
         this(env, System::currentTimeMillis);
@@ -55,6 +52,7 @@ public final class Core {
     public Core(GameEnv env, LongSupplier wallClockMillis) {
         this.env = env;
         this.wallClockMillis = wallClockMillis;
+        this.population = new PopulationRunner(env, store, world, takeover);
     }
 
     public State state() { return state; }
@@ -80,7 +78,7 @@ public final class Core {
 
     /** The game's room zombie spawn is skipped: the mod seeded this world's buildings. */
     public synchronized boolean skipRoomSpawns() {
-        return state == State.RUNNING && seeded && env.populationSettings().buildingZombiesSeeded;
+        return state == State.RUNNING && population.seededWorld() && population.buildingZombiesSeeded();
     }
 
     /** Permanently switches the mod off for this game session. */
@@ -94,6 +92,7 @@ public final class Core {
         if (state == State.DISABLED || state == State.OFF || env.isClient() || !env.isWorldReady()) return;
         if (state == State.IDLE && !start()) return;
         world.tick();
+        population.tick(env.worldAgeHours());
         long t0 = System.nanoTime();
         scheduler.run(clock.advance(env.worldAgeHours()));
         stats.count("held", store.size());
@@ -110,8 +109,6 @@ public final class Core {
         LoadResult r = SaveFile.read(env.stateFile());
         store.clear();
         for (ZombieRecord e : r.records) store.restore(e);
-        seeded = r.seeded;
-        population = r.population;
         store.setNextId(r.nextId);
         double now = env.worldAgeHours();
         if (r.status == LoadResult.Status.OK || r.status == LoadResult.Status.RECOVERED) {
@@ -133,6 +130,7 @@ public final class Core {
         } catch (Throwable t) {
             Log.error("could not read the map data; terrain knowledge is off", t);
         }
+        population.start(r);
         return true;
     }
 
@@ -140,7 +138,8 @@ public final class Core {
     public synchronized boolean save() {
         if (state != State.RUNNING || env.isClient()) return false;
         try {
-            SaveFile.write(env.stateFile(), store, env.worldAgeHours(), seeded, population);
+            SaveFile.write(env.stateFile(), store, env.worldAgeHours(), population.mode() == PopulationRunner.Mode.SEEDED,
+                population.blob());
             lastSaveHours = env.worldAgeHours();
             lastWriteMillis = wallClockMillis.getAsLong();
             Log.debug("core", "saved " + store.size() + " held zombies");
@@ -173,8 +172,7 @@ public final class Core {
         stats.clear();
         lastSaveHours = Double.NaN;
         lastWriteMillis = Long.MIN_VALUE;
-        seeded = false;
-        population = new byte[0];
+        population.stop();
     }
 
     public synchronized String status() {
@@ -182,7 +180,8 @@ public final class Core {
         sb.append("True Hordes ").append(Version.VERSION).append(" | state ").append(state);
         if (state == State.DISABLED) sb.append(" (").append(disabledReason).append(')');
         sb.append(" | mode ").append(env.isClient() ? "MP client" : env.isServer() ? "dedicated server" : "single player");
-        sb.append(" | held ").append(store.size());
+        if (state == State.RUNNING) sb.append(population.status(env.worldAgeHours()));
+        else sb.append(" | held ").append(store.size());
         sb.append(" | last load ").append(lastLoad.isEmpty() ? "-" : lastLoad);
         sb.append(" | last save ").append(Double.isNaN(lastSaveHours) ? "-" : String.format(Locale.ROOT, "world hour %.2f", lastSaveHours));
         return sb.toString();

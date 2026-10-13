@@ -226,6 +226,43 @@ public final class World {
         return sb.toString();
     }
 
+    /**
+     * Walkable chunks within two chunks of the map's outer edge (no-data chunks or the grid's border): where newcomers
+     * arrive later in a game. Keys chunkX << 32 | chunkY; empty if the map is not ready.
+     */
+    public long[] edgeChunks() {
+        Grid g = grid;
+        if (g == null) return new long[0];
+        java.util.Set<Long> out = new java.util.LinkedHashSet<>();
+        for (int iy = 0; iy < g.height; iy++) {
+            for (int ix = 0; ix < g.width; ix++) {
+                int cx = g.originX + ix, cy = g.originY + iy;
+                boolean border = ix < 2 || iy < 2 || ix >= g.width - 2 || iy >= g.height - 2;
+                if (g.terrain(cx, cy) == Terrain.UNKNOWN) {
+                    boolean nextToKnown = false;
+                    for (Dir d : Dir.values()) {
+                        if (g.index(cx + d.dx, cy + d.dy) >= 0 && g.terrain(cx + d.dx, cy + d.dy) != Terrain.UNKNOWN) nextToKnown = true;
+                    }
+                    if (!nextToKnown) continue;
+                    for (int dy = -2; dy <= 2; dy++) {
+                        for (int dx = -2; dx <= 2; dx++) addEdge(g, cx + dx, cy + dy, out);
+                    }
+                } else if (border) {
+                    addEdge(g, cx, cy, out);
+                }
+            }
+        }
+        long[] keys = new long[out.size()];
+        int i = 0;
+        for (long k : out) keys[i++] = k;
+        return keys;
+    }
+
+    private static void addEdge(Grid g, int cx, int cy, java.util.Set<Long> out) {
+        if (g.index(cx, cy) < 0 || g.terrain(cx, cy) == Terrain.UNKNOWN || g.blocked(cx, cy)) return;
+        out.add(WorldSource.key(cx, cy));
+    }
+
     /** Terrain codes every step tiles (step rounded up to a multiple of 8) over the rectangle; null if not ready. */
     public TerrainSample terrainSample(int minX, int minY, int maxX, int maxY, int step) {
         Grid g = grid;

@@ -221,4 +221,26 @@ public final class WorldTest {
             Log.setSink(null);
         }
     }
+
+    public static void testEdgeChunksRingTheMap() throws Exception {
+        Log.setSink(line -> {});
+        try {
+            Path dir = Files.createTempDirectory("th-edge");
+            Path p = FakeCells.cell().write(dir, "chunkdata_0_0.bin");
+            Map<Long, Path> files = new HashMap<>();
+            files.put(WorldSource.key(0, 0), p);
+            World w = new World();
+            w.start(new WorldSource(0, 0, 0, 0, files, null, List.of()));
+            Check.isTrue(w.awaitBuilt(10_000), "built");
+            w.tick();
+            long[] edge = w.edgeChunks();
+            Check.equal(32 * 32 - 28 * 28, edge.length, "a ring two chunks wide around a one-cell map");
+            for (long k : edge) {
+                int cx = (int) (k >> 32), cy = (int) k;
+                Check.isTrue(cx < 2 || cy < 2 || cx > 29 || cy > 29, "on the ring: " + cx + "," + cy);
+            }
+        } finally {
+            Log.setSink(null);
+        }
+    }
 }
