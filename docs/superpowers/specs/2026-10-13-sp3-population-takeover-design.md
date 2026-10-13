@@ -98,9 +98,10 @@ are until sub-project 4, and the arrival step here is a basic one until sub-proj
 - **Per-chunk target**: vanilla's formula, read out of `PZPopMan64.dll` by the first plan task (from the chunk
   intensity, the population and start/peak multipliers, min/max per chunk and the uniform per-chunk value), checked
   against the game's own per-cell targets in the debug population view.
-- **Seeding** places each chunk's target as individual standing zombies at random walkable tiles of that chunk
-  (world-knowledge tile queries; buildings' interiors count as the game allows: rooms are skipped like
-  `newChunks`). Outfit 0, no `persistentId` yet.
+- **Seeding** places each chunk's target as individual standing zombies at random outdoor walkable tiles of that
+  chunk (sub-project 2's tile queries, which exclude rooms; vanilla also drops held zombies inside rooms of newly
+  created chunks). Zombies inside buildings come, as in vanilla, from the game's own building spawns when a chunk is
+  first created; they are real and join the population like any other. Outfit 0, no `persistentId` yet.
 - **Growth**: the target follows the start → peak curve to the peak day as the DLL computes it; the mod adds the
   difference over time.
 - **Respawn**: every `RespawnHours` (if above 0), cells (256×256) unseen by any player for `RespawnUnseenHours` that
