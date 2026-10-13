@@ -84,16 +84,32 @@ final class GameEnvImpl implements GameEnv {
         return b.build();
     }
 
+    private static String newWorldDir;
+    private static boolean newWorldFlag;
+
+    /**
+     * Called while the game initialises the population (before it first saves a new world): remembers whether this
+     * world has never been saved. The game saves a new world (map_t.bin, zpop) before the core's first tick, so the
+     * check cannot wait until then.
+     */
+    static synchronized void noteWorldLoading() {
+        String dir = ZomboidFileSystem.instance.getFileNameInCurrentSave("");
+        if (dir.equals(newWorldDir)) return;
+        newWorldDir = dir;
+        newWorldFlag = neverSaved();
+    }
+
+    private static boolean neverSaved() {
+        return !java.nio.file.Files.exists(Paths.get(ZomboidFileSystem.instance.getFileNameInCurrentSave("truehordes", "state.bin")))
+            && !java.nio.file.Files.exists(Paths.get(ZomboidFileSystem.instance.getFileNameInCurrentSave("map_t.bin")));
+    }
+
     @Override
     public boolean newWorld() {
-        if (java.nio.file.Files.exists(stateFile())) return false;
-        Path zpop = Paths.get(ZomboidFileSystem.instance.getFileNameInCurrentSave("zpop"));
-        if (!java.nio.file.Files.isDirectory(zpop)) return true;
-        try (var listing = java.nio.file.Files.list(zpop)) {
-            return listing.findAny().isEmpty();
-        } catch (java.io.IOException e) {
-            return false;
+        synchronized (GameEnvImpl.class) {
+            if (ZomboidFileSystem.instance.getFileNameInCurrentSave("").equals(newWorldDir)) return newWorldFlag;
         }
+        return neverSaved();
     }
 
     @Override

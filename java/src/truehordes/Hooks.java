@@ -74,6 +74,7 @@ public final class Hooks {
 
     public static void onConfigReloaded() {
         try {
+            GameEnvImpl.noteWorldLoading();
             PopulationBridge.onConfigReloaded(core);
         } catch (Throwable t) {
             Log.errorOnce("hook:config:" + t.getClass().getName(), "population config hook failed", t);
