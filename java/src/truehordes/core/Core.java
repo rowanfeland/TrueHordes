@@ -76,9 +76,14 @@ public final class Core {
         return state != State.DISABLED && !env.isClient() && env.enabled();
     }
 
-    /** The game's room zombie spawn is skipped: the mod seeded this world's buildings. */
+    /**
+     * The game's room zombie spawn is skipped: the mod seeds (or seeded) this world's buildings. Also before the core
+     * starts in a new world, because the game can see the first rooms in the frames before the core's first tick.
+     */
     public synchronized boolean skipRoomSpawns() {
-        return state == State.RUNNING && population.seededWorld() && population.buildingZombiesSeeded();
+        if (state == State.RUNNING) return population.seededWorld() && population.buildingZombiesSeeded();
+        return state == State.IDLE && !env.isClient() && env.enabled() && env.populationSettings().buildingZombiesSeeded
+            && env.newWorld();
     }
 
     /** Permanently switches the mod off for this game session. */

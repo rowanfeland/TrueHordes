@@ -329,4 +329,21 @@ public final class CoreTest {
             Log.setSink(null);
         }
     }
+
+    /** Final review: rooms seen in the first frames of a new game, before the core starts, must not spawn a second set. */
+    public static void testRoomSpawnsSkippedBeforeStartInNewWorld() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        env.newWorld = true;
+        Core core = new Core(env);
+        Check.equal(Core.State.IDLE, core.state(), "not started yet");
+        Check.isTrue(core.skipRoomSpawns(), "new world, building option on: skipped from the first frame");
+        env.settings = env.settings.toBuilder().buildingZombiesSeeded(false).build();
+        Check.isTrue(!core.skipRoomSpawns(), "option off: vanilla room spawns");
+        env.settings = env.settings.toBuilder().buildingZombiesSeeded(true).build();
+        env.newWorld = false;
+        Check.isTrue(!core.skipRoomSpawns(), "existing save: vanilla room spawns");
+        env.newWorld = true;
+        env.enabled = false;
+        Check.isTrue(!core.skipRoomSpawns(), "mod switched off in the sandbox: vanilla");
+    }
 }
