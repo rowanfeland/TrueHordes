@@ -121,7 +121,7 @@ public final class Hooks {
     public static boolean rallyOff() {
         try {
             Core c = core;
-            return c != null && c.takesOverPopulation();
+            return c != null && c.rallyOff();
         } catch (Throwable t) {
             Log.errorOnce("hook:rally:" + t.getClass().getName(), "rally hook failed", t);
             return false;

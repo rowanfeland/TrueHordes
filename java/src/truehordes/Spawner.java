@@ -67,7 +67,7 @@ final class Spawner {
     static Result spawn(ZombieRecord r) throws ReflectiveOperationException {
         ArrayList<IsoZombie> list = IsoWorld.instance.currentCell.getZombieList();
         int before = list.size();
-        IsoDirections dir = IsoDirections.fromIndex(r.dir);
+        IsoDirections dir = IsoDirections.fromIndex(ZombieRecord.dirOf(r.heading)); // where it is walking now
         ZombieStateFlags state = ZombieStateFlags.fromInt(r.stateFlags);
         ZombiePopulationManager pm = ZombiePopulationManager.instance;
         if (r.hasTarget()) {

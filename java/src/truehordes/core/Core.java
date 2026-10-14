@@ -52,6 +52,8 @@ public final class Core {
     private SimThread simThread;
     /** World hour as of the last tick, for the simulation thread (it never calls into the game). */
     private volatile double simNowHours;
+    /** Mirrors takesOverPopulation() without the lock, for the per-zombie, per-frame rally hook. */
+    private volatile boolean rallyOff;
     private double lastConservationHours = Double.NaN;
 
     /** Background slice length and pause (spec 5). */
@@ -107,6 +109,9 @@ public final class Core {
             && env.newWorld();
     }
 
+    /** Vanilla rally groups are skipped (lock-free; refreshed every tick). */
+    public boolean rallyOff() { return rallyOff && state != State.DISABLED; }
+
     /** Permanently switches the mod off for this game session. */
     public synchronized void disable(String reason) {
         state = State.DISABLED;
@@ -118,6 +123,7 @@ public final class Core {
         if (state == State.DISABLED || state == State.OFF || env.isClient() || !env.isWorldReady()) return;
         if (state == State.IDLE && !start()) return;
         world.tick();
+        rallyOff = !env.isClient() && env.enabled();
         population.tick(env.worldAgeHours());
         simNowHours = env.worldAgeHours();
         if (sim != null && sim.takeLayoutDue()) env.spawnLoadedChunks();

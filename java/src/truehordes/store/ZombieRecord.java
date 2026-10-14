@@ -21,8 +21,9 @@ public final class ZombieRecord {
     public final int stateFlags;
     /** The game's persistent zombie ID; 0 = none yet (the game assigns one when it becomes real). */
     public final int persistentId;
-    public final int targetX;
-    public final int targetY;
+    /** Walking target kept from the real zombie; dropped once the simulation walks it elsewhere. */
+    public int targetX;
+    public int targetY;
     /** The zombie's ModData as saved by the game's Lua table serialiser; null = none. Never modified. */
     public final byte[] modData;
     /** Seeded inside a building (option BuildingZombiesSeeded). */

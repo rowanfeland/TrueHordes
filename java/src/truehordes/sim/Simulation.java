@@ -310,6 +310,8 @@ public final class Simulation {
                 } else {
                     store.moved(r, st.x(), st.y());
                     r.heading = st.heading();
+                    r.targetX = ZombieRecord.NO_TARGET; // it walked somewhere else: the old target is stale
+                    r.targetY = ZombieRecord.NO_TARGET;
                 }
                 r.pauseMinutes = st.boxedIn() ? 10f : Movement.rollPause((float) dt, random);
             }

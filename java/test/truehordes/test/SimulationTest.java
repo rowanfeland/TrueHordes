@@ -148,6 +148,16 @@ public final class SimulationTest {
         Check.isTrue(drift < 40, "no shared direction without sounds or hordes (mean drift " + drift + " tiles)");
     }
 
+    /** Final review I3: a zombie that walked off screen forgets its old walking target. */
+    public static void testWalkingClearsAnOldTarget() {
+        Store s = new Store();
+        ZombieRecord r = s.add(800, 800, 0, (byte) 6, 0, 0, 0, 900, 900, null, false);
+        r.strRolled = true;
+        Simulation sim = new Simulation(s, openMap(200, -1), quiet(), 1, 0);
+        run(sim, 0, 2);
+        Check.isTrue(!r.hasTarget(), "the stale target is dropped once it walks");
+    }
+
     public static void testRealChunksSkipped() {
         Store s = new Store();
         ZombieRecord r = add(s, 100 * 8 + 4, 100 * 8 + 4, 0);

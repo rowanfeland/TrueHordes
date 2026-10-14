@@ -44,6 +44,16 @@ public final class Movement {
      */
     public float chooseHeading(float x, float y, float heading, float pullX, float pullY, float pullWeight,
                                DoubleSupplier rng) {
+        return choose(x, y, heading, pullX, pullY, pullWeight, rng, false);
+    }
+
+    private float chooseBehind(float x, float y, float heading, float pullX, float pullY, float pullWeight,
+                               DoubleSupplier rng) {
+        return choose(x, y, normalise(heading + (float) Math.PI), pullX, pullY, pullWeight, rng, true);
+    }
+
+    private float choose(float x, float y, float heading, float pullX, float pullY, float pullWeight,
+                         DoubleSupplier rng, boolean behind) {
         int cx = chunk(x), cy = chunk(y);
         boolean onRoad = map.rank(cx, cy) == 1;
         float pullAngle = pullWeight > 0 ? (float) Math.atan2(pullY - y, pullX - x) : 0f;
@@ -74,7 +84,11 @@ public final class Movement {
             w[i] = Math.exp(score) * (i == FAN.length - 1 ? BACK_WEIGHT : 1);
             total += w[i];
         }
-        if (total == 0) return Float.NaN;
+        if (total == 0) {
+            // Nothing in the fan: look the other way round (the gaps at about +-135 degrees), else truly boxed in.
+            if (!behind) return chooseBehind(x, y, heading, pullX, pullY, pullWeight, rng);
+            return Float.NaN;
+        }
         // On a road, a heading that leaves it is only allowed on an off-road roll.
         for (int i = 0; i < FAN.length; i++) {
             kept[i] = w[i];

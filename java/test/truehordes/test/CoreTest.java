@@ -153,6 +153,29 @@ public final class CoreTest {
         core.stop();
     }
 
+    /** Final review I2: the rally hook runs per real zombie per frame and must not wait for the simulation's lock. */
+    public static void testRallyCheckDoesNotWaitForTheLock() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        Core core = new Core(env);
+        core.tick();
+        java.util.concurrent.CountDownLatch held = new java.util.concurrent.CountDownLatch(1);
+        Thread t = new Thread(() -> {
+            synchronized (core) {
+                held.countDown();
+                try { Thread.sleep(500); } catch (InterruptedException e) { }
+            }
+        });
+        t.start();
+        held.await();
+        long t0 = System.nanoTime();
+        boolean off = core.rallyOff();
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+        Check.isTrue(off, "rally groups off while the mod runs");
+        Check.isTrue(ms < 100, "answered without waiting for the lock (" + ms + " ms)");
+        t.join();
+        core.stop();
+    }
+
     public static void testWaitsForWorld() throws Exception {
         FakeEnv env = new FakeEnv(file());
         env.worldReady = false;

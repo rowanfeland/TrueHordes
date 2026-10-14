@@ -187,6 +187,22 @@ public final class MovementTest {
         Check.isTrue(Float.isNaN(mv.chooseHeading(tile(1), tile(1), EAST, 0, 0, 0, rng::nextDouble)), "no heading");
     }
 
+    /** Final review I4: the only way out is behind and to the side (about 135 degrees): the walker must find it. */
+    public static void testFindsAWayOutBehindTheFan() {
+        TextMap m = new TextMap(
+            "~~~~~~~",
+            "~~~O~~~",
+            "~~O~~~~",
+            "~O~~~~~",
+            "~~~~~~~");
+        // At (3,1) heading east: east, NE/SE, N/S and west are water; the only way on is south-west.
+        Movement mv = move(m, 0.1);
+        Random rng = new Random(9);
+        float h = mv.chooseHeading(tile(3), tile(1), EAST, 0, 0, 0, rng::nextDouble);
+        Check.isTrue(!Float.isNaN(h), "a way out is found");
+        Check.isTrue(Math.cos(h) < 0 && Math.sin(h) > 0, "south-west");
+    }
+
     public static void testTightChunksCounted() {
         TextMap alley = new TextMap(
             "BBBBBBBBB",
