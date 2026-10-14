@@ -103,22 +103,82 @@ public final class LuaApi {
         }
     }
 
+    /** Debug: a sound at (x, y) heard for half an in-game hour (default 90 dB); zombies in range head for it. */
+    @LuaMethod(name = "Hordes_j_sound", global = true)
+    public static String sound(Object x, Object y, Object loudness) {
+        Core c = Hooks.core();
+        if (c == null) return NOT_INSTALLED;
+        float db = LuaArgs.toFloat(loudness, 90f);
+        synchronized (c) {
+            truehordes.sim.Simulation sim = c.simulation();
+            if (sim == null) return "not running (state " + c.state() + ")";
+            float sx = LuaArgs.toFloat(x, 0), sy = LuaArgs.toFloat(y, 0);
+            sim.addSound(sx, sy, db, 0.5);
+            return String.format(java.util.Locale.ROOT, "sound at %.0f,%.0f (%.0f dB) heard to about %.0f tiles for 30 in-game minutes",
+                sx, sy, db, truehordes.sim.Hearing.range(db));
+        }
+    }
+
+    /** Debug: the 20 biggest hordes. */
+    @LuaMethod(name = "Hordes_j_hordes", global = true)
+    public static String hordes() {
+        Core c = Hooks.core();
+        if (c == null) return NOT_INSTALLED;
+        synchronized (c) {
+            truehordes.sim.Simulation sim = c.simulation();
+            if (sim == null) return "not running (state " + c.state() + ")";
+            java.util.List<truehordes.sim.Horde> list = new java.util.ArrayList<>(sim.hordes().all());
+            list.sort((a, b) -> Integer.compare(b.size(), a.size()));
+            StringBuilder sb = new StringBuilder();
+            sb.append(sim.hordes().size()).append(" hordes, ").append(sim.hordes().memberCount()).append(" zombies in hordes");
+            for (int i = 0; i < Math.min(20, list.size()); i++) {
+                truehordes.sim.Horde h = list.get(i);
+                sb.append(String.format(java.util.Locale.ROOT, "\n#%d: %d zombies at %.0f,%.0f heading %.0f deg, %s%s",
+                    h.id, h.size(), h.x, h.y, Math.toDegrees(h.heading), h.pauseMinutes > 0 ? "paused" : "moving",
+                    h.followHordeId != 0 ? ", following #" + h.followHordeId : ""));
+            }
+            return sb.toString();
+        }
+    }
+
     /** Debug-map data for a rectangle, or nil when the core is not running. */
     @LuaMethod(name = "Hordes_j_snapshot", global = true)
     public static KahluaTable snapshot(Object minX, Object minY, Object maxX, Object maxY, Object maxPoints) {
         Core c = Hooks.core();
         if (c == null || c.state() != Core.State.RUNNING) return null;
+        float x0 = LuaArgs.toFloat(minX, 0), y0 = LuaArgs.toFloat(minY, 0);
+        float x1 = LuaArgs.toFloat(maxX, 0), y1 = LuaArgs.toFloat(maxY, 0);
         try {
-            Snapshot s = c.store().snapshot(LuaArgs.toFloat(minX, 0), LuaArgs.toFloat(minY, 0),
-                LuaArgs.toFloat(maxX, 0), LuaArgs.toFloat(maxY, 0), LuaArgs.toInt(maxPoints, 2000));
-            KahluaTable t = LuaManager.platform.newTable();
-            t.rawset("density", s.density);
-            t.rawset("cell", (double) s.cellSize);
-            t.rawset("n", (double) s.items);
-            t.rawset("total", (double) s.total);
-            t.rawset("maxCount", (double) s.maxCount);
-            for (int i = 0; i < s.data.length; i++) t.rawset((double) (i + 1), (double) s.data[i]);
-            return t;
+            // Under the core's lock: the simulation thread moves zombies in the background.
+            synchronized (c) {
+                Snapshot s = c.store().snapshot(x0, y0, x1, y1, LuaArgs.toInt(maxPoints, 2000));
+                KahluaTable t = LuaManager.platform.newTable();
+                t.rawset("density", s.density);
+                t.rawset("cell", (double) s.cellSize);
+                t.rawset("n", (double) s.items);
+                t.rawset("total", (double) s.total);
+                t.rawset("maxCount", (double) s.maxCount);
+                for (int i = 0; i < s.data.length; i++) t.rawset((double) (i + 1), (double) s.data[i]);
+                // Hordes in view: x, y, spread, size, heading per horde.
+                KahluaTable hs = LuaManager.platform.newTable();
+                int n = 0;
+                truehordes.sim.Simulation sim = c.simulation();
+                if (sim != null) {
+                    for (truehordes.sim.Horde h : sim.hordes().all()) {
+                        float r = h.spread();
+                        if (h.x + r < x0 || h.x - r >= x1 || h.y + r < y0 || h.y - r >= y1) continue;
+                        hs.rawset((double) (n * 5 + 1), (double) h.x);
+                        hs.rawset((double) (n * 5 + 2), (double) h.y);
+                        hs.rawset((double) (n * 5 + 3), (double) r);
+                        hs.rawset((double) (n * 5 + 4), (double) h.size());
+                        hs.rawset((double) (n * 5 + 5), (double) h.heading);
+                        n++;
+                    }
+                }
+                hs.rawset("n", (double) n);
+                t.rawset("hordes", hs);
+                return t;
+            }
         } catch (Throwable t) {
             Log.errorOnce("lua:snapshot:" + t.getClass().getName(), "snapshot failed", t);
             return null;

@@ -152,10 +152,13 @@ public final class Store {
             if (e.x >= minX && e.x < maxX && e.y >= minY && e.y < maxY) in.add(e);
         }
         if (in.size() <= limit) {
-            float[] d = new float[in.size() * 2];
+            // Points: x, y, kind (0 wanderer, 1 straggler).
+            float[] d = new float[in.size() * 3];
             for (int i = 0; i < in.size(); i++) {
-                d[i * 2] = in.get(i).x;
-                d[i * 2 + 1] = in.get(i).y;
+                ZombieRecord e = in.get(i);
+                d[i * 3] = e.x;
+                d[i * 3 + 1] = e.y;
+                d[i * 3 + 2] = e.straggler ? 1 : 0;
             }
             return new Snapshot(false, 0, d, in.size(), in.size(), 1);
         }

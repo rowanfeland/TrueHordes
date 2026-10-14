@@ -99,7 +99,18 @@ public final class StoreTest {
         Check.equal(2, snap.items, "two points");
         Check.equal(2, snap.total, "total in view");
         Check.near(10, snap.data[0], 0, "x of first");
-        Check.near(50, snap.data[3], 0, "y of second");
+        Check.near(50, snap.data[4], 0, "y of second (points are x, y, kind)");
+    }
+
+    public static void testSnapshotMarksStragglers() {
+        Store s = new Store();
+        add(s, 10, 10);
+        ZombieRecord b = add(s, 20, 20);
+        b.straggler = true;
+        Snapshot snap = s.snapshot(0, 0, 100, 100, 10);
+        Check.equal(6, snap.data.length, "x, y, kind per point");
+        Check.near(0, snap.data[2], 0, "wanderer kind 0");
+        Check.near(1, snap.data[5], 0, "straggler kind 1");
     }
 
     public static void testSnapshotSwitchesToDensity() {

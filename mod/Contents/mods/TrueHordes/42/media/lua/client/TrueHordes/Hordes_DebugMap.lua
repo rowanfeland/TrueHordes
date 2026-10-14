@@ -117,6 +117,24 @@ function Hordes_MapPanel:drawTerrain()
     end
 end
 
+--- Hordes as circles (radius = spread) with their size and a heading arrow; h holds x, y, spread, size, heading.
+function Hordes_MapPanel:drawHordes(h)
+    if not h then return end
+    local n = h.n or 0
+    for i = 1, n * 5, 5 do
+        local cx, cy = self:worldToScreen(h[i], h[i + 1])
+        local r = math.max(3, h[i + 2] * self.zoom)
+        local steps = 24
+        for k = 0, steps - 1 do
+            local a = k / steps * 2 * math.pi
+            self:drawRect(cx + math.cos(a) * r - 1, cy + math.sin(a) * r - 1, 2, 2, 1, 0.75, 0.2, 1.0)
+        end
+        local hx, hy = math.cos(h[i + 4]), math.sin(h[i + 4])
+        for d = 0, r + 6, 2 do self:drawRect(cx + hx * d - 1, cy + hy * d - 1, 2, 2, 1, 1, 1, 1) end
+        self:drawText(tostring(math.floor(h[i + 3])), cx + 4, cy - 14, 1, 1, 1, 1, UIFont.Small)
+    end
+end
+
 function Hordes_MapPanel:prerender()
     ISPanel.prerender(self)
     local player = getPlayer()
@@ -141,11 +159,17 @@ function Hordes_MapPanel:prerender()
                 self:drawRect(sx, sy, size, size, alpha, 0.9, 0.2, 0.2)
             end
         else
-            for i = 1, n * 2, 2 do
+            -- Points are x, y, kind: wanderers red, stragglers (never join hordes) yellow.
+            for i = 1, n * 3, 3 do
                 local sx, sy = self:worldToScreen(s[i], s[i + 1])
-                self:drawRect(sx - 1, sy - 1, 3, 3, 1, 0.9, 0.3, 0.3)
+                if s[i + 2] == 1 then
+                    self:drawRect(sx - 1, sy - 1, 3, 3, 1, 1.0, 0.85, 0.2)
+                else
+                    self:drawRect(sx - 1, sy - 1, 3, 3, 1, 0.9, 0.3, 0.3)
+                end
             end
         end
+        self:drawHordes(s.hordes)
     end
     if player then
         local px, py = self:worldToScreen(player:getX(), player:getY())
@@ -157,7 +181,7 @@ function Hordes_MapPanel:prerender()
     elseif s.density then
         status = string.format("%d in view, density cells of %d tiles", s.total, s.cell)
     else
-        status = string.format("%d in view", s.total)
+        status = string.format("%d wanderers in view, %d hordes (purple)", s.total, s.hordes and s.hordes.n or 0)
     end
     self:drawText(string.format("zoom %.2f px/tile | %s%s", self.zoom, status, self.follow and " | following" or ""),
         4, 4, 1, 1, 1, 1, UIFont.Small)
