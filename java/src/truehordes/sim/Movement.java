@@ -14,6 +14,11 @@ public final class Movement {
         (float) (-Math.PI / 2), (float) Math.PI};
     private static final float BACK_WEIGHT = 0.05f;
     private static final float MOMENTUM = 2f;
+    /**
+     * How much one step of terrain preference counts (road vs open ground is 3 steps). Tuned so roads get roughly half
+     * again their share of zombies, not all of them (in-game test 2026-10-14: at 1 every road filled within a day).
+     */
+    private static final float TERRAIN_WEIGHT = 0.2f;
     private static final int LOOK_AHEAD = 3;
     private static final float CHUNK = 8f;
     /** Longest straight piece walked before the next map check, in tiles (half a chunk). */
@@ -27,7 +32,8 @@ public final class Movement {
     // Scratch for chooseHeading (one simulation thread; avoids garbage on every pick).
     private final double[] w = new double[FAN.length];
     private final double[] kept = new double[FAN.length];
-    private final boolean[] offRoad = new boolean[FAN.length];
+    /** Chance roll a heading needs because it leaves a road or trail (1 = none needed). */
+    private final double[] leaveChance = new double[FAN.length];
 
     public Movement(MapView map, SimSettings s) {
         this.map = map;
@@ -55,12 +61,12 @@ public final class Movement {
     private float choose(float x, float y, float heading, float pullX, float pullY, float pullWeight,
                          DoubleSupplier rng, boolean behind) {
         int cx = chunk(x), cy = chunk(y);
-        boolean onRoad = map.rank(cx, cy) == 1;
+        int here = map.rank(cx, cy);
         float pullAngle = pullWeight > 0 ? (float) Math.atan2(pullY - y, pullX - x) : 0f;
         double total = 0, totalRoadOk = 0;
         for (int i = 0; i < FAN.length; i++) {
             w[i] = 0;
-            offRoad[i] = false;
+            leaveChance[i] = 1;
             float h = heading + FAN[i];
             double dx = Math.cos(h), dy = Math.sin(h);
             double terrain = 0;
@@ -74,12 +80,12 @@ public final class Movement {
                     if (k == 1) drop = true;
                     break;
                 }
-                if (k == 1) offRoad[i] = onRoad && r != 1;
+                if (k == 1) leaveChance[i] = leaving(here, r);
                 terrain += 5 - r;
                 seen++;
             }
             if (drop || seen == 0) continue;
-            double score = MOMENTUM * Math.cos(FAN[i]) + terrain / seen;
+            double score = MOMENTUM * Math.cos(FAN[i]) + TERRAIN_WEIGHT * terrain / seen;
             if (pullWeight > 0) score += pullWeight * Math.cos(h - pullAngle);
             w[i] = Math.exp(score) * (i == FAN.length - 1 ? BACK_WEIGHT : 1);
             total += w[i];
@@ -89,10 +95,10 @@ public final class Movement {
             if (!behind) return chooseBehind(x, y, heading, pullX, pullY, pullWeight, rng);
             return Float.NaN;
         }
-        // On a road, a heading that leaves it is only allowed on an off-road roll.
+        // On a road or trail, a heading that leaves it is only allowed on a roll (trail, or off-road).
         for (int i = 0; i < FAN.length; i++) {
             kept[i] = w[i];
-            if (kept[i] > 0 && offRoad[i] && rng.getAsDouble() >= s.offRoadChance()) kept[i] = 0;
+            if (kept[i] > 0 && leaveChance[i] < 1 && rng.getAsDouble() >= leaveChance[i]) kept[i] = 0;
             totalRoadOk += kept[i];
         }
         double[] use = totalRoadOk > 0 ? kept : w;
@@ -145,6 +151,13 @@ public final class Movement {
             }
         }
         return new Step(x, y, h, tight, false);
+    }
+
+    /** The roll needed to go from terrain rank {@code from} to {@code to}: road to trail, or road/trail to open ground. */
+    private double leaving(int from, int to) {
+        if (from == 1 && to == 2) return s.trailChance();
+        if ((from == 1 || from == 2) && to > 2) return s.offRoadChance();
+        return 1;
     }
 
     private boolean enterable(int cx, int cy, int nx, int ny) {

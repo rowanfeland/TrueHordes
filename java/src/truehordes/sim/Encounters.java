@@ -21,7 +21,11 @@ public final class Encounters {
     static final float CHAIN_RADIUS = 16f;
     /** Responders within this distance of a sound when it ends count as gathered there (tiles). */
     static final float GATHER_RADIUS = 8f;
-    private static final int MAX_CHAIN = 1000;
+    /**
+     * Longest follow chain: a chain of HordeFormSize moving together already becomes a horde, so deeper chains are
+     * strung-out ones; capping them keeps every chain walk short (in dense towns they grew hundreds deep).
+     */
+    static final int MAX_CHAIN = 32;
 
     private final Store store;
     private final Hordes hordes;
@@ -86,7 +90,7 @@ public final class Encounters {
             grid.nearWanderers(r.x(), r.y(), radius, addSeenWanderer);
             for (int i = 0; i < seenWanderers.size(); i++) {
                 ZombieRecord w = seenWanderers.get(i);
-                if (w == r || w.straggler || !moving(w, nowHours) || leads(r, w)) continue;
+                if (w == r || w.straggler || !moving(w, nowHours) || leads(r, w) || depth(w) >= MAX_CHAIN - 1) continue;
                 if (!Vision.sees(r.x(), r.y(), r.heading, w.x(), w.y(), 0, radius, random)) continue;
                 r.followId = w.id;
                 break;
@@ -103,6 +107,13 @@ public final class Encounters {
             c = store.get(c.followId);
         }
         return false;
+    }
+
+    /** How many links lead from {@code w} to the front of its chain (at most MAX_CHAIN). */
+    private int depth(ZombieRecord w) {
+        int d = 0;
+        for (ZombieRecord c = w; d < MAX_CHAIN && c != null && c.followId > 0; d++) c = store.get(c.followId);
+        return d;
     }
 
     /** The zombie at the front of r's follow chain (r itself if it follows nobody). */

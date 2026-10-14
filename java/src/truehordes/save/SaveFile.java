@@ -60,68 +60,79 @@ public final class SaveFile {
      */
     public static byte[] encode(Store store, Hordes hordes, double worldAgeHours, boolean seeded, byte[] population)
             throws IOException {
-        int members = hordes == null ? 0 : hordes.memberCount();
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream(64 + population.length
-            + (store.size() + members) * RECORD_BYTES);
-        DataOutputStream out = new DataOutputStream(bytes);
-        out.writeInt(MAGIC);
-        out.writeInt(VERSION);
-        out.writeDouble(worldAgeHours);
-        out.writeLong(System.currentTimeMillis());
-        out.writeLong(store.nextId());
-        out.writeBoolean(seeded);
-        out.writeInt(population.length);
-        out.write(population);
-        out.writeInt(store.size());
-        for (ZombieRecord r : store.all()) writeRecord(out, r);
-        out.writeLong(hordes == null ? 1 : hordes.nextId());
-        out.writeInt(hordes == null ? 0 : hordes.size());
+        // Exact size first, then one pass into one buffer: no per-byte stream calls, no copies (this runs on the
+        // game's main thread under the core's lock).
+        long size = 4 + 4 + 8 + 8 + 8 + 1 + 4 + population.length + 4 + 8 + 4 + 8;
+        for (ZombieRecord r : store.all()) size += recordSize(r);
         if (hordes != null) {
             for (Horde h : hordes.all()) {
-                out.writeLong(h.id);
-                out.writeFloat(h.x);
-                out.writeFloat(h.y);
-                out.writeFloat(h.heading);
-                out.writeFloat(h.pauseMinutes);
-                out.writeInt(h.size());
-                for (ZombieRecord r : h.members) writeRecord(out, r);
+                size += 8 + 4 * 4 + 4;
+                for (ZombieRecord r : h.members) size += recordSize(r);
             }
         }
-        out.flush();
+        if (size > Integer.MAX_VALUE - 16) throw new IOException("save too large: " + size + " bytes");
+        ByteBuffer out = ByteBuffer.allocate((int) size);
+        out.putInt(MAGIC);
+        out.putInt(VERSION);
+        out.putDouble(worldAgeHours);
+        out.putLong(System.currentTimeMillis());
+        out.putLong(store.nextId());
+        out.put((byte) (seeded ? 1 : 0));
+        out.putInt(population.length);
+        out.put(population);
+        out.putInt(store.size());
+        for (ZombieRecord r : store.all()) putRecord(out, r);
+        out.putLong(hordes == null ? 1 : hordes.nextId());
+        out.putInt(hordes == null ? 0 : hordes.size());
+        if (hordes != null) {
+            for (Horde h : hordes.all()) {
+                out.putLong(h.id);
+                out.putFloat(h.x);
+                out.putFloat(h.y);
+                out.putFloat(h.heading);
+                out.putFloat(h.pauseMinutes);
+                out.putInt(h.size());
+                for (ZombieRecord r : h.members) putRecord(out, r);
+            }
+        }
         CRC32 crc = new CRC32();
-        crc.update(bytes.toByteArray());
-        out.writeLong(crc.getValue());
-        out.flush();
-        return bytes.toByteArray();
+        crc.update(out.array(), 0, out.position());
+        out.putLong(crc.getValue());
+        if (out.hasRemaining()) throw new IOException("save size miscounted");
+        return out.array();
     }
 
-    private static void writeRecord(DataOutputStream out, ZombieRecord r) throws IOException {
-        out.writeLong(r.id);
-        out.writeFloat(r.x());
-        out.writeFloat(r.y());
-        out.writeFloat(r.z);
-        out.writeByte(r.dir);
-        out.writeInt(r.outfitId);
-        out.writeInt(r.stateFlags);
-        out.writeInt(r.persistentId);
-        out.writeInt(r.targetX);
-        out.writeInt(r.targetY);
-        out.writeBoolean(r.building);
+    private static int recordSize(ZombieRecord r) {
+        return RECORD_BYTES + (r.modData == null ? 0 : r.modData.length);
+    }
+
+    private static void putRecord(ByteBuffer out, ZombieRecord r) {
+        out.putLong(r.id);
+        out.putFloat(r.x());
+        out.putFloat(r.y());
+        out.putFloat(r.z);
+        out.put(r.dir);
+        out.putInt(r.outfitId);
+        out.putInt(r.stateFlags);
+        out.putInt(r.persistentId);
+        out.putInt(r.targetX);
+        out.putInt(r.targetY);
+        out.put((byte) (r.building ? 1 : 0));
         if (r.modData == null) {
-            out.writeInt(-1);
+            out.putInt(-1);
         } else {
-            out.writeInt(r.modData.length);
-            out.write(r.modData);
+            out.putInt(r.modData.length);
+            out.put(r.modData);
         }
         // Walk state (version 3).
-        out.writeFloat(r.heading);
-        out.writeFloat(r.pauseMinutes);
-        out.writeBoolean(r.straggler);
-        out.writeBoolean(r.strRolled);
-        out.writeLong(r.followId);
-        out.writeLong(r.hordeId);
-        out.writeDouble(r.lingerUntilHours);
-        out.writeBoolean(r.idle);
+        out.putFloat(r.heading);
+        out.putFloat(r.pauseMinutes);
+        out.put((byte) (r.straggler ? 1 : 0));
+        out.put((byte) (r.strRolled ? 1 : 0));
+        out.putLong(r.followId);
+        out.putLong(r.hordeId);
+        out.putDouble(r.lingerUntilHours);
+        out.put((byte) (r.idle ? 1 : 0));
     }
 
     /** Writes encoded bytes: a flushed temp file, the old file kept as .bak, then an atomic replace. */

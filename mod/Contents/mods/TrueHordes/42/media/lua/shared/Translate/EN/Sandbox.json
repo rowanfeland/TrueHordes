@@ -17,7 +17,9 @@
     "Sandbox_TrueHordes_FollowChance": "Chance to follow another zombie",
     "Sandbox_TrueHordes_FollowChance_tooltip": "Chance per in-game hour that a wandering zombie that sees another zombie walking falls in behind it. Chains of followers grow into hordes.",
     "Sandbox_TrueHordes_OffRoadChance": "Chance to leave the road",
-    "Sandbox_TrueHordes_OffRoadChance_tooltip": "How often a walking zombie or horde on a road turns off it. Lower keeps more hordes on roads and highways.",
+    "Sandbox_TrueHordes_OffRoadChance_tooltip": "How often a zombie or horde walking a road or trail turns off it into open ground, fields or woods. Lower keeps more of them on roads.",
     "Sandbox_TrueHordes_BreakAwayChance": "Chance to be left behind",
-    "Sandbox_TrueHordes_BreakAwayChance_tooltip": "Chance for each horde member to get left behind when the horde squeezes through an alley or between buildings."
+    "Sandbox_TrueHordes_BreakAwayChance_tooltip": "Chance for each horde member to get left behind when the horde squeezes through an alley or between buildings.",
+    "Sandbox_TrueHordes_TrailChance": "Chance to take a trail",
+    "Sandbox_TrueHordes_TrailChance_tooltip": "How often a zombie or horde walking a road turns onto a trail it passes."
 }

@@ -6,7 +6,7 @@ package truehordes.sim;
  */
 public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSize, double followChancePerHour,
                           double offRoadChance, double breakAwayChance, int sightSetting, int speedSetting,
-                          double realSecondsPerGameMinute) {
+                          double realSecondsPerGameMinute, double trailChance) {
 
     /** Share of the time an off-screen zombie spends walking rather than standing (vanilla zombies idle a lot). */
     public static final double DUTY = 0.5;
@@ -28,6 +28,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         checkChance(followChancePerHour, "followChancePerHour");
         checkChance(offRoadChance, "offRoadChance");
         checkChance(breakAwayChance, "breakAwayChance");
+        checkChance(trailChance, "trailChance");
         if (!(realSecondsPerGameMinute > 0)) throw new IllegalArgumentException("realSecondsPerGameMinute must be > 0");
     }
 
@@ -37,14 +38,14 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
 
     /** Defaults: the user's decisions (2026-10-14) and the game's defaults (Normal sight, shamblers, 1-hour days). */
     public static SimSettings defaults() {
-        return new SimSettings(75, 10, 5, 0.01, 0.10, 0.005, 2, SPEED_SHAMBLER, 2.5);
+        return new SimSettings(75, 10, 5, 0.05, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30);
     }
 
     public Builder toBuilder() { return new Builder(this); }
 
     public static final class Builder {
         private int stragglerOneIn, hordeFormSize, hordeMinSize, sightSetting, speedSetting;
-        private double followChancePerHour, offRoadChance, breakAwayChance, realSecondsPerGameMinute;
+        private double followChancePerHour, offRoadChance, breakAwayChance, realSecondsPerGameMinute, trailChance;
 
         private Builder(SimSettings s) {
             stragglerOneIn = s.stragglerOneIn;
@@ -56,6 +57,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
             sightSetting = s.sightSetting;
             speedSetting = s.speedSetting;
             realSecondsPerGameMinute = s.realSecondsPerGameMinute;
+            trailChance = s.trailChance;
         }
 
         public Builder stragglerOneIn(int v) { stragglerOneIn = v; return this; }
@@ -67,10 +69,11 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         public Builder sightSetting(int v) { sightSetting = v; return this; }
         public Builder speedSetting(int v) { speedSetting = v; return this; }
         public Builder realSecondsPerGameMinute(double v) { realSecondsPerGameMinute = v; return this; }
+        public Builder trailChance(double v) { trailChance = v; return this; }
 
         public SimSettings build() {
             return new SimSettings(stragglerOneIn, hordeFormSize, hordeMinSize, followChancePerHour, offRoadChance,
-                breakAwayChance, sightSetting, speedSetting, realSecondsPerGameMinute);
+                breakAwayChance, sightSetting, speedSetting, realSecondsPerGameMinute, trailChance);
         }
     }
 }

@@ -23,6 +23,10 @@ import truehordes.store.ZombieRecord;
 public final class Simulation {
     /** How strongly a follower steers towards the zombie it trails. */
     static final float FOLLOW_PULL = 2.5f;
+    /** A follower walks this far behind the zombie it follows (tiles). */
+    static final float TRAIL_GAP = 1.5f;
+    /** A follower further than this from its leader has lost it (tiles). */
+    static final float TRAIL_LOST = 48f;
     /** Walkers this close to a sound mill there instead of walking on (tiles). */
     static final float MILL_RADIUS = 3f;
     /** Moaning reach is re-indexed this often (in-game minutes); hordes move slowly. */
@@ -298,7 +302,11 @@ public final class Simulation {
                 }
             } else if (r.followId > 0) {
                 ZombieRecord t = store.get(r.followId);
-                if (t != null) {
+                if (t == null || Hearing.dist(r.x(), r.y(), t.x(), t.y()) > TRAIL_LOST) {
+                    r.followId = 0; // lost sight of it
+                } else if (trail(r, t, dt)) {
+                    walk = false;
+                } else {
                     px = t.x();
                     py = t.y();
                     pw = FOLLOW_PULL;
@@ -386,6 +394,31 @@ public final class Simulation {
             maxUpdateNanos = nanos;
             maxUpdateWhat = hordeSize == 0 ? "wanderer" : "horde of " + hordeSize;
         }
+    }
+
+    /**
+     * A follower walks straight to its place just behind the zombie it follows (as far as its speed allows this
+     * update) and takes its heading, so a follow chain stays together and can become a horde. False when that place
+     * cannot be entered (water, buildings, the loaded area): the follower then just steers towards it.
+     */
+    private boolean trail(ZombieRecord r, ZombieRecord t, double dt) {
+        float gx = (float) (t.x() - Math.cos(t.heading) * TRAIL_GAP), gy = (float) (t.y() - Math.sin(t.heading) * TRAIL_GAP);
+        int gcx = chunk(gx), gcy = chunk(gy);
+        if (movement.map().rank(gcx, gcy) == 0 || players.nearChunk(gcx, gcy)) return false;
+        float d = Hearing.dist(r.x(), r.y(), gx, gy);
+        float reach = movement.speedTilesPerGameMinute(1, s.speedSetting(), r.id, (r.stateFlags & 2) != 0) * (float) dt;
+        if (d > reach) {
+            float f = reach / d;
+            gx = r.x() + (gx - r.x()) * f;
+            gy = r.y() + (gy - r.y()) * f;
+            if (movement.map().rank(chunk(gx), chunk(gy)) == 0 || players.nearChunk(chunk(gx), chunk(gy))) return false;
+        }
+        store.moved(r, gx, gy);
+        r.heading = t.heading;
+        r.pauseMinutes = 0;
+        r.targetX = ZombieRecord.NO_TARGET;
+        r.targetY = ZombieRecord.NO_TARGET;
+        return true;
     }
 
     private static float turnedBack(float heading) { return Movement.normalise(heading + (float) Math.PI); }

@@ -175,6 +175,56 @@ public final class SimulationTest {
         Check.isTrue(Math.abs(str.x() - 900) < before, "but it heads for a real sound");
     }
 
+    /** A town of 30x30 chunks, a road every 4th row and column (about 44% of its chunks), open ground around. */
+    static MapView townMap() {
+        return new MapView() {
+            @Override public int rank(int cx, int cy) {
+                if (!inMap(cx, cy)) return 0;
+                boolean inTown = cx >= 80 && cx < 110 && cy >= 80 && cy < 110;
+                return inTown && (cx % 4 == 0 || cy % 4 == 0) ? 1 : 4;
+            }
+            @Override public boolean inMap(int cx, int cy) { return cx >= 0 && cy >= 0 && cx < 200 && cy < 200; }
+            @Override public boolean tight(int cx, int cy) { return false; }
+        };
+    }
+
+    static Store town(int n, long seed) {
+        Store s = new Store();
+        Random rng = new Random(seed);
+        for (int i = 0; i < n; i++) add(s, 80 * 8 + rng.nextInt(240), 80 * 8 + rng.nextInt(240), (float) (rng.nextDouble() * 6.28));
+        return s;
+    }
+
+    /** In-game test 2026-10-14: within a day nearly every zombie sat on a road. Roads are preferred, not a trap. */
+    public static void testRoadsArePreferredNotATrap() {
+        Store s = town(1000, 1);
+        MapView map = townMap();
+        Simulation sim = new Simulation(s, map, SimSettings.defaults(), 5, 0);
+        run(sim, 0, 24);
+        int inTown = 0, onRoad = 0;
+        for (ZombieRecord r : s.all()) {
+            int cx = Math.floorDiv((int) r.x(), 8), cy = Math.floorDiv((int) r.y(), 8);
+            if (cx < 80 || cx >= 110 || cy < 80 || cy >= 110) continue;
+            inTown++;
+            if (map.rank(cx, cy) == 1) onRoad++;
+        }
+        double share = onRoad / (double) Math.max(1, inTown);
+        Check.isTrue(share > 0.5, "roads get more than their 44% share (" + share + ")");
+        // With the user's 15% off-road / 30% trail rolls town zombies mostly keep to the streets (about 80%), but the
+        // roads are not a trap any more (91% within a day before).
+        Check.isTrue(share < 0.85, "but zombies still leave the roads (" + share + ")");
+    }
+
+    /** In-game test 2026-10-14: three weeks, no hordes. Followers trail close behind, so chains become hordes. */
+    public static void testFollowChainsBecomeHordesInATown() {
+        Store s = town(300, 2);
+        Simulation sim = new Simulation(s, townMap(), SimSettings.defaults(), 6, 0);
+        run(sim, 0, 14 * 24);
+        Check.isTrue(sim.hordes().size() >= 1, "a town of 300 grows at least one horde within two weeks ("
+            + sim.hordes().size() + ")");
+        Check.equal("", sim.checkConservation("test"), "conservation");
+    }
+
     public static void testRealChunksSkipped() {
         Store s = new Store();
         ZombieRecord r = add(s, 100 * 8 + 4, 100 * 8 + 4, 0);

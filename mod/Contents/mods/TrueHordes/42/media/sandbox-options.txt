@@ -79,7 +79,7 @@ option TrueHordes.OffRoadChance
 	type = double,
 	min = 0,
 	max = 1,
-	default = 0.1,
+	default = 0.15,
 	page = TrueHordes,
 	translation = TrueHordes_OffRoadChance,
 }
@@ -92,4 +92,14 @@ option TrueHordes.BreakAwayChance
 	default = 0.005,
 	page = TrueHordes,
 	translation = TrueHordes_BreakAwayChance,
+}
+
+option TrueHordes.TrailChance
+{
+	type = double,
+	min = 0,
+	max = 1,
+	default = 0.3,
+	page = TrueHordes,
+	translation = TrueHordes_TrailChance,
 }

@@ -215,6 +215,26 @@ public final class SaveFileTest {
         Check.equal(hs.nextId(), r.hordeNextId, "horde id counter");
     }
 
+    /** In-game test 2026-10-14: small hitches on every hot save. The in-memory encode must be quick. */
+    public static void testEncodeIsQuick() throws IOException {
+        Store s = new Store();
+        for (int i = 0; i < 200_000; i++) {
+            s.add(i % 5000, i / 5000, 0, (byte) 0, 1, 4, i, ZombieRecord.NO_TARGET, ZombieRecord.NO_TARGET,
+                i % 10 == 0 ? new byte[40] : null, false);
+        }
+        for (int i = 0; i < 3; i++) SaveFile.encode(s, null, 1.0, true, new byte[1000]); // warm up
+        long ms = Long.MAX_VALUE; // best of 5: other test threads and the collector share this JVM
+        byte[] data = null;
+        for (int i = 0; i < 5; i++) {
+            long t0 = System.nanoTime();
+            data = SaveFile.encode(s, null, 1.0, true, new byte[1000]);
+            ms = Math.min(ms, (System.nanoTime() - t0) / 1_000_000);
+        }
+        Check.isTrue(data.length > 200_000 * 50, "all records encoded");
+        // The old stream-based encode took about 87 ms here; one sized buffer is about half that or less.
+        Check.isTrue(ms < 60, "200,000 records encode in under 60 ms (" + ms + " ms)");
+    }
+
     /** A version 2 file exactly as sub-project 3 wrote it. */
     private static void writeV2(Path f, Store s) throws IOException {
         java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
