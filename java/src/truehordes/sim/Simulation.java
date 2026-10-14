@@ -27,6 +27,8 @@ public final class Simulation {
     static final float MILL_RADIUS = 3f;
     /** Moaning reach is re-indexed this often (in-game minutes); hordes move slowly. */
     static final int HORDE_INDEX_MINUTES = 5;
+    /** Shortest time a straggler stands around between short shuffles, in in-game hours (up to 3 more at random). */
+    static final double STRAGGLER_LINGER_MIN_HOURS = 1.0;
     private static final int CELL = 256;
     private static final PlayerNearby NOBODY = new PlayerNearby() {
         @Override public boolean nearCell(int cellX, int cellY) { return false; }
@@ -282,7 +284,8 @@ public final class Simulation {
         if (walk) {
             float px = 0, py = 0, pw = 0;
             Hearing.Pull p = pull(r.x(), r.y(), 0, 0f);
-            if (p != null && !r.straggler) {
+            // Stragglers hear real sounds like everyone, but never go towards a horde's moaning.
+            if (p != null && (p.event() != null || !r.straggler)) {
                 px = p.x();
                 py = p.y();
                 pw = p.weight();
@@ -314,6 +317,10 @@ public final class Simulation {
                     r.targetY = ZombieRecord.NO_TARGET;
                 }
                 r.pauseMinutes = st.boxedIn() ? 10f : Movement.rollPause((float) dt, random);
+                // A straggler only shuffles a little, then lingers where it is for a few hours (spec 4.6).
+                if (r.straggler && (p == null || p.event() == null)) {
+                    r.lingerUntilHours = now + STRAGGLER_LINGER_MIN_HOURS + 3 * rng.nextDouble();
+                }
             }
         }
         internal(() -> encounters.wanderer(r, now, dt / 60.0));

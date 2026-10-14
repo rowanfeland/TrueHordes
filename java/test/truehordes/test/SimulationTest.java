@@ -158,6 +158,23 @@ public final class SimulationTest {
         Check.isTrue(!r.hasTarget(), "the stale target is dropped once it walks");
     }
 
+    /** Final review I6: stragglers linger and stay near where they are, but still hear real sounds. */
+    public static void testStragglersLingerButHearSounds() {
+        Store s = new Store();
+        ZombieRecord str = add(s, 800, 800, 0);
+        str.straggler = true;
+        ZombieRecord w = add(s, 800, 1200, 0);
+        Simulation sim = new Simulation(s, openMap(200, -1), quiet(), 3, 0);
+        run(sim, 0, 24);
+        float strayed = Math.abs(str.x() - 800) + Math.abs(str.y() - 800);
+        float walked = Math.abs(w.x() - 800) + Math.abs(w.y() - 1200);
+        Check.isTrue(strayed * 3 < walked, "a straggler stays close (" + strayed + " vs " + walked + " tiles)");
+        float before = Math.abs(str.x() - 900);
+        sim.addSound(900, str.y(), 90, 1);
+        run(sim, 24, 1);
+        Check.isTrue(Math.abs(str.x() - 900) < before, "but it heads for a real sound");
+    }
+
     public static void testRealChunksSkipped() {
         Store s = new Store();
         ZombieRecord r = add(s, 100 * 8 + 4, 100 * 8 + 4, 0);
