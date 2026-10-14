@@ -11,7 +11,7 @@ import truehordes.store.ZombieRecord;
  * Walkers bucketed per 8x8-tile chunk so encounters only look at nearby chunks. A horde sits in every chunk its spread
  * circle covers. Not thread-safe: used under the core's lock.
  */
-public final class SpatialGrid {
+public final class SpatialGrid implements truehordes.store.Store.Listener {
     private final Map<Long, List<ZombieRecord>> wanderers = new HashMap<>();
     private final Map<Long, List<Horde>> hordes = new HashMap<>();
     private int wandererCount;
@@ -21,6 +21,12 @@ public final class SpatialGrid {
     static long key(int cx, int cy) { return ((long) cx << 32) | (cy & 0xFFFFFFFFL); }
 
     static int chunk(float tile) { return Math.floorDiv((int) Math.floor(tile), 8); }
+
+    @Override public void added(ZombieRecord r) { putWanderer(r); }
+
+    @Override public void removed(ZombieRecord r) { removeWanderer(r); }
+
+    @Override public void moved(ZombieRecord r, float oldX, float oldY) { moveWanderer(r, oldX, oldY); }
 
     public void putWanderer(ZombieRecord r) {
         wanderers.computeIfAbsent(key(r.chunkX(), r.chunkY()), k -> new ArrayList<>()).add(r);
@@ -48,8 +54,11 @@ public final class SpatialGrid {
         putHorde(h);
     }
 
-    public void removeHorde(Horde h) {
-        forCircle(h.x, h.y, h.spread(), k -> { if (removeFrom(hordes, k, h)) hordeEntries--; });
+    public void removeHorde(Horde h) { removeHorde(h, h.x, h.y, h.spread()); }
+
+    /** Removes a horde that covered the circle (x, y, spread) when it was last put or moved. */
+    public void removeHorde(Horde h, float x, float y, float spread) {
+        forCircle(x, y, spread, k -> { if (removeFrom(hordes, k, h)) hordeEntries--; });
     }
 
     private void addHorde(long k, Horde h) {

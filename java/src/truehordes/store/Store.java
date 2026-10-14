@@ -19,12 +19,31 @@ public final class Store {
     private final Map<Integer, ZombieRecord> byPersistentId = new HashMap<>();
     private final Map<Long, int[]> perCell = new HashMap<>();
     private long nextId = 1;
+    private Listener listener = Listener.NONE;
+
+    /** Told about every add, removal and move (the off-screen simulation keeps its grid and schedule from this). */
+    public interface Listener {
+        Listener NONE = new Listener() {
+            @Override public void added(ZombieRecord r) {}
+            @Override public void removed(ZombieRecord r) {}
+            @Override public void moved(ZombieRecord r, float oldX, float oldY) {}
+        };
+
+        void added(ZombieRecord r);
+
+        void removed(ZombieRecord r);
+
+        void moved(ZombieRecord r, float oldX, float oldY);
+    }
+
+    public void setListener(Listener l) { listener = l == null ? Listener.NONE : l; }
 
     public ZombieRecord add(float x, float y, float z, byte dir, int outfitId, int stateFlags, int persistentId,
                             int targetX, int targetY, byte[] modData, boolean building) {
         ZombieRecord r = new ZombieRecord(nextId++, x, y, z, dir, outfitId, stateFlags, persistentId, targetX, targetY,
             modData, building);
         index(r);
+        listener.added(r);
         return r;
     }
 
@@ -33,6 +52,7 @@ public final class Store {
         if (byId.containsKey(r.id)) throw new IllegalStateException("duplicate record id " + r.id);
         index(r);
         if (r.id >= nextId) nextId = r.id + 1;
+        listener.added(r);
     }
 
     private void index(ZombieRecord r) {
@@ -68,6 +88,7 @@ public final class Store {
         if (r == null) return false;
         unindexPosition(r);
         if (r.persistentId != 0 && byPersistentId.get(r.persistentId) == r) byPersistentId.remove(r.persistentId);
+        listener.removed(r);
         return true;
     }
 
@@ -83,11 +104,21 @@ public final class Store {
 
     /** Moves a record and keeps the indexes right. */
     public void moved(ZombieRecord r, float x, float y) {
-        unindexPosition(r);
+        float ox = r.x, oy = r.y;
+        int ocx = r.chunkX(), ocy = r.chunkY();
         r.x = x;
         r.y = y;
-        byChunk.computeIfAbsent(key(r.chunkX(), r.chunkY()), k -> new ArrayList<>()).add(r);
-        cellCount(r, 1);
+        if (ocx != r.chunkX() || ocy != r.chunkY()) {
+            float nx = r.x, ny = r.y;
+            r.x = ox;
+            r.y = oy;
+            unindexPosition(r);
+            r.x = nx;
+            r.y = ny;
+            byChunk.computeIfAbsent(key(r.chunkX(), r.chunkY()), k -> new ArrayList<>()).add(r);
+            cellCount(r, 1);
+        }
+        listener.moved(r, ox, oy);
     }
 
     /** Records held in a 256x256 cell. */
