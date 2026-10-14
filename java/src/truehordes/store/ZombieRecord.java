@@ -47,6 +47,9 @@ public final class ZombieRecord {
     public double lingerUntilHours;
     /** Standing still in a building or lying fake-dead: does nothing until a sound moves it. */
     public boolean idle;
+    /** Scheduling (simulation only, not saved): the in-game minute of its next update and the hour of its last. */
+    public long dueMinute = Long.MIN_VALUE;
+    public double simHours = Double.NaN;
 
     public ZombieRecord(long id, float x, float y, float z, byte dir, int outfitId, int stateFlags, int persistentId,
                         int targetX, int targetY, byte[] modData, boolean building) {

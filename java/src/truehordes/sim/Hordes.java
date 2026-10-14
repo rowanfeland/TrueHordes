@@ -13,9 +13,16 @@ public final class Hordes {
     private long nextId = 1;
     private int members;
 
+    private java.util.function.Consumer<Horde> onCreated = h -> {};
+
+    /** Told about every horde made by {@link #create} (the simulation schedules it). */
+    public void setOnCreated(java.util.function.Consumer<Horde> c) { onCreated = c == null ? h -> {} : c; }
+
     /** A new horde; every member records it as its horde. */
     public Horde create(float x, float y, float heading, List<ZombieRecord> memberList) {
-        return add(new Horde(nextId++, x, y, heading, memberList));
+        Horde h = add(new Horde(nextId++, x, y, heading, memberList));
+        onCreated.accept(h);
+        return h;
     }
 
     /** Re-adds a loaded horde with its saved id. */

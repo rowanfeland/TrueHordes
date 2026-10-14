@@ -18,6 +18,9 @@ public final class Horde {
     /** The louder horde this one is trailing (0 none); informational, for Hordes_hordes(). */
     public long followHordeId;
     public final List<ZombieRecord> members;
+    /** Scheduling (not saved): the in-game minute of its next update and the hour of its last. */
+    long dueMinute = Long.MIN_VALUE;
+    double simHours = Double.NaN;
     /** Query stamp used by SpatialGrid to report a horde once per query. */
     int seenStamp;
 

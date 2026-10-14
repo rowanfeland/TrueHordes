@@ -5,8 +5,9 @@ import java.util.List;
 /**
  * Who hears what off screen (spec 4.4): loudness in dB falls off with distance like real sound (-20 dB per tenfold
  * distance) and is heard down to 30 dB. Any sound event beats every horde's moaning (moaning is always the lowest
- * priority); a horde never hears itself, and its own moaning masks quieter moaning where it is, so a small horde hears
- * a big one and follows while the big one does not notice. Sub-project 5 retunes the physics on this core.
+ * priority); a horde never hears itself, and its own moaning drowns out any horde quieter than itself, so a small horde
+ * hears a big one (when it is audible where the small one is) and follows, while the big one does not notice.
+ * Sub-project 5 retunes the physics on this core.
  */
 public final class Hearing {
     /** Quietest level a zombie reacts to, in dB. */
@@ -33,14 +34,14 @@ public final class Hearing {
     /** Range of a horde's moaning measured from its centre (its circle edge carries the sound). */
     public static float moanRange(Horde h) { return range(h.loudnessDb()) + h.spread(); }
 
-    /** The level of a horde's own moaning where its members stand (masks quieter moaning); 0 for a lone wanderer. */
+    /** The loudness of a listener's own moaning: hordes no louder than this are drowned out; 0 for a lone wanderer. */
     public static float maskingDb(Horde h) {
-        return h == null ? 0f : levelAt(h.loudnessDb(), h.spread());
+        return h == null ? 0f : h.loudnessDb();
     }
 
     /**
      * What a walker at (x, y) heads for: the loudest audible sound event if any; otherwise the loudest audible moaning
-     * of another horde that is louder here than the walker's own ({@code ownDb}); otherwise null.
+     * of another horde that is louder than the walker's own horde ({@code ownDb}, see maskingDb); otherwise null.
      */
     public static Pull choose(float x, float y, long ownHordeId, float ownDb, List<SoundEvent> events,
                               List<Horde> nearbyHordes) {
@@ -61,7 +62,7 @@ public final class Hearing {
             Horde h = nearbyHordes.get(i);
             if (h.id == ownHordeId) continue;
             float level = levelAt(h.loudnessDb(), dist(x, y, h.x, h.y) - h.spread());
-            if (level >= THRESHOLD_DB && level > ownDb && (bestHorde == null || level > bestLevel)) {
+            if (level >= THRESHOLD_DB && h.loudnessDb() > ownDb && (bestHorde == null || level > bestLevel)) {
                 bestLevel = level;
                 bestHorde = h;
             }
