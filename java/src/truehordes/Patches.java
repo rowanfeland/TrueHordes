@@ -93,4 +93,11 @@ public final class Patches {
         @Patch.OnEnter(skipOn = true)
         public static boolean enter(@Patch.Argument(0) IsoRoom room) { return Hooks.onRoomSpotted(room); }
     }
+
+    /** Vanilla rally groups: skipped while the mod runs the population, so groups form only through its rules. */
+    @Patch(className = HookTargets.GROUP_MANAGER, methodName = HookTargets.RALLY)
+    public static class RallyOff {
+        @Patch.OnEnter(skipOn = true)
+        public static boolean enter() { return Hooks.rallyOff(); }
+    }
 }

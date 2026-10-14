@@ -19,6 +19,7 @@ public class Main {
             List<String> missing = HookTargets.missing(Main::declaredMethodNames);
             if (missing.isEmpty()) {
                 Log.info("hook targets found: " + HookTargets.ALL.length);
+                Log.info("vanilla rally groups switched off while True Hordes runs the population (the mod forms hordes)");
             } else {
                 core.disable("game methods missing (game update?): " + missing);
             }

@@ -25,6 +25,9 @@ public final class HookTargets {
     public static final String WALKED_OFF = "virtualizeZombie";
     public static final String POP_CHUNK_LOADED = "addChunkToWorld";
     public static final String ROOM_SPOTTED = "roomSpotted";
+    /** Vanilla rally groups (sub-project 4): only ZombieGroupManager.update creates them. */
+    public static final String GROUP_MANAGER = "zombie.ai.ZombieGroupManager";
+    public static final String RALLY = "update";
     /** Private ZombiePopulationManager members the takeover calls or reads by reflection. */
     public static final String ADD_STANDING = "addZombieStanding";
     public static final String ADD_MOVING = "addZombieMoving";
@@ -46,6 +49,7 @@ public final class HookTargets {
         {POPMAN, WALKED_OFF},
         {POPMAN, POP_CHUNK_LOADED},
         {VZM, ROOM_SPOTTED},
+        {GROUP_MANAGER, RALLY},
     };
 
     /** Live map updates. Optional: if missing, the world map still builds from the files. */

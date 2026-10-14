@@ -36,6 +36,18 @@ public final class VerifyTargetsTest {
         Check.isTrue(missing.contains(HookTargets.POPMAN + "." + HookTargets.TICK), "names class.method");
     }
 
+    /** Sub-project 4: vanilla rally groups are switched off through ZombieGroupManager.update (required). */
+    public static void testRallyTargetExists() throws Exception {
+        List<String> all = new java.util.ArrayList<>();
+        for (String[] t : HookTargets.ALL) all.add(t[0] + "." + t[1]);
+        Check.isTrue(all.contains("zombie.ai.ZombieGroupManager.update"), "rally target is required");
+        Check.equal(11, HookTargets.ALL.length, "hook count");
+        try (ZipFile jar = new ZipFile(System.getProperty("truehordes.gameJar"))) {
+            Check.isTrue(ClassFileMethods.methodNames(jar, "zombie.ai.ZombieGroupManager").contains("update"),
+                "ZombieGroupManager.update exists in the game");
+        }
+    }
+
     public static void testLiveTargetsAndRulesExistInGameJar() throws Exception {
         String jarPath = System.getProperty("truehordes.gameJar");
         Check.isTrue(jarPath != null, "build passes the game jar path to the test runner");

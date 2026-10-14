@@ -117,6 +117,17 @@ public final class Hooks {
         }
     }
 
+    /** True = skip the game's rally-group update (the mod owns hordes). */
+    public static boolean rallyOff() {
+        try {
+            Core c = core;
+            return c != null && c.takesOverPopulation();
+        } catch (Throwable t) {
+            Log.errorOnce("hook:rally:" + t.getClass().getName(), "rally hook failed", t);
+            return false;
+        }
+    }
+
     public static void onStop() {
         PopulationBridge.clearLoaded();
         Core c = core;

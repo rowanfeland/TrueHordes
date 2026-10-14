@@ -54,7 +54,8 @@ public final class Simulation {
     private long moanIndexMinute = Long.MIN_VALUE / 2; // far past, without overflow in the subtraction
     private long nextEventId = 1;
     private int internal;
-    private long queued, updatesTotal, lastStepNanos, maxStepNanos;
+    private long queued, updatesTotal, lastStepNanos, maxStepNanos, maxUpdateNanos;
+    private String maxUpdateWhat = "-";
 
     public Simulation(Store store, MapView map, SimSettings s, long seed, double nowHours) {
         this.store = store;
@@ -221,13 +222,18 @@ public final class Simulation {
             if (key > 0) {
                 ZombieRecord r = store.get(key);
                 if (r != null && r.dueMinute == minute) {
+                    long u0 = System.nanoTime();
                     updateWanderer(r, nowHours);
+                    noteUpdate(System.nanoTime() - u0, 0);
                     updated++;
                 }
             } else {
                 Horde h = hordes.get(-key);
                 if (h != null && h.dueMinute == minute) {
+                    long u0 = System.nanoTime();
+                    int size = h.size();
                     updateHorde(h, nowHours);
+                    noteUpdate(System.nanoTime() - u0, size);
                     updated++;
                 }
             }
@@ -359,6 +365,14 @@ public final class Simulation {
         }
     }
 
+    /** Remembers the slowest single update (hordeSize 0 = a wanderer) for the stats line. */
+    private void noteUpdate(long nanos, int hordeSize) {
+        if (nanos > maxUpdateNanos) {
+            maxUpdateNanos = nanos;
+            maxUpdateWhat = hordeSize == 0 ? "wanderer" : "horde of " + hordeSize;
+        }
+    }
+
     private static float turnedBack(float heading) { return Movement.normalise(heading + (float) Math.PI); }
 
     // ---- hearing ----
@@ -404,10 +418,10 @@ public final class Simulation {
         int biggest = 0;
         for (Horde h : hordes.all()) biggest = Math.max(biggest, h.size());
         return String.format(Locale.ROOT,
-            "sim: wanderers %d, hordes %d (biggest %d, %d members), updates %d, queue %d, last step %.2f ms (max %.2f), "
+            "sim: wanderers %d, hordes %d (biggest %d, %d members), updates %d, queue %d, last step %.2f ms (max %.2f, slowest update %.2f ms: %s), "
                 + "formed %d, joined %d, merged %d, left behind %d, broke up %d, sounds %d | conservation %s",
             store.size(), hordes.size(), biggest, hordes.memberCount(), updatesTotal, queued, lastStepNanos / 1e6,
-            maxStepNanos / 1e6, encounters.formed(), encounters.joined(), encounters.merged(), encounters.brokeAway(),
+            maxStepNanos / 1e6, maxUpdateNanos / 1e6, maxUpdateWhat, encounters.formed(), encounters.joined(), encounters.merged(), encounters.brokeAway(),
             encounters.dissolved(), events.size(), conservation.summary());
     }
 
