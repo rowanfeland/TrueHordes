@@ -23,5 +23,7 @@
     "Sandbox_TrueHordes_TrailChance": "Chance to take a trail",
     "Sandbox_TrueHordes_TrailChance_tooltip": "How often a zombie or horde walking a road turns onto a trail it passes.",
     "Sandbox_TrueHordes_MoanResponseChance": "Chance to notice a horde's moaning",
-    "Sandbox_TrueHordes_MoanResponseChance_tooltip": "Chance per in-game hour that a zombie who can hear a horde turns towards it. Higher makes hordes gather a city faster."
+    "Sandbox_TrueHordes_MoanResponseChance_tooltip": "Chance per in-game hour that a zombie who can hear a horde turns towards it. Higher makes hordes gather a city faster.",
+    "Sandbox_TrueHordes_JoinChance": "Chance to join a horde in sight",
+    "Sandbox_TrueHordes_JoinChance_tooltip": "Chance per in-game hour that a zombie who sees a horde joins it. Higher makes cities gather into hordes faster."
 }

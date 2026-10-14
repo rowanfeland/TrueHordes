@@ -361,6 +361,11 @@ public final class Simulation {
         int tight = 0;
         if (walk) {
             Hearing.Pull p = pull(h.x, h.y, h.id, Hearing.maskingDb(h));
+            if (h.followHordeId != 0 && hordes.get(h.followHordeId) == null) h.followHordeId = 0;
+            if (p != null && p.event() == null && p.horde() != null && h.followHordeId != p.horde().id) {
+                // Like single zombies, a horde notices a louder horde's moaning gradually.
+                if (random.getAsDouble() >= 1 - Math.pow(1 - s.moanResponsePerHour(), dt / 60.0)) p = null;
+            }
             h.followHordeId = p != null && p.horde() != null ? p.horde().id : 0;
             float px = 0, py = 0, pw = 0;
             if (p != null) {

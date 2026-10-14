@@ -96,6 +96,33 @@ public final class SpatialGrid implements truehordes.store.Store.Listener {
         }
     }
 
+    /**
+     * Wanderers inside [minX,maxX) x [minY,maxY): walks the chunks of the rectangle, or every occupied chunk when that
+     * is fewer (a zoomed-out debug map covers millions of chunks but only thousands hold anyone).
+     */
+    public void wanderersIn(float minX, float minY, float maxX, float maxY, Consumer<ZombieRecord> out) {
+        int x0 = chunk(minX), x1 = chunk(maxX), y0 = chunk(minY), y1 = chunk(maxY);
+        long area = (long) (x1 - x0 + 1) * (y1 - y0 + 1);
+        if (area > wanderers.size()) {
+            for (List<ZombieRecord> ws : wanderers.values()) addIn(ws, minX, minY, maxX, maxY, out);
+        } else {
+            for (int cx = x0; cx <= x1; cx++) {
+                for (int cy = y0; cy <= y1; cy++) {
+                    List<ZombieRecord> ws = wanderers.get(key(cx, cy));
+                    if (ws != null) addIn(ws, minX, minY, maxX, maxY, out);
+                }
+            }
+        }
+    }
+
+    private static void addIn(List<ZombieRecord> ws, float minX, float minY, float maxX, float maxY,
+                              Consumer<ZombieRecord> out) {
+        for (int i = 0; i < ws.size(); i++) {
+            ZombieRecord w = ws.get(i);
+            if (w.x() >= minX && w.x() < maxX && w.y() >= minY && w.y() < maxY) out.accept(w);
+        }
+    }
+
     /** Hordes whose circle comes within {@code radius} of (x, y), each once. */
     public void nearHordes(float x, float y, float radius, Consumer<Horde> out) {
         if (hordeEntries == 0) return;

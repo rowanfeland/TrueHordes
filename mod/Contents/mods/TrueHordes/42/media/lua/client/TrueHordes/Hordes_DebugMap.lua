@@ -5,9 +5,10 @@ require "ISUI/ISPanel"
 require "ISUI/ISCollapsableWindow"
 require "ISUI/ISButton"
 
-local FETCH_MS = 300
-local MAX_POINTS = 4000
-local TERRAIN_MS = 1000
+-- Refresh rates: each fetch builds Lua tables on the main thread, so keep them modest (frame rate and garbage).
+local FETCH_MS = 1000
+local MAX_POINTS = 3000
+local TERRAIN_MS = 10000 -- terrain hardly changes: refetched when the view moves, else every 10 s
 local TILE_ZOOM = 4 -- px per tile at which walls are drawn
 -- Terrain codes (Java truehordes.world.Terrain) to colours.
 local TERRAIN_COLOURS = {
@@ -70,11 +71,14 @@ end
 
 function Hordes_MapPanel:fetchTerrain()
     local now = getTimestampMs()
-    if self.terrain and now - self.lastTerrain < TERRAIN_MS then return end
+    local step = math.max(8, math.ceil(8 / self.zoom))
+    -- The view, rounded to the terrain step: following a walking player only refetches when it moves a whole step.
+    local key = math.floor(self.centerX / step) .. ":" .. math.floor(self.centerY / step) .. ":" .. self.zoom
+    if self.terrain and key == self.terrainKey and now - self.lastTerrain < TERRAIN_MS then return end
+    self.terrainKey = key
     self.lastTerrain = now
     local halfW = self.width / 2 / self.zoom
     local halfH = self.height / 2 / self.zoom
-    local step = math.max(8, math.ceil(8 / self.zoom))
     self.terrain = TrueHordes.terrain(self.centerX - halfW, self.centerY - halfH,
         self.centerX + halfW, self.centerY + halfH, step)
     if self.zoom >= TILE_ZOOM then

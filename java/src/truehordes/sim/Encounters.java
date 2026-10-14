@@ -74,11 +74,16 @@ public final class Encounters {
         float radius = sightRadius(r);
         seenHordes.clear();
         grid.nearHordes(r.x(), r.y(), radius, addSeenHorde);
+        // Joining takes a little time (user, 2026-10-14): a wanderer that sees a horde joins with a chance per hour.
+        double joinP = 1 - Math.pow(1 - s.joinChancePerHour(), dtHours);
         for (int i = 0; i < seenHordes.size(); i++) {
             Horde h = seenHordes.get(i);
             if (Vision.sees(r.x(), r.y(), r.heading, h.x, h.y, h.spread(), radius, random)) {
-                join(h, r);
-                return;
+                if (random.getAsDouble() < joinP) {
+                    join(h, r);
+                    return;
+                }
+                break;
             }
         }
         if (r.followId > 0 && store.get(r.followId) == null) r.followId = 0;

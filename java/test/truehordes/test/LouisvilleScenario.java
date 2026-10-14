@@ -35,6 +35,8 @@ public final class LouisvilleScenario {
         int zombies = args.length > 2 ? Integer.parseInt(args[2]) : 30000;
         double follow = args.length > 3 ? Double.parseDouble(args[3]) : SimSettings.defaults().followChancePerHour();
         long seed = args.length > 4 ? Long.parseLong(args[4]) : 1;
+        double join = args.length > 5 ? Double.parseDouble(args[5]) : SimSettings.defaults().joinChancePerHour();
+        double moan = args.length > 6 ? Double.parseDouble(args[6]) : SimSettings.defaults().moanResponsePerHour();
         Map<Long, Path> files = new HashMap<>();
         int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE;
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, "chunkdata_*.bin")) {
@@ -74,7 +76,9 @@ public final class LouisvilleScenario {
             s.add(x, y, 0, (byte) rng.nextInt(8), 0, 0, 0, ZombieRecord.NO_TARGET, ZombieRecord.NO_TARGET, null, false);
             placed++;
         }
-        SimSettings settings = SimSettings.defaults().toBuilder().followChancePerHour(follow).build();
+        SimSettings settings = SimSettings.defaults().toBuilder().followChancePerHour(follow).joinChancePerHour(join)
+            .moanResponsePerHour(moan).build();
+        System.out.println("follow " + follow + "/h, join " + join + "/h, moan " + moan + "/h");
         Simulation sim = new Simulation(s, map, settings, seed, 0);
         long t0 = System.currentTimeMillis();
         for (int day = 1; day <= days; day++) {

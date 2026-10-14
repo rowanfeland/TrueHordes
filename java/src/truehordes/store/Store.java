@@ -146,11 +146,17 @@ public final class Store {
 
     /** Records inside [minX,maxX) x [minY,maxY): as points if there are at most maxPoints, else counts per cell. */
     public Snapshot snapshot(float minX, float minY, float maxX, float maxY, int maxPoints) {
-        int limit = Math.max(1, maxPoints);
         List<ZombieRecord> in = new ArrayList<>();
         for (ZombieRecord e : byId.values()) {
             if (e.x >= minX && e.x < maxX && e.y >= minY && e.y < maxY) in.add(e);
         }
+        return snapshotOf(in, minX, minY, maxX, maxY, maxPoints);
+    }
+
+    /** The same, for records already picked from the rectangle (e.g. through the simulation's spatial grid). */
+    public static Snapshot snapshotOf(List<ZombieRecord> in, float minX, float minY, float maxX, float maxY,
+                                      int maxPoints) {
+        int limit = Math.max(1, maxPoints);
         if (in.size() <= limit) {
             // Points: x, y, kind (0 wanderer, 1 straggler).
             float[] d = new float[in.size() * 3];

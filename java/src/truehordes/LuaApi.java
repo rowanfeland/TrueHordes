@@ -151,7 +151,16 @@ public final class LuaApi {
         try {
             // Under the core's lock: the simulation thread moves zombies in the background.
             synchronized (c) {
-                Snapshot s = c.store().snapshot(x0, y0, x1, y1, LuaArgs.toInt(maxPoints, 2000));
+                truehordes.sim.Simulation running = c.simulation();
+                Snapshot s;
+                if (running != null) {
+                    // Through the spatial grid: only the chunks in view, not every held zombie (main thread, locked).
+                    java.util.List<truehordes.store.ZombieRecord> in = new java.util.ArrayList<>();
+                    running.grid().wanderersIn(x0, y0, x1, y1, in::add);
+                    s = truehordes.store.Store.snapshotOf(in, x0, y0, x1, y1, LuaArgs.toInt(maxPoints, 2000));
+                } else {
+                    s = c.store().snapshot(x0, y0, x1, y1, LuaArgs.toInt(maxPoints, 2000));
+                }
                 KahluaTable t = LuaManager.platform.newTable();
                 t.rawset("density", s.density);
                 t.rawset("cell", (double) s.cellSize);

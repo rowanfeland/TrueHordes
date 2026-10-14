@@ -109,7 +109,9 @@ public final class SimulationTest {
 
     public static void testFollowerHordeTrailsUntilItCatchesUp() {
         Store s = new Store();
-        Simulation sim = new Simulation(s, roadMap(400, 21, 10), quiet().toBuilder().offRoadChance(0).build(), 4, 0);
+        // Noticing is certain here: this checks how a follower trails, not how soon it notices.
+        Simulation sim = new Simulation(s, roadMap(400, 21, 10),
+            quiet().toBuilder().offRoadChance(0).moanResponsePerHour(1).build(), 4, 0);
         Horde leader = horde(sim, 60 * 8, 10 * 8 + 4, 0, 2000);
         Horde follower = horde(sim, 50 * 8, 10 * 8 + 4, 0, 20);
         boolean trailed = false;
@@ -219,8 +221,8 @@ public final class SimulationTest {
     public static void testFollowChainsBecomeHordesInATown() {
         Store s = town(300, 2);
         Simulation sim = new Simulation(s, townMap(), SimSettings.defaults(), 6, 0);
-        run(sim, 0, 14 * 24);
-        Check.isTrue(sim.hordes().size() >= 1, "a town of 300 grows at least one horde within two weeks ("
+        run(sim, 0, 28 * 24);
+        Check.isTrue(sim.hordes().size() >= 1, "a town of 300 grows at least one horde within four weeks ("
             + sim.hordes().size() + ")");
         Check.equal("", sim.checkConservation("test"), "conservation");
     }

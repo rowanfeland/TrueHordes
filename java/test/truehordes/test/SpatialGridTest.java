@@ -70,6 +70,22 @@ public final class SpatialGridTest {
         Check.equal(0, found.size(), "too far");
     }
 
+    /** The debug map asks the grid for its view instead of scanning every held zombie. */
+    public static void testWanderersInRectangle() {
+        Store s = new Store();
+        SpatialGrid g = new SpatialGrid();
+        s.setListener(g);
+        rec(s, 10, 10);
+        rec(s, 50, 50);
+        rec(s, 5000, 5000);
+        List<ZombieRecord> small = new ArrayList<>();
+        g.wanderersIn(0, 0, 100, 100, small::add);
+        Check.equal(2, small.size(), "small view: chunk walk");
+        List<ZombieRecord> huge = new ArrayList<>();
+        g.wanderersIn(-100_000, -100_000, 100_000, 100_000, huge::add);
+        Check.equal(3, huge.size(), "huge view: occupied chunks only");
+    }
+
     public static void testMovesKeepOneEntry() {
         Store s = new Store();
         SpatialGrid g = new SpatialGrid();

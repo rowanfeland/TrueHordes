@@ -6,7 +6,8 @@ package truehordes.sim;
  */
 public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSize, double followChancePerHour,
                           double offRoadChance, double breakAwayChance, int sightSetting, int speedSetting,
-                          double realSecondsPerGameMinute, double trailChance, double moanResponsePerHour) {
+                          double realSecondsPerGameMinute, double trailChance, double moanResponsePerHour,
+                          double joinChancePerHour) {
 
     /** Share of the time an off-screen zombie spends walking rather than standing (vanilla zombies idle a lot). */
     public static final double DUTY = 0.5;
@@ -30,6 +31,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         checkChance(breakAwayChance, "breakAwayChance");
         checkChance(trailChance, "trailChance");
         checkChance(moanResponsePerHour, "moanResponsePerHour");
+        checkChance(joinChancePerHour, "joinChancePerHour");
         if (!(realSecondsPerGameMinute > 0)) throw new IllegalArgumentException("realSecondsPerGameMinute must be > 0");
     }
 
@@ -37,9 +39,13 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         if (!(v >= 0 && v <= 1)) throw new IllegalArgumentException(name + " must be in 0..1");
     }
 
-    /** Defaults: the user's decisions (2026-10-14) and the game's defaults (Normal sight, shamblers, 1-hour days). */
+    /**
+     * Defaults: the user's decisions (2026-10-14) and the game's defaults (Normal sight, shamblers, 1-hour days). The
+     * horde rates were tuned on the real map (LouisvilleScenario, 30,000 zombies): about half of Louisville in hordes
+     * after 10 days, most after a month, two city-sized hordes after 2 to 3 months.
+     */
     public static SimSettings defaults() {
-        return new SimSettings(75, 10, 5, 0.03, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.02);
+        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05);
     }
 
     public Builder toBuilder() { return new Builder(this); }
@@ -47,7 +53,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
     public static final class Builder {
         private int stragglerOneIn, hordeFormSize, hordeMinSize, sightSetting, speedSetting;
         private double followChancePerHour, offRoadChance, breakAwayChance, realSecondsPerGameMinute, trailChance,
-            moanResponsePerHour;
+            moanResponsePerHour, joinChancePerHour;
 
         private Builder(SimSettings s) {
             stragglerOneIn = s.stragglerOneIn;
@@ -61,6 +67,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
             realSecondsPerGameMinute = s.realSecondsPerGameMinute;
             trailChance = s.trailChance;
             moanResponsePerHour = s.moanResponsePerHour;
+            joinChancePerHour = s.joinChancePerHour;
         }
 
         public Builder stragglerOneIn(int v) { stragglerOneIn = v; return this; }
@@ -74,10 +81,12 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         public Builder realSecondsPerGameMinute(double v) { realSecondsPerGameMinute = v; return this; }
         public Builder trailChance(double v) { trailChance = v; return this; }
         public Builder moanResponsePerHour(double v) { moanResponsePerHour = v; return this; }
+        public Builder joinChancePerHour(double v) { joinChancePerHour = v; return this; }
 
         public SimSettings build() {
             return new SimSettings(stragglerOneIn, hordeFormSize, hordeMinSize, followChancePerHour, offRoadChance,
-                breakAwayChance, sightSetting, speedSetting, realSecondsPerGameMinute, trailChance, moanResponsePerHour);
+                breakAwayChance, sightSetting, speedSetting, realSecondsPerGameMinute, trailChance, moanResponsePerHour,
+                joinChancePerHour);
         }
     }
 }

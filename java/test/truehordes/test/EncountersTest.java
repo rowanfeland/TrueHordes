@@ -27,7 +27,7 @@ public final class EncountersTest {
             enc = new Encounters(store, hordes, grid, s, new Random(seed));
         }
 
-        Rig() { this(SimSettings.defaults().toBuilder().followChancePerHour(0).build(), 1); }
+        Rig() { this(SimSettings.defaults().toBuilder().followChancePerHour(0).joinChancePerHour(1).build(), 1); }
 
         ZombieRecord wanderer(float x, float y, float heading, boolean building) {
             ZombieRecord r = store.add(x, y, 0, (byte) 0, 0, 0, 0, ZombieRecord.NO_TARGET, ZombieRecord.NO_TARGET,
@@ -94,6 +94,21 @@ public final class EncountersTest {
         Check.equal(21, h.size(), "joined");
         Check.equal(h.id, r.hordeId, "knows its horde");
         Check.equal(0, rig.store.size(), "no longer a wanderer");
+    }
+
+    /** User decision 2026-10-14 (A): a wanderer that sees a horde joins with a chance per hour, not at once. */
+    public static void testJoiningTakesTime() {
+        Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(0).joinChancePerHour(0.2).build(), 8);
+        Horde h = rig.horde(5000, 5000, 0, 20);
+        int joined = 0;
+        for (int i = 0; i < 2000; i++) {
+            ZombieRecord r = rig.wanderer(4990, 5000, 0, false);
+            rig.enc.wanderer(r, 1, 1.0);
+            if (rig.store.get(r.id) == null) joined++;
+            else rig.store.remove(r.id);
+        }
+        Check.isTrue(joined > 300 && joined < 500, "about 20% join within an hour of seeing it (" + joined + ")");
+        Check.isTrue(h.size() == 20 + joined, "joined ones are members");
     }
 
     public static void testWandererBehindHordeDoesNotSee() {
