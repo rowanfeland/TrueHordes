@@ -60,6 +60,24 @@ public final class Hordes {
         return true;
     }
 
+    /** Removes the member at index {@code i} in O(1) (the last member takes its place; order does not matter). */
+    public ZombieRecord removeMemberAt(Horde h, int i) {
+        List<ZombieRecord> m = h.members;
+        ZombieRecord r = m.get(i);
+        int last = m.size() - 1;
+        m.set(i, m.get(last));
+        m.remove(last);
+        members--;
+        return r;
+    }
+
+    /** Removes the given members in one pass (identity). */
+    public void removeMembers(Horde h, java.util.Set<ZombieRecord> gone) {
+        int before = h.members.size();
+        h.members.removeIf(gone::contains);
+        members -= before - h.members.size();
+    }
+
     /** Moves every member of {@code from} into {@code into} and removes {@code from}. */
     public void absorb(Horde into, Horde from) {
         for (ZombieRecord r : from.members) r.hordeId = into.id;

@@ -48,10 +48,28 @@ public final class RespawnerTest {
 
         int count(int cellX) { return store.countInCell(cellX, 0); }
 
+        double last = 0;
+
         int update(double hours) {
-            return respawner.update(hours, book, (cx, cy) -> store.countInCell(cx, cy), MAP, s, new Random(3), EDGE,
+            int n = respawner.update(hours, last, book, (cx, cy) -> store.countInCell(cx, cy), MAP, s, new Random(3), EDGE,
                 (x, y) -> true, store, NOBODY);
+            last = hours;
+            return n;
         }
+    }
+
+    /** Zombies walking out of a never-loaded cell (the simulation) must not be refilled: growth follows the curve. */
+    public static void testZombiesLeavingAnUnloadedCellAreNotRefilled() {
+        World w = new World(PopulationSettings.vanillaDefaults().toBuilder().edgeArrivalMonths(100000f).build());
+        w.update(30 * 24.0); // at the peak
+        int atPeak = w.count(0);
+        java.util.List<truehordes.store.ZombieRecord> inCell = new java.util.ArrayList<>();
+        for (truehordes.store.ZombieRecord r : w.store.all()) if (Math.floorDiv(r.chunkX(), 32) == 0) inCell.add(r);
+        for (int i = 0; i < inCell.size() / 2; i++) w.store.moved(inCell.get(i), 5000 + i % 100, 5000); // walked away
+        int left = w.count(0);
+        Check.isTrue(left < atPeak, "half walked out");
+        for (int h = 1; h <= 48; h++) w.update(30 * 24.0 + h);
+        Check.equal(left, w.count(0), "nobody refills a cell the zombies walked out of");
     }
 
     private static int curveAt(World w, int cellX, double day) { return Formula.curve(w.book.baseTarget(cellX, 0), day, w.s); }

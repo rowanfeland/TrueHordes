@@ -30,33 +30,65 @@ public final class HandOver {
         this.store = store;
     }
 
-    /** Lays out {@code h}: members back in the Store (positions in a column), the horde removed. Returns them. */
+    /**
+     * Lays out {@code h} as a column along its heading (front row first, the column centred on the horde): every
+     * member whose place falls in a loaded chunk with a floor nearby leaves the horde as a held record there (the
+     * arrivals then make it real); the others stay in the horde off screen, which carries on (or breaks up into
+     * wanderers at their places if it is left below the minimum size). Returns the members laid out.
+     */
     public List<ZombieRecord> layOut(Horde h, Takeover.FloorCheck floors) {
-        List<ZombieRecord> out = new ArrayList<>(h.members);
-        int n = out.size();
+        PlayerNearby loaded = sim.players();
+        List<ZombieRecord> members = new ArrayList<>(h.members);
+        int n = members.size();
         int width = Math.max(1, (int) Math.ceil(Math.sqrt(n) / 2));
+        int rows = (n + width - 1) / width;
         float fx = (float) Math.cos(h.heading), fy = (float) Math.sin(h.heading);
         float sx = -fy, sy = fx; // to the side
+        float front = (rows - 1) * SPACING / 2f;
+        List<ZombieRecord> out = new ArrayList<>();
+        java.util.Set<ZombieRecord> gone = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        float[][] places = new float[n][];
+        float oldSpread = h.spread();
         sim.internal(() -> {
-            sim.grid().removeHorde(h);
-            sim.hordes().remove(h.id);
             for (int i = 0; i < n; i++) {
-                ZombieRecord r = out.get(i);
+                ZombieRecord r = members.get(i);
                 int row = i / width, col = i % width;
-                float side = (col - (width - 1) / 2f) * SPACING, back = row * SPACING;
-                float x = h.x - fx * back + sx * side, y = h.y - fy * back + sy * side;
+                float side = (col - (width - 1) / 2f) * SPACING, ahead = front - row * SPACING;
+                float x = h.x + fx * ahead + sx * side, y = h.y + fy * ahead + sy * side;
+                places[i] = new float[] {x, y};
+                if (!loaded.nearChunk(Math.floorDiv((int) Math.floor(x), 8), Math.floorDiv((int) Math.floor(y), 8))) {
+                    continue;
+                }
                 float[] spot = floorNear(x, y, (int) Math.floor(r.z), floors);
-                if (spot == null) spot = new float[] {h.x, h.y};
-                r.followId = 0;
-                r.pauseMinutes = 0;
-                r.lingerUntilHours = 0;
-                r.heading = h.heading;
-                store.restore(r);
-                store.moved(r, spot[0], spot[1]);
+                if (spot == null) continue;
+                gone.add(r);
+                leave(r, h.heading, spot[0], spot[1]);
+                out.add(r);
+            }
+            if (!gone.isEmpty()) sim.hordes().removeMembers(h, gone);
+            if (h.size() < sim.settings().hordeMinSize()) {
+                sim.grid().removeHorde(h, h.x, h.y, oldSpread);
+                sim.hordes().remove(h.id);
+                for (int i = 0; i < n; i++) {
+                    ZombieRecord r = members.get(i);
+                    if (store.get(r.id) != r) leave(r, h.heading, places[i][0], places[i][1]);
+                }
+            } else if (!out.isEmpty()) {
+                sim.grid().moveHorde(h, h.x, h.y, oldSpread);
             }
         });
-        laidOut += n;
+        laidOut += out.size();
         return out;
+    }
+
+    private void leave(ZombieRecord r, float heading, float x, float y) {
+        r.followId = 0;
+        r.pauseMinutes = 0;
+        r.lingerUntilHours = 0;
+        r.idle = false;
+        r.heading = heading;
+        store.restore(r);
+        store.moved(r, x, y);
     }
 
     private static float[] floorNear(float x, float y, int z, Takeover.FloorCheck floors) {

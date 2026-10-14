@@ -144,6 +144,15 @@ public final class CoreTest {
         again.stop();
     }
 
+    /** Final review I1: hordes already touching the loaded area at load are laid out right after the simulation starts. */
+    public static void testArrivalsRunAgainOnceTheSimulationExists() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        Core core = new Core(env);
+        core.tick();
+        Check.isTrue(env.spawnLoadedCalls >= 2, "arrivals run again after the simulation started (" + env.spawnLoadedCalls + ")");
+        core.stop();
+    }
+
     public static void testWaitsForWorld() throws Exception {
         FakeEnv env = new FakeEnv(file());
         env.worldReady = false;
@@ -362,9 +371,9 @@ public final class CoreTest {
             env.newWorld = true;
             Core core = new Core(env);
             core.tick();
-            Check.equal(1, env.spawnLoadedCalls, "arrivals for chunks loaded at start");
+            Check.equal(2, env.spawnLoadedCalls, "arrivals for chunks loaded at start (again once the simulation exists)");
             runUntilSeeded(core, env);
-            Check.equal(2, env.spawnLoadedCalls, "and again once the seeded zombies exist");
+            Check.equal(3, env.spawnLoadedCalls, "and again once the seeded zombies exist");
         } finally {
             Log.setSink(null);
         }

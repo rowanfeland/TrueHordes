@@ -160,8 +160,7 @@ public final class Encounters {
             for (int t = 0; t < tightChunks; t++) {
                 for (int i = h.members.size() - 1; i >= 0; i--) {
                     if (rng.nextDouble() < s.breakAwayChance()) {
-                        ZombieRecord r = h.members.get(i);
-                        hordes.removeMember(h, r);
+                        ZombieRecord r = hordes.removeMemberAt(h, i); // going backwards: the swapped-in one was seen
                         leaveAsWanderer(h, r, old, nowHours + 1 + 5 * rng.nextDouble());
                         brokeAway++;
                     }

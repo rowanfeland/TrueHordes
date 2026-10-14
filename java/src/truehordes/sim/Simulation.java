@@ -99,6 +99,8 @@ public final class Simulation {
 
     public Movement movement() { return movement; }
 
+    public SimSettings settings() { return s; }
+
     public HandOver handOver() { return handOver; }
 
     /** True once after a horde touched the loaded area (the main thread then runs arrivals for loaded chunks). */
@@ -106,6 +108,13 @@ public final class Simulation {
         boolean d = layoutDue;
         layoutDue = false;
         return d;
+    }
+
+    /** Horde members per 256-tile cell (by horde centre), keyed like CellBook: (cellX << 32) | cellY. */
+    public Map<Long, Integer> hordeMembersPerCell() {
+        Map<Long, Integer> out = new HashMap<>();
+        for (Horde h : hordes.all()) out.merge(cellKey(h.x, h.y), h.size(), Integer::sum);
+        return out;
     }
 
     /** Zombies held off screen: wanderers plus horde members. */
@@ -316,11 +325,8 @@ public final class Simulation {
         h.simHours = now;
         h.dueMinute = Long.MIN_VALUE;
         int iv = interval(h.x, h.y);
-        if (iv < LevelOfDetail.FAR_MINUTES && HandOver.touchesLoaded(h, players)) {
-            layoutDue = true; // laid out by the hand-over on the main thread; it waits here until then
-            scheduleHorde(h, currentMinute + LevelOfDetail.EDGE_MINUTES);
-            return;
-        }
+        // Touching the loaded area: the main thread lays out the members whose place is inside it (the rest walk on).
+        if (iv < LevelOfDetail.FAR_MINUTES && HandOver.touchesLoaded(h, players)) layoutDue = true;
         boolean walk = true;
         if (h.pauseMinutes > 0) {
             h.pauseMinutes = (float) Math.max(0, h.pauseMinutes - dt);

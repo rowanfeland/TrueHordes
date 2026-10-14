@@ -9,8 +9,9 @@ import truehordes.store.Store;
 
 /**
  * Growth and respawn (spec section 5), run every in-game hour in a mod-seeded world.
- * Growth: a cell no player has ever loaded is topped up to vanilla's start-to-peak curve (vanilla fills an untouched
- * cell at the curve value of the day it is first touched). Respawn: a visited cell with no player near, at least 10
+ * Growth: a cell no player has ever loaded gains what vanilla's start-to-peak curve rose by since the last update
+ * (vanilla fills an untouched cell at the curve value of the day it is first touched). Only the rise is added, never a
+ * refill: zombies wander between cells off screen (sub-project 4), so a cell they walked out of stays emptier. Respawn: a visited cell with no player near, at least 10
  * below the curve, whose RespawnHours have passed, gets one group in an eligible chunk (unseen for RespawnUnseenHours,
  * below its own value, not refilled for RespawnHours) or, with the edge share from EdgeArrivalMonths, at the map's edge.
  */
@@ -27,12 +28,14 @@ public final class Respawner {
     public int lastEdgeArrivals() { return edgeLast; }
 
     /** Returns the zombies added. */
-    public int update(double hours, CellBook book, PopulationCounter counter, MapSource map, PopulationSettings s,
-                      Random rnd, EdgeChunks edge, TilePicker tiles, Store store, PlayerNearby players) {
+    public int update(double hours, double previousHours, CellBook book, PopulationCounter counter, MapSource map,
+                      PopulationSettings s, Random rnd, EdgeChunks edge, TilePicker tiles, Store store,
+                      PlayerNearby players) {
         respawnedLast.clear();
         edgeLast = 0;
         if (!book.initialised()) return 0;
         double day = hours / 24.0;
+        double previousDay = Math.min(hours, previousHours) / 24.0;
         double edgeShare = s.edgeArrivalMonths <= 0f ? 1.0
             : Math.min(1.0, Math.max(0.0, (hours - book.startHours()) / HOURS_PER_MONTH / s.edgeArrivalMonths));
         int added = 0;
@@ -42,10 +45,11 @@ public final class Respawner {
                 int t = book.baseTarget(cellX, cellY);
                 if (t <= 0 || players.nearCell(cellX, cellY)) continue;
                 int target = Formula.curve(t, day, s);
-                int have = counter.count(cellX, cellY);
                 if (!book.everLoaded(cellX, cellY)) {
-                    if (target > have) added += grow(cellX, cellY, target - have, map, s, rnd, tiles, store);
+                    int rise = target - Formula.curve(t, previousDay, s);
+                    if (rise > 0) added += grow(cellX, cellY, rise, map, s, rnd, tiles, store);
                 } else {
+                    int have = counter.count(cellX, cellY);
                     added += respawn(cellX, cellY, hours, target, target - have, book, map, s, rnd, edge, edgeShare,
                         tiles, store, players);
                 }

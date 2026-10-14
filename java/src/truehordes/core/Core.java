@@ -172,6 +172,7 @@ public final class Core {
         }
         population.start(r);
         startSimulation(r, now);
+        env.spawnLoadedChunks(); // again, now that the simulation exists: lays out hordes already at the loaded area
         return true;
     }
 
@@ -189,6 +190,7 @@ public final class Core {
             Log.error("could not read where the players are; the simulation treats every area as far away", t);
         }
         takeover.setRejoin(sim.handOver()::rejoin);
+        population.setHordeCounter(sim::hordeMembersPerCell);
         simThread = new SimThread(this, sim, () -> simNowHours, world::ready, SIM_SLICE_NANOS, SIM_SLEEP_MILLIS);
         simThread.start();
         Log.info("simulation started: " + store.size() + " wanderers, " + sim.hordes().size() + " hordes");
@@ -253,6 +255,7 @@ public final class Core {
         simThread = null;
         sim = null;
         takeover.setRejoin(null);
+        population.setHordeCounter(null);
         lastConservationHours = Double.NaN;
         store.setListener(null);
         store.clear();

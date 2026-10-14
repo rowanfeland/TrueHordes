@@ -30,14 +30,25 @@ public final class HandOverTest {
         return new Simulation(s, SimulationTest.openMap(200, -1), SimSettings.defaults(), 1, 0);
     }
 
-    public static void testLayoutIsColumnBehindHeading() {
-        Store s = new Store();
+    /** A simulation where every chunk counts as loaded (a whole horde can be laid out). */
+    static Simulation allLoaded(Store s) {
         Simulation sim = sim(s);
+        sim.setPlayers(new truehordes.population.PlayerNearby() {
+            @Override public boolean nearCell(int cellX, int cellY) { return true; }
+            @Override public boolean nearChunk(int chunkX, int chunkY) { return true; }
+        });
+        return sim;
+    }
+
+    public static void testLayoutIsColumnAlongHeading() {
+        Store s = new Store();
+        Simulation sim = allLoaded(s);
         Horde h = horde(sim, 500, 500, 0, 100);
         List<ZombieRecord> out = sim.handOver().layOut(h, ALL_FLOOR);
+        Check.equal(100, out.size(), "all inside the loaded area are laid out");
         float minX = Float.MAX_VALUE, maxX = -Float.MAX_VALUE, minY = Float.MAX_VALUE, maxY = -Float.MAX_VALUE;
         for (ZombieRecord r : out) {
-            Check.isTrue(r.x() <= 501, "behind the centre (heading east)");
+            Check.isTrue(Math.abs(r.x() - 500) <= 13, "column centred on the horde (100 zombies: 20 rows of 5)");
             minX = Math.min(minX, r.x()); maxX = Math.max(maxX, r.x());
             minY = Math.min(minY, r.y()); maxY = Math.max(maxY, r.y());
         }
@@ -51,6 +62,7 @@ public final class HandOverTest {
         Store s = new Store();
         Simulation sim = sim(s);
         Horde h = horde(sim, 500, 500, 1, 100);
+        sim.setPlayers(allLoaded(new Store()).players());
         List<ZombieRecord> before = new ArrayList<>(h.members);
         List<ZombieRecord> out = sim.handOver().layOut(h, ALL_FLOOR);
         Check.equal(100, out.size(), "everyone");
@@ -80,7 +92,32 @@ public final class HandOverTest {
         for (int cx = 100; cx <= 106; cx++) {
             for (int cy = 97; cy <= 103; cy++) out.addAll(sim.handOver().layOutTouching(cx, cy, ALL_FLOOR));
         }
-        Check.equal(400, out.size(), "laid out when the arrivals of the chunk it touches run");
+        Check.isTrue(!out.isEmpty(), "its front is laid out when the arrivals of the chunk it touches run");
+        for (ZombieRecord r : out) {
+            Check.isTrue(sim.players().nearChunk(Math.floorDiv((int) r.x(), 8), Math.floorDiv((int) r.y(), 8)),
+                "inside the loaded area");
+        }
+        Horde rest = sim.hordes().get(h.id);
+        Check.equal(400, out.size() + (rest == null ? 0 : rest.size()), "nobody lost");
+    }
+
+    /**
+     * Final review C1: a horde just touching the loaded area lays out only the members whose place is inside it (where
+     * the game has floors); the rest stay a horde off screen, nobody is dumped on the centre tile.
+     */
+    public static void testOnlyMembersInsideTheLoadedAreaAreLaidOut() {
+        Store s = new Store();
+        Simulation sim = sim(s);
+        Horde h = horde(sim, 790, 804, 0, 400); // spread 12: reaches x 802, loaded area starts at x 800
+        truehordes.population.PlayerNearby loaded = SimulationTest.loadedAround(106, 100, 6); // chunks 100..112
+        Takeover.FloorCheck floors = (x, y, z) -> Math.floorDiv(x, 8) >= 100; // the game only has floors loaded
+        sim.setPlayers(loaded);
+        List<ZombieRecord> out = sim.handOver().layOutTouching(100, 100, floors);
+        Check.isTrue(!out.isEmpty(), "the front of the horde becomes real");
+        for (ZombieRecord r : out) Check.isTrue(r.x() >= 800, "only members inside the loaded area are laid out");
+        Check.isTrue(sim.hordes().get(h.id) != null, "the rest stays a horde off screen");
+        Check.equal(400, out.size() + h.size(), "everyone is either laid out or still in the horde");
+        Check.equal("", sim.checkConservation("test"), "conservation");
     }
 
     public static void testRealMemberRejoinsNearbyHorde() {
@@ -114,10 +151,13 @@ public final class HandOverTest {
         Horde h = horde(sim, 500, 500, 0, 30);
         Takeover t = new Takeover(s);
         t.setRejoin(sim.handOver()::rejoin);
+        sim.setPlayers(allLoaded(new Store()).players());
         sim.handOver().layOut(h, ALL_FLOOR);
         int cx = Math.floorDiv(500, 8), cy = Math.floorDiv(500, 8);
         List<ZombieRecord> spawned = new ArrayList<>();
-        for (int x = cx - 4; x <= cx; x++) spawned.addAll(t.arrivals(x, cy, id -> false, ALL_FLOOR));
+        for (int x = cx - 4; x <= cx + 4; x++) {
+            for (int y = cy - 4; y <= cy + 4; y++) spawned.addAll(t.arrivals(x, y, id -> false, ALL_FLOOR));
+        }
         Check.isTrue(!spawned.isEmpty(), "members became real");
         long held = sim.held();
         // A real zombie that dies is never taken back: nothing re-enters, and its old horde does not exist anymore.

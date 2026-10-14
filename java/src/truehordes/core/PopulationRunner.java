@@ -128,15 +128,23 @@ final class PopulationRunner {
         env.spawnLoadedChunks();
     }
 
+    /** Zombies held in hordes per cell (sub-project 4), so respawn sees them; set by the core. */
+    private java.util.function.Supplier<Map<Long, Integer>> inHordes = java.util.Map::of;
+
+    void setHordeCounter(java.util.function.Supplier<Map<Long, Integer>> c) { inHordes = c == null ? java.util.Map::of : c; }
+
     private void hourly(double hours) {
+        double previous = Double.isNaN(lastHourly) ? hours : lastHourly;
         lastHourly = hours;
         settings = env.populationSettings();
         if (map == null) map = env.mapSource();
         if (!book.initialised()) book.init(map, settings, rnd::nextInt, hours);
         for (long k : env.loadedChunks()) book.seen((int) (k >> 32), (int) k, hours);
         Map<Long, Integer> real = env.realZombiesPerCell();
-        int added = respawner.update(hours, book,
-            (cx, cy) -> store.countInCell(cx, cy) + real.getOrDefault(((long) cx << 32) | (cy & 0xFFFFFFFFL), 0),
+        Map<Long, Integer> hordes = inHordes.get();
+        int added = respawner.update(hours, previous, book,
+            (cx, cy) -> store.countInCell(cx, cy) + hordes.getOrDefault(((long) cx << 32) | (cy & 0xFFFFFFFFL), 0)
+                + real.getOrDefault(((long) cx << 32) | (cy & 0xFFFFFFFFL), 0),
             map, settings, rnd, edgeChunks(), world::walkable, store, env.playerNearby());
         if (added > 0) Log.debug("population", "growth and respawn added " + added);
     }
