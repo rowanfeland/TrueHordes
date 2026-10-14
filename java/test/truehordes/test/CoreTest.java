@@ -99,6 +99,51 @@ public final class CoreTest {
         core.stop();
     }
 
+    public static void testHotSaveDoesNotWriteOnCallerThread() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        Core core = new Core(env);
+        core.tick();
+        Check.isTrue(core.hotSave(), "hot save submitted");
+        boolean saveThread = false;
+        for (Thread t : Thread.getAllStackTraces().keySet()) if (t.getName().equals("TrueHordes-save")) saveThread = true;
+        Check.isTrue(saveThread, "the file is written by the save thread");
+        core.stop();
+        Check.equal(truehordes.save.LoadResult.Status.OK, SaveFile.read(env.stateFile).status, "on disk after stop");
+    }
+
+    public static void testStopFlushesPendingSave() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        Core core = new Core(env);
+        core.tick();
+        core.hotSave();
+        core.stop();
+        Check.equal(truehordes.save.LoadResult.Status.OK, SaveFile.read(env.stateFile).status,
+            "stop waited for the pending write");
+    }
+
+    public static void testHordesSurviveSaveAndReload() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        Core core = new Core(env);
+        core.tick();
+        synchronized (core) {
+            java.util.List<truehordes.store.ZombieRecord> m = new java.util.ArrayList<>();
+            for (int i = 0; i < 15; i++) {
+                m.add(new truehordes.store.ZombieRecord(900_000 + i, 50, 50, 0, (byte) 0, 0, 0, 0,
+                    truehordes.store.ZombieRecord.NO_TARGET, truehordes.store.ZombieRecord.NO_TARGET, null, false));
+            }
+            core.simulation().restoreHorde(core.simulation().hordes().nextId(), 50, 50, 0, 0, m);
+        }
+        Check.isTrue(core.save(), "saved");
+        core.stop();
+        Core again = new Core(env);
+        again.tick();
+        synchronized (again) {
+            Check.equal(1, again.simulation().hordes().size(), "the horde came back");
+            Check.equal(15, again.simulation().hordes().memberCount(), "with its members");
+        }
+        again.stop();
+    }
+
     public static void testWaitsForWorld() throws Exception {
         FakeEnv env = new FakeEnv(file());
         env.worldReady = false;

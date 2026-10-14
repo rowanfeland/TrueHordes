@@ -44,6 +44,9 @@ public final class Core {
     private double lastSaveHours = Double.NaN;
     private long lastWriteMillis = Long.MIN_VALUE;
     private final PopulationRunner population;
+    private final SaveWriter saveWriter = new SaveWriter();
+    /** How long a full save or stop waits for the save thread, in real milliseconds. */
+    static final long SAVE_FLUSH_MS = 10_000L;
     private truehordes.sim.SimSettings simSettings = truehordes.sim.SimSettings.defaults();
     private truehordes.sim.Simulation sim;
     private SimThread simThread;
@@ -168,14 +171,18 @@ public final class Core {
             Log.error("could not read the map data; terrain knowledge is off", t);
         }
         population.start(r);
-        startSimulation(now);
+        startSimulation(r, now);
         return true;
     }
 
-    private void startSimulation(double now) {
+    private void startSimulation(LoadResult r, double now) {
         simNowHours = now;
         sim = new truehordes.sim.Simulation(store, new truehordes.sim.WorldMapView(world), simSettings, System.nanoTime(),
             now);
+        for (LoadResult.SavedHorde h : r.hordes) {
+            sim.restoreHorde(h.id(), h.x(), h.y(), h.heading(), h.pauseMinutes(), h.members());
+        }
+        sim.hordes().setNextId(r.hordeNextId);
         try {
             sim.setPlayers(env.playerNearby());
         } catch (Throwable t) {
@@ -202,16 +209,26 @@ public final class Core {
 
     /** Writes the mod's state; called from the game's save. Returns true if a file was written. */
     public synchronized boolean save() {
+        if (!submitSave()) return false;
+        // A full save (the game's own save, quitting) waits until the file is on disk.
+        if (!saveWriter.flush(SAVE_FLUSH_MS)) Log.warn("the mod's save is still being written");
+        return true;
+    }
+
+    /** Encodes the state in memory (under this lock) and hands the file write to the save thread. */
+    private boolean submitSave() {
         if (state != State.RUNNING || env.isClient()) return false;
         try {
-            SaveFile.write(env.stateFile(), store, env.worldAgeHours(), population.mode() == PopulationRunner.Mode.SEEDED,
-                population.blob());
+            byte[] data = SaveFile.encode(store, sim == null ? null : sim.hordes(), env.worldAgeHours(),
+                population.mode() == PopulationRunner.Mode.SEEDED, population.blob());
+            saveWriter.submit(env.stateFile(), data);
             lastSaveHours = env.worldAgeHours();
             lastWriteMillis = wallClockMillis.getAsLong();
-            Log.debug("core", "saved " + store.size() + " held zombies");
+            Log.debug("core", "saved " + store.size() + " wanderers and " + (sim == null ? 0 : sim.hordes().memberCount())
+                + " zombies in hordes");
             return true;
         } catch (IOException e) {
-            Log.error("could not write the mod's save file " + env.stateFile(), e);
+            Log.error("could not encode the mod's save", e);
             return false;
         }
     }
@@ -224,13 +241,14 @@ public final class Core {
         if (state != State.RUNNING || env.isClient()) return false;
         long now = wallClockMillis.getAsLong();
         if (lastWriteMillis != Long.MIN_VALUE && now - lastWriteMillis < HOT_SAVE_MIN_MS) return false;
-        return save();
+        return submitSave(); // written on the save thread: the main thread only pays for the encode
     }
 
     /** World unloaded: forget everything (no save here; the game's save already ran). */
     public synchronized void stop() {
         if (state == State.RUNNING) Log.info("stopped");
         if (state != State.DISABLED) state = State.IDLE;
+        if (!saveWriter.flush(SAVE_FLUSH_MS)) Log.warn("the mod's last save was still being written at stop");
         if (simThread != null) simThread.stop();
         simThread = null;
         sim = null;

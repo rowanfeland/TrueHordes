@@ -16,9 +16,22 @@ public final class LoadResult {
     /** The population bookkeeping (CellBook) as saved; empty when there is none. */
     public final byte[] population;
     public final String message;
+    /** Hordes held off screen (version 3); empty for older saves. */
+    public final List<SavedHorde> hordes;
+    public final long hordeNextId;
+
+    /** A saved horde: its members are whole records. */
+    public record SavedHorde(long id, float x, float y, float heading, float pauseMinutes, List<ZombieRecord> members) {}
 
     LoadResult(Status status, double worldAgeHours, long nextId, List<ZombieRecord> records, boolean seeded,
                byte[] population, String message) {
+        this(status, worldAgeHours, nextId, records, seeded, population, message, List.of(), 1);
+    }
+
+    LoadResult(Status status, double worldAgeHours, long nextId, List<ZombieRecord> records, boolean seeded,
+               byte[] population, String message, List<SavedHorde> hordes, long hordeNextId) {
+        this.hordes = hordes;
+        this.hordeNextId = hordeNextId;
         this.status = status;
         this.worldAgeHours = worldAgeHours;
         this.nextId = nextId;
@@ -29,7 +42,7 @@ public final class LoadResult {
     }
 
     LoadResult withStatus(Status s, String msg) {
-        return new LoadResult(s, worldAgeHours, nextId, records, seeded, population, msg);
+        return new LoadResult(s, worldAgeHours, nextId, records, seeded, population, msg, hordes, hordeNextId);
     }
 
     static LoadResult empty(Status status, String message) {

@@ -168,6 +168,103 @@ public final class SaveFileTest {
         Check.equal(0, plain.population.length, "default empty blob");
     }
 
+    public static void testV3RoundTripKeepsHordesAndWalkFields() throws IOException {
+        Path f = tempDir().resolve("state.bin");
+        Store s = sample();
+        ZombieRecord w = s.all().iterator().next();
+        w.heading = 1.25f;
+        w.pauseMinutes = 3.5f;
+        w.straggler = true;
+        w.strRolled = true;
+        w.followId = 42;
+        w.hordeId = 7;
+        w.lingerUntilHours = 99.5;
+        w.idle = true;
+        truehordes.sim.Hordes hs = new truehordes.sim.Hordes();
+        java.util.List<ZombieRecord> m = new java.util.ArrayList<>();
+        for (int i = 0; i < 12; i++) {
+            m.add(new ZombieRecord(500 + i, 10, 20, 0, (byte) 2, 300 + i, 4, 900 + i, ZombieRecord.NO_TARGET,
+                ZombieRecord.NO_TARGET, new byte[] {(byte) i}, false));
+        }
+        truehordes.sim.Horde h = hs.create(1000.5f, 2000.25f, -0.5f, m);
+        h.pauseMinutes = 4f;
+        SaveFile.writeBytes(f, SaveFile.encode(s, hs, 12.0, true, new byte[] {9, 8}));
+        LoadResult r = SaveFile.read(f);
+        Check.equal(LoadResult.Status.OK, r.status, "read back");
+        ZombieRecord back = null;
+        for (ZombieRecord x : r.records) if (x.id == w.id) back = x;
+        Check.isTrue(back != null, "wanderer kept");
+        Check.near(1.25, back.heading, 1e-6, "heading");
+        Check.near(3.5, back.pauseMinutes, 1e-6, "pause");
+        Check.isTrue(back.straggler && back.strRolled && back.idle, "flags");
+        Check.equal(42L, back.followId, "follow");
+        Check.equal(7L, back.hordeId, "horde id");
+        Check.near(99.5, back.lingerUntilHours, 1e-9, "linger");
+        Check.equal(1, r.hordes.size(), "one horde");
+        LoadResult.SavedHorde sh = r.hordes.get(0);
+        Check.equal(h.id, sh.id(), "horde id kept");
+        Check.near(1000.5, sh.x(), 1e-4, "x");
+        Check.near(2000.25, sh.y(), 1e-4, "y");
+        Check.near(-0.5, sh.heading(), 1e-6, "heading");
+        Check.near(4, sh.pauseMinutes(), 1e-6, "pause");
+        Check.equal(12, sh.members().size(), "members");
+        Check.equal(305, sh.members().get(5).outfitId, "member outfit");
+        Check.equal(905, sh.members().get(5).persistentId, "member persistent id");
+        Check.equal((byte) 5, sh.members().get(5).modData[0], "member mod data");
+        Check.equal(h.id, sh.members().get(5).hordeId, "member knows its horde");
+        Check.equal(hs.nextId(), r.hordeNextId, "horde id counter");
+    }
+
+    /** A version 2 file exactly as sub-project 3 wrote it. */
+    private static void writeV2(Path f, Store s) throws IOException {
+        java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream out = new java.io.DataOutputStream(bytes);
+        out.writeInt(SaveFile.MAGIC);
+        out.writeInt(2);
+        out.writeDouble(5.0);
+        out.writeLong(0L);
+        out.writeLong(s.nextId());
+        out.writeBoolean(true);
+        out.writeInt(0);
+        out.writeInt(s.size());
+        for (ZombieRecord r : s.all()) {
+            out.writeLong(r.id);
+            out.writeFloat(r.x());
+            out.writeFloat(r.y());
+            out.writeFloat(r.z);
+            out.writeByte(r.dir);
+            out.writeInt(r.outfitId);
+            out.writeInt(r.stateFlags);
+            out.writeInt(r.persistentId);
+            out.writeInt(r.targetX);
+            out.writeInt(r.targetY);
+            out.writeBoolean(r.building);
+            out.writeInt(-1);
+        }
+        out.flush();
+        java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+        crc.update(bytes.toByteArray());
+        out.writeLong(crc.getValue());
+        out.flush();
+        Files.write(f, bytes.toByteArray());
+    }
+
+    public static void testV2UpgradesToWanderers() throws IOException {
+        Path f = tempDir().resolve("state.bin");
+        Store s = sample();
+        writeV2(f, s);
+        LoadResult r = SaveFile.read(f);
+        Check.equal(LoadResult.Status.OK, r.status, "version 2 reads");
+        Check.equal(s.size(), r.records.size(), "every zombie kept");
+        Check.equal(0, r.hordes.size(), "no hordes yet");
+        for (ZombieRecord x : r.records) {
+            Check.isTrue(!x.strRolled, "straggler rolled later");
+            Check.equal(0L, x.hordeId, "a wanderer");
+            Check.equal(0L, x.followId, "following nobody");
+        }
+        Check.isTrue(r.seeded, "seeded flag kept");
+    }
+
     public static void testVersion1Upgrades() throws IOException {
         Path f = tempDir().resolve("state.bin");
         java.io.ByteArrayOutputStream bytes = new java.io.ByteArrayOutputStream();

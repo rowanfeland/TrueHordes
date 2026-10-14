@@ -14,6 +14,8 @@ import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.CRC32;
+import truehordes.sim.Horde;
+import truehordes.sim.Hordes;
 import truehordes.store.Store;
 import truehordes.store.ZombieRecord;
 import truehordes.util.Log;
@@ -25,10 +27,10 @@ import truehordes.util.Log;
  */
 public final class SaveFile {
     public static final int MAGIC = 0x54485244; // "THRD"
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
     /** The smallest header of any version (version 1). */
     private static final int HEADER_BYTES = 4 + 4 + 8 + 8 + 8 + 4;
-    private static final int RECORD_BYTES = 8 + 4 * 3 + 1 + 4 * 5 + 1 + 4;
+    private static final int RECORD_BYTES = 8 + 4 * 3 + 1 + 4 * 5 + 1 + 4 + 4 * 2 + 2 + 8 * 3 + 1;
 
     private SaveFile() {}
 
@@ -47,12 +49,20 @@ public final class SaveFile {
         write(file, store, worldAgeHours, false, new byte[0]);
     }
 
-    /** Version 2: header, seeded flag, population bookkeeping blob, then every record. */
     public static void write(Path file, Store store, double worldAgeHours, boolean seeded, byte[] population)
             throws IOException {
-        Path dir = file.toAbsolutePath().getParent();
-        if (dir != null) Files.createDirectories(dir);
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream(64 + population.length + store.size() * RECORD_BYTES);
+        writeBytes(file, encode(store, null, worldAgeHours, seeded, population));
+    }
+
+    /**
+     * Version 3, in memory (quick; done under the core's lock): header, seeded flag, population bookkeeping blob,
+     * every wanderer record, then every horde with its member records; a CRC32 at the end.
+     */
+    public static byte[] encode(Store store, Hordes hordes, double worldAgeHours, boolean seeded, byte[] population)
+            throws IOException {
+        int members = hordes == null ? 0 : hordes.memberCount();
+        ByteArrayOutputStream bytes = new ByteArrayOutputStream(64 + population.length
+            + (store.size() + members) * RECORD_BYTES);
         DataOutputStream out = new DataOutputStream(bytes);
         out.writeInt(MAGIC);
         out.writeInt(VERSION);
@@ -63,23 +73,18 @@ public final class SaveFile {
         out.writeInt(population.length);
         out.write(population);
         out.writeInt(store.size());
-        for (ZombieRecord r : store.all()) {
-            out.writeLong(r.id);
-            out.writeFloat(r.x());
-            out.writeFloat(r.y());
-            out.writeFloat(r.z);
-            out.writeByte(r.dir);
-            out.writeInt(r.outfitId);
-            out.writeInt(r.stateFlags);
-            out.writeInt(r.persistentId);
-            out.writeInt(r.targetX);
-            out.writeInt(r.targetY);
-            out.writeBoolean(r.building);
-            if (r.modData == null) {
-                out.writeInt(-1);
-            } else {
-                out.writeInt(r.modData.length);
-                out.write(r.modData);
+        for (ZombieRecord r : store.all()) writeRecord(out, r);
+        out.writeLong(hordes == null ? 1 : hordes.nextId());
+        out.writeInt(hordes == null ? 0 : hordes.size());
+        if (hordes != null) {
+            for (Horde h : hordes.all()) {
+                out.writeLong(h.id);
+                out.writeFloat(h.x);
+                out.writeFloat(h.y);
+                out.writeFloat(h.heading);
+                out.writeFloat(h.pauseMinutes);
+                out.writeInt(h.size());
+                for (ZombieRecord r : h.members) writeRecord(out, r);
             }
         }
         out.flush();
@@ -87,11 +92,46 @@ public final class SaveFile {
         crc.update(bytes.toByteArray());
         out.writeLong(crc.getValue());
         out.flush();
+        return bytes.toByteArray();
+    }
 
+    private static void writeRecord(DataOutputStream out, ZombieRecord r) throws IOException {
+        out.writeLong(r.id);
+        out.writeFloat(r.x());
+        out.writeFloat(r.y());
+        out.writeFloat(r.z);
+        out.writeByte(r.dir);
+        out.writeInt(r.outfitId);
+        out.writeInt(r.stateFlags);
+        out.writeInt(r.persistentId);
+        out.writeInt(r.targetX);
+        out.writeInt(r.targetY);
+        out.writeBoolean(r.building);
+        if (r.modData == null) {
+            out.writeInt(-1);
+        } else {
+            out.writeInt(r.modData.length);
+            out.write(r.modData);
+        }
+        // Walk state (version 3).
+        out.writeFloat(r.heading);
+        out.writeFloat(r.pauseMinutes);
+        out.writeBoolean(r.straggler);
+        out.writeBoolean(r.strRolled);
+        out.writeLong(r.followId);
+        out.writeLong(r.hordeId);
+        out.writeDouble(r.lingerUntilHours);
+        out.writeBoolean(r.idle);
+    }
+
+    /** Writes encoded bytes: a flushed temp file, the old file kept as .bak, then an atomic replace. */
+    public static void writeBytes(Path file, byte[] data) throws IOException {
+        Path dir = file.toAbsolutePath().getParent();
+        if (dir != null) Files.createDirectories(dir);
         Path tmp = file.resolveSibling(file.getFileName() + ".tmp");
         try (FileChannel ch = FileChannel.open(tmp, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING,
                 StandardOpenOption.WRITE)) {
-            ByteBuffer buf = ByteBuffer.wrap(bytes.toByteArray());
+            ByteBuffer buf = ByteBuffer.wrap(data);
             while (buf.hasRemaining()) ch.write(buf);
             ch.force(true);
         }
@@ -144,7 +184,8 @@ public final class SaveFile {
             case 1:
                 return decodeV1(in, okStatus);
             case 2:
-                return decodeV2(in, okStatus);
+            case 3:
+                return decodeV2(in, okStatus, version);
             default:
                 throw new FormatException("unsupported save version " + version);
         }
@@ -164,7 +205,8 @@ public final class SaveFile {
             "version 1 placeholders discarded");
     }
 
-    private static LoadResult decodeV2(DataInputStream in, LoadResult.Status okStatus) throws IOException {
+    /** Versions 2 and 3 (3 adds walk state per record and the hordes; version 2 records load as wanderers). */
+    private static LoadResult decodeV2(DataInputStream in, LoadResult.Status okStatus, int version) throws IOException {
         double worldAge = in.readDouble();
         in.readLong(); // savedAtMillis: informational
         long nextId = in.readLong();
@@ -175,20 +217,49 @@ public final class SaveFile {
         int count = in.readInt();
         if (count < 0) throw new FormatException("negative record count");
         List<ZombieRecord> records = new ArrayList<>(Math.min(count, 1 << 20));
-        for (int i = 0; i < count; i++) {
-            long id = in.readLong();
-            float x = in.readFloat(), y = in.readFloat(), z = in.readFloat();
-            byte dir = in.readByte();
-            int outfit = in.readInt(), flags = in.readInt(), pid = in.readInt(), tx = in.readInt(), ty = in.readInt();
-            boolean building = in.readBoolean();
-            int mdLength = in.readInt();
-            if (mdLength < -1 || mdLength > in.available()) throw new FormatException("bad mod data length " + mdLength);
-            byte[] modData = mdLength < 0 ? null : in.readNBytes(mdLength);
-            records.add(new ZombieRecord(id, x, y, z, dir, outfit, flags, pid, tx, ty, modData, building));
+        for (int i = 0; i < count; i++) records.add(readRecord(in, version));
+        List<LoadResult.SavedHorde> hordes = new ArrayList<>();
+        long hordeNextId = 1;
+        if (version >= 3) {
+            hordeNextId = in.readLong();
+            int hordeCount = in.readInt();
+            if (hordeCount < 0) throw new FormatException("negative horde count");
+            for (int i = 0; i < hordeCount; i++) {
+                long id = in.readLong();
+                float x = in.readFloat(), y = in.readFloat(), heading = in.readFloat(), pause = in.readFloat();
+                int n = in.readInt();
+                if (n < 0) throw new FormatException("negative horde size");
+                List<ZombieRecord> members = new ArrayList<>(Math.min(n, 1 << 16));
+                for (int k = 0; k < n; k++) members.add(readRecord(in, version));
+                hordes.add(new LoadResult.SavedHorde(id, x, y, heading, pause, members));
+            }
         }
         if (in.available() != 0) throw new FormatException("unexpected trailing data");
         return new LoadResult(okStatus, worldAge, nextId, records, seeded, population,
-            okStatus == LoadResult.Status.OK ? "loaded" : "loaded backup");
+            okStatus == LoadResult.Status.OK ? "loaded" : "loaded backup", hordes, hordeNextId);
+    }
+
+    private static ZombieRecord readRecord(DataInputStream in, int version) throws IOException {
+        long id = in.readLong();
+        float x = in.readFloat(), y = in.readFloat(), z = in.readFloat();
+        byte dir = in.readByte();
+        int outfit = in.readInt(), flags = in.readInt(), pid = in.readInt(), tx = in.readInt(), ty = in.readInt();
+        boolean building = in.readBoolean();
+        int mdLength = in.readInt();
+        if (mdLength < -1 || mdLength > in.available()) throw new FormatException("bad mod data length " + mdLength);
+        byte[] modData = mdLength < 0 ? null : in.readNBytes(mdLength);
+        ZombieRecord r = new ZombieRecord(id, x, y, z, dir, outfit, flags, pid, tx, ty, modData, building);
+        if (version >= 3) {
+            r.heading = in.readFloat();
+            r.pauseMinutes = in.readFloat();
+            r.straggler = in.readBoolean();
+            r.strRolled = in.readBoolean();
+            r.followId = in.readLong();
+            r.hordeId = in.readLong();
+            r.lingerUntilHours = in.readDouble();
+            r.idle = in.readBoolean();
+        }
+        return r;
     }
 
     private static void setAside(Path file) {
