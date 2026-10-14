@@ -23,7 +23,8 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'test compile failed' }
 
     # The game jar is on the test classpath only for LuaSyntaxTest (Kahlua compiler); pure tests never load game classes.
-    & (Join-Path $jdk 'java.exe') -cp "$(Join-Path $out 'test');$(Join-Path $out 'classes');$cp" truehordes.test.TestRunner $gameJar
+    # Same collector as the game (ProjectZomboid64.json), so timing tests see the game's pause behaviour.
+    & (Join-Path $jdk 'java.exe') -XX:+UseShenandoahGC -cp "$(Join-Path $out 'test');$(Join-Path $out 'classes');$cp" truehordes.test.TestRunner $gameJar
     if ($LASTEXITCODE -ne 0) { throw 'tests failed' }
 
     New-Item -ItemType Directory -Force (Split-Path $jarOut) | Out-Null
