@@ -36,6 +36,7 @@ public final class Simulation {
     private final Store store;
     private final SimSettings s;
     private final Random rng;
+    private final java.util.function.DoubleSupplier random;
     private final Hordes hordes = new Hordes();
     private final SpatialGrid grid = new SpatialGrid();
     private final Movement movement;
@@ -56,6 +57,7 @@ public final class Simulation {
         this.store = store;
         this.s = s;
         this.rng = new Random(seed);
+        this.random = rng::nextDouble;
         this.movement = new Movement(map, s);
         this.encounters = new Encounters(store, hordes, grid, s, rng);
         this.currentHours = nowHours;
@@ -231,7 +233,7 @@ public final class Simulation {
     }
 
     private void updateWanderer(ZombieRecord r, double now) {
-        double dt = elapsedMinutes(r.simHours, now, interval(r.x(), r.y()));
+        double dt = elapsedMinutes(r.simHours, now, LevelOfDetail.FAR_MINUTES);
         r.simHours = now;
         r.dueMinute = Long.MIN_VALUE;
         if (players.nearChunk(r.chunkX(), r.chunkY())) {
@@ -274,14 +276,14 @@ public final class Simulation {
             if (walk) {
                 boolean crawler = (r.stateFlags & 2) != 0;
                 Movement.Step st = movement.advance(r.x(), r.y(), r.heading, (float) dt, 1, r.id, crawler, px, py, pw,
-                    rng::nextDouble);
+                    random);
                 if (players.nearChunk(chunk(st.x()), chunk(st.y()))) {
                     r.heading = turnedBack(st.heading());
                 } else {
                     store.moved(r, st.x(), st.y());
                     r.heading = st.heading();
                 }
-                r.pauseMinutes = st.boxedIn() ? 10f : Movement.rollPause((float) dt, rng::nextDouble);
+                r.pauseMinutes = st.boxedIn() ? 10f : Movement.rollPause((float) dt, random);
             }
         }
         internal(() -> encounters.wanderer(r, now, dt / 60.0));
@@ -291,7 +293,7 @@ public final class Simulation {
     }
 
     private void updateHorde(Horde h, double now) {
-        double dt = elapsedMinutes(h.simHours, now, interval(h.x, h.y));
+        double dt = elapsedMinutes(h.simHours, now, LevelOfDetail.FAR_MINUTES);
         h.simHours = now;
         h.dueMinute = Long.MIN_VALUE;
         if (players.nearChunk(chunk(h.x), chunk(h.y))) {
@@ -320,7 +322,7 @@ public final class Simulation {
             if (walk) {
                 float ox = h.x, oy = h.y, oldSpread = h.spread();
                 Movement.Step st = movement.advance(h.x, h.y, h.heading, (float) dt, h.size(), h.id, h.allCrawlers(),
-                    px, py, pw, rng::nextDouble);
+                    px, py, pw, random);
                 if (players.nearChunk(chunk(st.x()), chunk(st.y()))) {
                     h.heading = turnedBack(st.heading());
                 } else {
@@ -330,7 +332,7 @@ public final class Simulation {
                     tight = st.tightChunks();
                 }
                 grid.moveHorde(h, ox, oy, oldSpread);
-                h.pauseMinutes = st.boxedIn() ? 10f : Movement.rollPause((float) dt, rng::nextDouble);
+                h.pauseMinutes = st.boxedIn() ? 10f : Movement.rollPause((float) dt, random);
             }
         }
         final int tightSpots = tight;

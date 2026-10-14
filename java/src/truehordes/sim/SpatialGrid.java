@@ -8,8 +8,8 @@ import java.util.function.Consumer;
 import truehordes.store.ZombieRecord;
 
 /**
- * Walkers bucketed per 8x8-tile chunk so encounters only look at nearby chunks. A horde sits in every chunk its spread
- * circle covers. Not thread-safe: used under the core's lock.
+ * Walkers bucketed so encounters only look nearby: wanderers per 8x8-tile chunk, hordes (few, but wide) per 64x64-tile
+ * block, in every block their spread circle covers. Not thread-safe: used under the core's lock.
  */
 public final class SpatialGrid implements truehordes.store.Store.Listener {
     private final Map<Long, List<ZombieRecord>> wanderers = new HashMap<>();
@@ -21,6 +21,10 @@ public final class SpatialGrid implements truehordes.store.Store.Listener {
     static long key(int cx, int cy) { return ((long) cx << 32) | (cy & 0xFFFFFFFFL); }
 
     static int chunk(float tile) { return Math.floorDiv((int) Math.floor(tile), 8); }
+
+    static final int BLOCK = 64;
+
+    static int block(float tile) { return Math.floorDiv((int) Math.floor(tile), BLOCK); }
 
     @Override public void added(ZombieRecord r) { putWanderer(r); }
 
@@ -71,30 +75,43 @@ public final class SpatialGrid implements truehordes.store.Store.Listener {
      * reported once.
      */
     public void near(float x, float y, float radius, Consumer<ZombieRecord> wandererOut, Consumer<Horde> hordeOut) {
-        int s = ++stamp;
+        nearWanderers(x, y, radius, wandererOut);
+        nearHordes(x, y, radius, hordeOut);
+    }
+
+    /** Wanderers within {@code radius} of (x, y). */
+    public void nearWanderers(float x, float y, float radius, Consumer<ZombieRecord> out) {
         float r2 = radius * radius;
         int x0 = chunk(x - radius), x1 = chunk(x + radius), y0 = chunk(y - radius), y1 = chunk(y + radius);
         for (int cx = x0; cx <= x1; cx++) {
             for (int cy = y0; cy <= y1; cy++) {
-                long k = key(cx, cy);
-                List<ZombieRecord> ws = wanderers.get(k);
-                if (ws != null) {
-                    for (int i = 0; i < ws.size(); i++) {
-                        ZombieRecord w = ws.get(i);
-                        float dx = w.x() - x, dy = w.y() - y;
-                        if (dx * dx + dy * dy <= r2) wandererOut.accept(w);
-                    }
+                List<ZombieRecord> ws = wanderers.get(key(cx, cy));
+                if (ws == null) continue;
+                for (int i = 0; i < ws.size(); i++) {
+                    ZombieRecord w = ws.get(i);
+                    float dx = w.x() - x, dy = w.y() - y;
+                    if (dx * dx + dy * dy <= r2) out.accept(w);
                 }
-                List<Horde> hs = hordes.get(k);
-                if (hs != null) {
-                    for (int i = 0; i < hs.size(); i++) {
-                        Horde h = hs.get(i);
-                        if (h.seenStamp == s) continue;
-                        h.seenStamp = s;
-                        float dx = h.x - x, dy = h.y - y;
-                        float reach = radius + h.spread();
-                        if (dx * dx + dy * dy <= reach * reach) hordeOut.accept(h);
-                    }
+            }
+        }
+    }
+
+    /** Hordes whose circle comes within {@code radius} of (x, y), each once. */
+    public void nearHordes(float x, float y, float radius, Consumer<Horde> out) {
+        if (hordeEntries == 0) return;
+        int s = ++stamp;
+        int x0 = block(x - radius), x1 = block(x + radius), y0 = block(y - radius), y1 = block(y + radius);
+        for (int bx = x0; bx <= x1; bx++) {
+            for (int by = y0; by <= y1; by++) {
+                List<Horde> hs = hordes.get(key(bx, by));
+                if (hs == null) continue;
+                for (int i = 0; i < hs.size(); i++) {
+                    Horde h = hs.get(i);
+                    if (h.seenStamp == s) continue;
+                    h.seenStamp = s;
+                    float dx = h.x - x, dy = h.y - y;
+                    float reach = radius + h.spread();
+                    if (dx * dx + dy * dy <= reach * reach) out.accept(h);
                 }
             }
         }
@@ -127,7 +144,7 @@ public final class SpatialGrid implements truehordes.store.Store.Listener {
     }
 
     private static void forCircle(float x, float y, float r, java.util.function.LongConsumer out) {
-        int x0 = chunk(x - r), x1 = chunk(x + r), y0 = chunk(y - r), y1 = chunk(y + r);
-        for (int cx = x0; cx <= x1; cx++) for (int cy = y0; cy <= y1; cy++) out.accept(key(cx, cy));
+        int x0 = block(x - r), x1 = block(x + r), y0 = block(y - r), y1 = block(y + r);
+        for (int bx = x0; bx <= x1; bx++) for (int by = y0; by <= y1; by++) out.accept(key(bx, by));
     }
 }

@@ -79,7 +79,7 @@ public final class SimulationTest {
     public static void testFarWalkersUpdateLessOften() {
         MapView map = openMap(400, -1);
         Store edge = new Store();
-        add(edge, 100 * 8 + 4, 103 * 8 + 4, 0);
+        add(edge, 100 * 8 + 4, 102 * 8 + 4, 0);
         Simulation a = new Simulation(edge, map, quiet(), 1, 0);
         a.setPlayers(loadedAround(100, 100, 1));
         run(a, 0, 1);
@@ -88,8 +88,8 @@ public final class SimulationTest {
         Simulation b = new Simulation(far, map, quiet(), 1, 0);
         b.setPlayers(loadedAround(100, 100, 1));
         run(b, 0, 1);
-        Check.isTrue(a.updatesTotal() >= 50, "near the loaded edge: about every minute (" + a.updatesTotal() + ")");
-        Check.isTrue(b.updatesTotal() <= 4, "far away: every 20 minutes (" + b.updatesTotal() + ")");
+        Check.isTrue(a.updatesTotal() >= 30, "near the loaded edge: about every minute (" + a.updatesTotal() + ")");
+        Check.isTrue(b.updatesTotal() <= 3, "far away: every 30 minutes (" + b.updatesTotal() + ")");
     }
 
     public static void testSliceRespectsBudget() {

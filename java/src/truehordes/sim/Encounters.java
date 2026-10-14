@@ -28,9 +28,12 @@ public final class Encounters {
     private final SpatialGrid grid;
     private final SimSettings s;
     private final Random rng;
+    private final java.util.function.DoubleSupplier random;
     private final Map<Long, List<ZombieRecord>> responders = new HashMap<>();
     private final List<ZombieRecord> seenWanderers = new ArrayList<>();
     private final List<Horde> seenHordes = new ArrayList<>();
+    private final java.util.function.Consumer<ZombieRecord> addSeenWanderer = seenWanderers::add;
+    private final java.util.function.Consumer<Horde> addSeenHorde = seenHordes::add;
     private int formed, joined, merged, brokeAway, dissolved;
 
     public Encounters(Store store, Hordes hordes, SpatialGrid grid, SimSettings s, Random rng) {
@@ -39,6 +42,7 @@ public final class Encounters {
         this.grid = grid;
         this.s = s;
         this.rng = rng;
+        this.random = rng::nextDouble;
     }
 
     /** Rolls the straggler flag once per zombie (1 in StragglerOneIn). */
@@ -64,22 +68,27 @@ public final class Encounters {
         rollStraggler(r);
         if (r.straggler || r.idle) return;
         float radius = sightRadius(r);
-        seenWanderers.clear();
         seenHordes.clear();
-        grid.near(r.x(), r.y(), radius, seenWanderers::add, seenHordes::add);
-        for (Horde h : seenHordes) {
-            if (Vision.sees(r.x(), r.y(), r.heading, h.x, h.y, h.spread(), radius, rng::nextDouble)) {
+        grid.nearHordes(r.x(), r.y(), radius, addSeenHorde);
+        for (int i = 0; i < seenHordes.size(); i++) {
+            Horde h = seenHordes.get(i);
+            if (Vision.sees(r.x(), r.y(), r.heading, h.x, h.y, h.spread(), radius, random)) {
                 join(h, r);
                 return;
             }
         }
         if (r.followId > 0 && store.get(r.followId) == null) r.followId = 0;
-        if (r.followId == 0 && moving(r, nowHours) && s.followChancePerHour() > 0) {
-            double p = 1 - Math.pow(1 - s.followChancePerHour(), dtHours);
-            for (ZombieRecord w : seenWanderers) {
+        // Following: the chance roll comes first, then the zombie looks for someone walking past to fall in behind
+        // (the same odds as rolling once per update with a zombie in sight, without searching on every update).
+        if (r.followId == 0 && s.followChancePerHour() > 0 && moving(r, nowHours)
+                && rng.nextDouble() < 1 - Math.pow(1 - s.followChancePerHour(), dtHours)) {
+            seenWanderers.clear();
+            grid.nearWanderers(r.x(), r.y(), radius, addSeenWanderer);
+            for (int i = 0; i < seenWanderers.size(); i++) {
+                ZombieRecord w = seenWanderers.get(i);
                 if (w == r || w.straggler || !moving(w, nowHours) || leads(r, w)) continue;
-                if (!Vision.sees(r.x(), r.y(), r.heading, w.x(), w.y(), 0, radius, rng::nextDouble)) continue;
-                if (rng.nextDouble() < p) r.followId = w.id;
+                if (!Vision.sees(r.x(), r.y(), r.heading, w.x(), w.y(), 0, radius, random)) continue;
+                r.followId = w.id;
                 break;
             }
         }
@@ -111,9 +120,9 @@ public final class Encounters {
         ZombieRecord head = head(r);
         if (head == r) return;
         List<ZombieRecord> chain = new ArrayList<>();
-        grid.near(head.x(), head.y(), CHAIN_RADIUS, w -> {
+        grid.nearWanderers(head.x(), head.y(), CHAIN_RADIUS, w -> {
             if (!w.straggler && moving(w, nowHours) && (w == head || head(w) == head)) chain.add(w);
-        }, h -> {});
+        });
         if (chain.size() < s.hordeFormSize()) return;
         for (ZombieRecord w : chain) {
             store.remove(w.id);
@@ -140,8 +149,9 @@ public final class Encounters {
      */
     public Horde horde(Horde h, double nowHours, int tightChunks) {
         seenHordes.clear();
-        grid.near(h.x, h.y, h.spread(), w -> {}, seenHordes::add);
-        for (Horde o : seenHordes) {
+        grid.nearHordes(h.x, h.y, h.spread(), addSeenHorde);
+        for (int i = 0; i < seenHordes.size(); i++) {
+            Horde o = seenHordes.get(i);
             if (o == h || hordes.get(o.id) == null) continue;
             h = merge(h, o);
         }

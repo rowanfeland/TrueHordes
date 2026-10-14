@@ -24,6 +24,10 @@ public final class Movement {
 
     private final MapView map;
     private final SimSettings s;
+    // Scratch for chooseHeading (one simulation thread; avoids garbage on every pick).
+    private final double[] w = new double[FAN.length];
+    private final double[] kept = new double[FAN.length];
+    private final boolean[] offRoad = new boolean[FAN.length];
 
     public Movement(MapView map, SimSettings s) {
         this.map = map;
@@ -43,10 +47,10 @@ public final class Movement {
         int cx = chunk(x), cy = chunk(y);
         boolean onRoad = map.rank(cx, cy) == 1;
         float pullAngle = pullWeight > 0 ? (float) Math.atan2(pullY - y, pullX - x) : 0f;
-        double[] w = new double[FAN.length];
-        boolean[] offRoad = new boolean[FAN.length];
         double total = 0, totalRoadOk = 0;
         for (int i = 0; i < FAN.length; i++) {
+            w[i] = 0;
+            offRoad[i] = false;
             float h = heading + FAN[i];
             double dx = Math.cos(h), dy = Math.sin(h);
             double terrain = 0;
@@ -72,8 +76,8 @@ public final class Movement {
         }
         if (total == 0) return Float.NaN;
         // On a road, a heading that leaves it is only allowed on an off-road roll.
-        double[] kept = w.clone();
         for (int i = 0; i < FAN.length; i++) {
+            kept[i] = w[i];
             if (kept[i] > 0 && offRoad[i] && rng.getAsDouble() >= s.offRoadChance()) kept[i] = 0;
             totalRoadOk += kept[i];
         }

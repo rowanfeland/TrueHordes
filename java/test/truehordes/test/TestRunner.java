@@ -22,6 +22,7 @@ public final class TestRunner {
         HearingTest.class,
         EncountersTest.class,
         SimulationTest.class,
+        SimSpeedTest.class,
         LogStatsTest.class,
         ClockSchedulerTest.class,
         StoreTest.class,
