@@ -23,6 +23,7 @@ public final class TestRunner {
         EncountersTest.class,
         SimulationTest.class,
         SimSpeedTest.class,
+        HandOverTest.class,
         LogStatsTest.class,
         ClockSchedulerTest.class,
         StoreTest.class,

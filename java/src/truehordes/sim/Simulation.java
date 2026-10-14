@@ -42,6 +42,9 @@ public final class Simulation {
     private final Movement movement;
     private final Encounters encounters;
     private final Conservation conservation = new Conservation();
+    private final HandOver handOver;
+    /** A horde reached the loaded area: the main thread should run arrivals so it is laid out and made real. */
+    private boolean layoutDue;
     private final TreeMap<Long, LongStack> buckets = new TreeMap<>();
     private final List<SoundEvent> events = new ArrayList<>();
     private final Map<Long, List<Horde>> moanIndex = new HashMap<>();
@@ -60,6 +63,7 @@ public final class Simulation {
         this.random = rng::nextDouble;
         this.movement = new Movement(map, s);
         this.encounters = new Encounters(store, hordes, grid, s, rng);
+        this.handOver = new HandOver(this, store);
         this.currentHours = nowHours;
         this.currentMinute = minuteOf(nowHours);
         hordes.setOnCreated(this::hordeCreated);
@@ -93,6 +97,15 @@ public final class Simulation {
     public Conservation conservation() { return conservation; }
 
     public Movement movement() { return movement; }
+
+    public HandOver handOver() { return handOver; }
+
+    /** True once after a horde touched the loaded area (the main thread then runs arrivals for loaded chunks). */
+    public boolean takeLayoutDue() {
+        boolean d = layoutDue;
+        layoutDue = false;
+        return d;
+    }
 
     /** Zombies held off screen: wanderers plus horde members. */
     public long held() { return store.size() + (long) hordes.memberCount(); }
@@ -296,7 +309,9 @@ public final class Simulation {
         double dt = elapsedMinutes(h.simHours, now, LevelOfDetail.FAR_MINUTES);
         h.simHours = now;
         h.dueMinute = Long.MIN_VALUE;
-        if (players.nearChunk(chunk(h.x), chunk(h.y))) {
+        int iv = interval(h.x, h.y);
+        if (iv < LevelOfDetail.FAR_MINUTES && HandOver.touchesLoaded(h, players)) {
+            layoutDue = true; // laid out by the hand-over on the main thread; it waits here until then
             scheduleHorde(h, currentMinute + LevelOfDetail.EDGE_MINUTES);
             return;
         }

@@ -20,13 +20,23 @@ public final class Takeover {
 
     private final Store store;
     private int out, in, duplicates, refused, keptNoFloor, retried;
+    private java.util.function.Predicate<ZombieRecord> rejoin = r -> false;
+
+    /** What to try with a zombie taken back from a horde (the simulation's hand-over: rejoin the horde if near). */
+    public void setRejoin(java.util.function.Predicate<ZombieRecord> p) { rejoin = p == null ? r -> false : p; }
 
     public Takeover(Store store) { this.store = store; }
 
-    public void taken(ZombieSnapshot z) {
-        store.add(z.x(), z.y(), z.z(), z.dir(), z.outfitId(), z.stateFlags(), z.persistentId(), z.targetX(),
-            z.targetY(), z.modData(), false);
+    public void taken(ZombieSnapshot z) { taken(z, 0); }
+
+    /** A real zombie leaving; {@code hordeId} is the horde it was laid out from (0 none). */
+    public ZombieRecord taken(ZombieSnapshot z, long hordeId) {
+        ZombieRecord r = store.add(z.x(), z.y(), z.z(), z.dir(), z.outfitId(), z.stateFlags(), z.persistentId(),
+            z.targetX(), z.targetY(), z.modData(), false);
+        r.hordeId = hordeId;
         out++;
+        if (hordeId != 0) rejoin.test(r);
+        return r;
     }
 
     /** The chunk's records to make real; they leave the store. */

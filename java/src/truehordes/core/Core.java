@@ -117,6 +117,7 @@ public final class Core {
         world.tick();
         population.tick(env.worldAgeHours());
         simNowHours = env.worldAgeHours();
+        if (sim != null && sim.takeLayoutDue()) env.spawnLoadedChunks();
         if (sim != null && Log.isDebug("core") && (Double.isNaN(lastConservationHours)
                 || simNowHours - lastConservationHours >= 1.0)) {
             lastConservationHours = simNowHours;
@@ -180,9 +181,23 @@ public final class Core {
         } catch (Throwable t) {
             Log.error("could not read where the players are; the simulation treats every area as far away", t);
         }
+        takeover.setRejoin(sim.handOver()::rejoin);
         simThread = new SimThread(this, sim, () -> simNowHours, world::ready, SIM_SLICE_NANOS, SIM_SLEEP_MILLIS);
         simThread.start();
         Log.info("simulation started: " + store.size() + " wanderers, " + sim.hordes().size() + " hordes");
+    }
+
+    /**
+     * Lays out every held horde touching chunk (cx, cy) as held records (the arrivals then make them real). Returns the
+     * chunks the members landed in.
+     */
+    public synchronized java.util.Set<Long> layOutHordesTouching(int cx, int cy, truehordes.population.Takeover.FloorCheck floors) {
+        java.util.Set<Long> chunks = new java.util.HashSet<>();
+        if (sim == null || state != State.RUNNING) return chunks;
+        for (ZombieRecord r : sim.handOver().layOutTouching(cx, cy, floors)) {
+            chunks.add(((long) r.chunkX() << 32) | (r.chunkY() & 0xFFFFFFFFL));
+        }
+        return chunks;
     }
 
     /** Writes the mod's state; called from the game's save. Returns true if a file was written. */
@@ -219,6 +234,7 @@ public final class Core {
         if (simThread != null) simThread.stop();
         simThread = null;
         sim = null;
+        takeover.setRejoin(null);
         lastConservationHours = Double.NaN;
         store.setListener(null);
         store.clear();

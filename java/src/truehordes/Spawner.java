@@ -76,7 +76,9 @@ final class Spawner {
             addStanding.invoke(pm, r.x(), r.y(), r.z, dir, r.outfitId, state, r.persistentId);
         }
         if (list.size() <= before) return Result.REFUSED;
-        ModDataCodec.load(list.get(list.size() - 1), r.modData);
+        IsoZombie z = list.get(list.size() - 1);
+        ModDataCodec.load(z, r.modData);
+        PopulationBridge.rememberHorde(z, r.hordeId);
         return Result.SPAWNED;
     }
 

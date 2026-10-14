@@ -34,6 +34,12 @@ final class PopulationBridge {
     // Concurrent: the simulation thread reads these (PlayerNearby) while the main thread loads and unloads chunks.
     private static final Set<Long> loaded = java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final Map<Long, Integer> loadedPerCell = new java.util.concurrent.ConcurrentHashMap<>();
+    /** Real zombies laid out from a horde, so they can rejoin it when they leave again (main thread; weak keys). */
+    private static final Map<IsoZombie, Long> spawnedFromHorde = new java.util.WeakHashMap<>();
+
+    static void rememberHorde(IsoZombie z, long hordeId) {
+        if (hordeId != 0) spawnedFromHorde.put(z, hordeId);
+    }
 
     private PopulationBridge() {}
 
@@ -107,14 +113,24 @@ final class PopulationBridge {
 
     private static void arrive(Core c, int chunkX, int chunkY) {
         synchronized (c) {
-            List<ZombieRecord> spawn = c.takeover().arrivals(chunkX, chunkY, PopulationBridge::live, Spawner::floorAt);
-            for (ZombieRecord r : spawn) {
-                try {
-                    if (Spawner.spawn(r) == Spawner.Result.REFUSED) c.takeover().refused(r);
-                } catch (Throwable t) {
-                    c.takeover().failed(r);
-                    Log.errorOnce("bridge:spawn:" + t.getClass().getName(), "spawning a held zombie failed (kept held)", t);
-                }
+            // Hordes touching this chunk are laid out first; members that land in other loaded chunks spawn there too.
+            for (long k : c.layOutHordesTouching(chunkX, chunkY, Spawner::floorAt)) {
+                int x = (int) (k >> 32), y = (int) k;
+                if ((x != chunkX || y != chunkY) && loaded.contains(k)) spawnChunk(c, x, y);
+            }
+            spawnChunk(c, chunkX, chunkY);
+        }
+    }
+
+    /** Makes the chunk's held records real (caller holds the core's lock). */
+    private static void spawnChunk(Core c, int chunkX, int chunkY) {
+        List<ZombieRecord> spawn = c.takeover().arrivals(chunkX, chunkY, PopulationBridge::live, Spawner::floorAt);
+        for (ZombieRecord r : spawn) {
+            try {
+                if (Spawner.spawn(r) == Spawner.Result.REFUSED) c.takeover().refused(r);
+            } catch (Throwable t) {
+                c.takeover().failed(r);
+                Log.errorOnce("bridge:spawn:" + t.getClass().getName(), "spawning a held zombie failed (kept held)", t);
             }
         }
     }
@@ -142,10 +158,11 @@ final class PopulationBridge {
         } catch (Throwable t) {
             Log.errorOnce("bridge:moddata", "could not save a zombie's mod data (zombie kept without it)", t);
         }
+        Long horde = spawnedFromHorde.remove(z);
         c.takeover().taken(new ZombieSnapshot(z.getX(), z.getY(), z.getZ(), (byte) z.getForwardIsoDirection().ordinal(),
             z.getPersistentOutfitID(), ZombieStateFlags.intFromZombie(z), z.persistentId,
             withTarget ? z.getPathTargetX() : ZombieRecord.NO_TARGET, withTarget ? z.getPathTargetY() : ZombieRecord.NO_TARGET,
-            modData));
+            modData), horde == null ? 0 : horde);
         z.removeFromWorld();
         z.removeFromSquare();
     }
