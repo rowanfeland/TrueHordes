@@ -45,6 +45,15 @@ public final class Core {
     private long lastWriteMillis = Long.MIN_VALUE;
     private final PopulationRunner population;
     private truehordes.sim.SimSettings simSettings = truehordes.sim.SimSettings.defaults();
+    private truehordes.sim.Simulation sim;
+    private SimThread simThread;
+    /** World hour as of the last tick, for the simulation thread (it never calls into the game). */
+    private volatile double simNowHours;
+    private double lastConservationHours = Double.NaN;
+
+    /** Background slice length and pause (spec 5). */
+    static final long SIM_SLICE_NANOS = 2_000_000L;
+    static final long SIM_SLEEP_MILLIS = 10L;
 
     public Core(GameEnv env) {
         this(env, System::currentTimeMillis);
@@ -65,6 +74,11 @@ public final class Core {
     public Scheduler scheduler() { return scheduler; }
 
     public World world() { return world; }
+
+    /** The off-screen simulation (null unless running). Use under this core's lock. */
+    public synchronized truehordes.sim.Simulation simulation() { return sim; }
+
+    public synchronized SimThread simThread() { return simThread; }
 
     /** The simulation settings read when the core started (defaults before that). */
     public synchronized truehordes.sim.SimSettings simSettings() { return simSettings; }
@@ -102,6 +116,13 @@ public final class Core {
         if (state == State.IDLE && !start()) return;
         world.tick();
         population.tick(env.worldAgeHours());
+        simNowHours = env.worldAgeHours();
+        if (sim != null && Log.isDebug("core") && (Double.isNaN(lastConservationHours)
+                || simNowHours - lastConservationHours >= 1.0)) {
+            lastConservationHours = simNowHours;
+            String problem = sim.checkConservation("hourly check");
+            if (!problem.isEmpty()) Log.warn(problem);
+        }
         long t0 = System.nanoTime();
         scheduler.run(clock.advance(env.worldAgeHours()));
         stats.count("held", store.size());
@@ -146,7 +167,22 @@ public final class Core {
             Log.error("could not read the map data; terrain knowledge is off", t);
         }
         population.start(r);
+        startSimulation(now);
         return true;
+    }
+
+    private void startSimulation(double now) {
+        simNowHours = now;
+        sim = new truehordes.sim.Simulation(store, new truehordes.sim.WorldMapView(world), simSettings, System.nanoTime(),
+            now);
+        try {
+            sim.setPlayers(env.playerNearby());
+        } catch (Throwable t) {
+            Log.error("could not read where the players are; the simulation treats every area as far away", t);
+        }
+        simThread = new SimThread(this, sim, () -> simNowHours, world::ready, SIM_SLICE_NANOS, SIM_SLEEP_MILLIS);
+        simThread.start();
+        Log.info("simulation started: " + store.size() + " wanderers, " + sim.hordes().size() + " hordes");
     }
 
     /** Writes the mod's state; called from the game's save. Returns true if a file was written. */
@@ -180,6 +216,11 @@ public final class Core {
     public synchronized void stop() {
         if (state == State.RUNNING) Log.info("stopped");
         if (state != State.DISABLED) state = State.IDLE;
+        if (simThread != null) simThread.stop();
+        simThread = null;
+        sim = null;
+        lastConservationHours = Double.NaN;
+        store.setListener(null);
         store.clear();
         takeover.reset();
         world.stop();
@@ -196,6 +237,12 @@ public final class Core {
         if (state == State.DISABLED) sb.append(" (").append(disabledReason).append(')');
         sb.append(" | mode ").append(env.isClient() ? "MP client" : env.isServer() ? "dedicated server" : "single player");
         if (state == State.RUNNING) sb.append(population.status(env.worldAgeHours()));
+        if (sim != null) {
+            int biggest = 0;
+            for (truehordes.sim.Horde h : sim.hordes().all()) biggest = Math.max(biggest, h.size());
+            sb.append(" | wanderers ").append(store.size()).append(", hordes ").append(sim.hordes().size())
+                .append(" (biggest ").append(biggest).append(", ").append(sim.hordes().memberCount()).append(" in hordes)");
+        }
         else sb.append(" | held ").append(store.size());
         sb.append(" | last load ").append(lastLoad.isEmpty() ? "-" : lastLoad);
         sb.append(" | last save ").append(Double.isNaN(lastSaveHours) ? "-" : String.format(Locale.ROOT, "world hour %.2f", lastSaveHours));

@@ -31,8 +31,9 @@ final class PopulationBridge {
     private static final String[] NATIVE_ZEROED = {"PopulationMultiplier", "PopulationStartMultiplier",
         "PopulationPeakMultiplier", "RespawnMultiplier", "RespawnHours"};
 
-    private static final Set<Long> loaded = new HashSet<>();
-    private static final Map<Long, Integer> loadedPerCell = new HashMap<>();
+    // Concurrent: the simulation thread reads these (PlayerNearby) while the main thread loads and unloads chunks.
+    private static final Set<Long> loaded = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private static final Map<Long, Integer> loadedPerCell = new java.util.concurrent.ConcurrentHashMap<>();
 
     private PopulationBridge() {}
 

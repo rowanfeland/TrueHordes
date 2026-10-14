@@ -29,7 +29,11 @@ public final class LuaApi {
     @LuaMethod(name = "Hordes_j_stats", global = true)
     public static String stats() {
         Core c = Hooks.core();
-        return c == null ? NOT_INSTALLED : c.stats().format();
+        if (c == null) return NOT_INSTALLED;
+        synchronized (c) {
+            truehordes.sim.Simulation sim = c.simulation();
+            return c.stats().format() + (sim == null ? "" : "\n" + sim.stats());
+        }
     }
 
     @LuaMethod(name = "Hordes_j_debug", global = true)

@@ -52,6 +52,53 @@ public final class CoreTest {
         Check.equal(5, d.hordeMinSize(), "default min size");
     }
 
+    public static void testSimThreadStartsAndStops() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        Core core = new Core(env);
+        core.tick();
+        Check.isTrue(core.simThread() != null && core.simThread().running(), "simulation thread runs once started");
+        truehordes.core.SimThread t = core.simThread();
+        core.stop();
+        Check.isTrue(t.awaitStopped(1000), "thread ends within a second of stop");
+    }
+
+    public static void testSimThreadSurvivesAnException() throws Exception {
+        int[] calls = {0};
+        truehordes.sim.MapView flaky = new truehordes.sim.MapView() {
+            @Override public int rank(int cx, int cy) {
+                if (calls[0]++ == 0) throw new IllegalStateException("test failure");
+                return 4;
+            }
+            @Override public boolean inMap(int cx, int cy) { return true; }
+            @Override public boolean tight(int cx, int cy) { return false; }
+        };
+        truehordes.store.Store store = new truehordes.store.Store();
+        for (int i = 0; i < 10; i++) {
+            store.add(100 + i, 100, 0, (byte) 0, 0, 0, 0, truehordes.store.ZombieRecord.NO_TARGET,
+                truehordes.store.ZombieRecord.NO_TARGET, null, false);
+        }
+        truehordes.sim.Simulation sim = new truehordes.sim.Simulation(store, flaky,
+            truehordes.sim.SimSettings.defaults(), 1, 0);
+        Object lock = new Object();
+        double[] now = {0};
+        truehordes.core.SimThread t = new truehordes.core.SimThread(lock, sim, () -> now[0] += 0.05, () -> true,
+            2_000_000L, 1);
+        t.start();
+        Thread.sleep(300);
+        Check.isTrue(t.running(), "still running after a failed step");
+        Check.isTrue(calls[0] > 1, "kept stepping");
+        t.stop();
+        Check.isTrue(t.awaitStopped(1000), "stops");
+    }
+
+    public static void testStatusShowsHordes() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        Core core = new Core(env);
+        core.tick();
+        Check.isTrue(core.status().contains("hordes"), "status lists hordes: " + core.status());
+        core.stop();
+    }
+
     public static void testWaitsForWorld() throws Exception {
         FakeEnv env = new FakeEnv(file());
         env.worldReady = false;
