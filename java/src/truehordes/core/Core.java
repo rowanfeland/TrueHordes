@@ -44,6 +44,7 @@ public final class Core {
     private double lastSaveHours = Double.NaN;
     private long lastWriteMillis = Long.MIN_VALUE;
     private final PopulationRunner population;
+    private truehordes.sim.SimSettings simSettings = truehordes.sim.SimSettings.defaults();
 
     public Core(GameEnv env) {
         this(env, System::currentTimeMillis);
@@ -64,6 +65,9 @@ public final class Core {
     public Scheduler scheduler() { return scheduler; }
 
     public World world() { return world; }
+
+    /** The simulation settings read when the core started (defaults before that). */
+    public synchronized truehordes.sim.SimSettings simSettings() { return simSettings; }
 
     /** Hand-over bookkeeping; changed only under this core's lock. */
     public Takeover takeover() { return takeover; }
@@ -111,6 +115,12 @@ public final class Core {
             return false;
         }
         Log.setDebug("core", env.debugLogging());
+        try {
+            simSettings = env.simSettings();
+        } catch (Throwable t) {
+            Log.error("could not read the simulation settings; using defaults", t);
+            simSettings = truehordes.sim.SimSettings.defaults();
+        }
         LoadResult r = SaveFile.read(env.stateFile());
         store.clear();
         for (ZombieRecord e : r.records) store.restore(e);

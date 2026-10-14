@@ -33,6 +33,25 @@ public final class CoreTest {
         Check.near(0.5, runs.get(0), 1e-12, "elapsed game time");
     }
 
+    public static void testSimSettingsReachTheCore() throws Exception {
+        FakeEnv env = new FakeEnv(file());
+        env.sim = truehordes.sim.SimSettings.defaults().toBuilder().stragglerOneIn(40).build();
+        Core core = new Core(env);
+        core.tick();
+        Check.equal(40, core.simSettings().stragglerOneIn(), "sandbox value reaches the core");
+    }
+
+    public static void testSimSettingsValidated() {
+        Check.throwsAny(() -> truehordes.sim.SimSettings.defaults().toBuilder().hordeMinSize(11).build(),
+            "min size above form size");
+        Check.throwsAny(() -> truehordes.sim.SimSettings.defaults().toBuilder().stragglerOneIn(0).build(),
+            "straggler one-in below 1");
+        truehordes.sim.SimSettings d = truehordes.sim.SimSettings.defaults();
+        Check.equal(75, d.stragglerOneIn(), "default stragglers");
+        Check.equal(10, d.hordeFormSize(), "default form size");
+        Check.equal(5, d.hordeMinSize(), "default min size");
+    }
+
     public static void testWaitsForWorld() throws Exception {
         FakeEnv env = new FakeEnv(file());
         env.worldReady = false;

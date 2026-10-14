@@ -33,6 +33,9 @@ public interface GameEnv {
     /** The vanilla sandbox zombie settings and True Hordes' population options, read now. */
     PopulationSettings populationSettings();
 
+    /** The off-screen simulation's settings (sandbox, Sight, Speed, day length). */
+    truehordes.sim.SimSettings simSettings();
+
     /** No True Hordes save and the game never saved a native population for this world: a new game. */
     boolean newWorld();
 

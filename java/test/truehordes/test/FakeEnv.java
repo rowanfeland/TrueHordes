@@ -41,6 +41,8 @@ public final class FakeEnv implements GameEnv {
     @Override public boolean debugLogging() { return debugLogging; }
     @Override public WorldSource worldSource() { return worldSource; }
     @Override public PopulationSettings populationSettings() { return settings; }
+    public truehordes.sim.SimSettings sim = truehordes.sim.SimSettings.defaults();
+    @Override public truehordes.sim.SimSettings simSettings() { return sim; }
     @Override public boolean newWorld() { return newWorld; }
     @Override public MapSource mapSource() { return map; }
     @Override public void spawnLoadedChunks() { spawnLoadedCalls++; }

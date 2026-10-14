@@ -7,5 +7,17 @@
     "Sandbox_TrueHordes_BuildingZombiesSeeded": "Building zombies from the start",
     "Sandbox_TrueHordes_BuildingZombiesSeeded_tooltip": "New games: every building's zombies exist from day one (held by the mod, able to leave buildings), instead of appearing when a room is first seen. Makes mods like Wake Them Up unnecessary.",
     "Sandbox_TrueHordes_EdgeArrivalMonths": "Months until newcomers arrive from the map edges",
-    "Sandbox_TrueHordes_EdgeArrivalMonths_tooltip": "Respawned zombies first appear in long-unseen areas; over this many months a growing share walks in from the map's edges instead. 0 = always from the edges."
+    "Sandbox_TrueHordes_EdgeArrivalMonths_tooltip": "Respawned zombies first appear in long-unseen areas; over this many months a growing share walks in from the map's edges instead. 0 = always from the edges.",
+    "Sandbox_TrueHordes_StragglerOneIn": "Stragglers: 1 in N never join hordes",
+    "Sandbox_TrueHordes_StragglerOneIn_tooltip": "This share of zombies never joins or follows a horde and lingers in or near buildings, so a town is never completely safe. 75 = 1 in 75.",
+    "Sandbox_TrueHordes_HordeFormSize": "Zombies needed to form a horde",
+    "Sandbox_TrueHordes_HordeFormSize_tooltip": "A group moving together becomes a horde at this size. Zombies just standing close together never form one.",
+    "Sandbox_TrueHordes_HordeMinSize": "Smallest horde",
+    "Sandbox_TrueHordes_HordeMinSize_tooltip": "A horde that shrinks below this size breaks up into single wanderers.",
+    "Sandbox_TrueHordes_FollowChance": "Chance to follow another zombie",
+    "Sandbox_TrueHordes_FollowChance_tooltip": "Chance per in-game hour that a wandering zombie that sees another zombie walking falls in behind it. Chains of followers grow into hordes.",
+    "Sandbox_TrueHordes_OffRoadChance": "Chance to leave the road",
+    "Sandbox_TrueHordes_OffRoadChance_tooltip": "How often a walking zombie or horde on a road turns off it. Lower keeps more hordes on roads and highways.",
+    "Sandbox_TrueHordes_BreakAwayChance": "Chance to be left behind",
+    "Sandbox_TrueHordes_BreakAwayChance_tooltip": "Chance for each horde member to get left behind when the horde squeezes through an alley or between buildings."
 }

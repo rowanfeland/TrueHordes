@@ -10,6 +10,20 @@ public final class StoreTest {
         return s.add(x, y, 0f, (byte) 0, 0, 0, 0, ZombieRecord.NO_TARGET, ZombieRecord.NO_TARGET, null, false);
     }
 
+    public static void testWalkFieldsDefault() {
+        Store s = new Store();
+        ZombieRecord out = s.add(1, 2, 0, (byte) 0, 0, 0, 0, ZombieRecord.NO_TARGET, ZombieRecord.NO_TARGET, null, false);
+        ZombieRecord in = s.add(1, 2, 0, (byte) 0, 0, 0, 0, ZombieRecord.NO_TARGET, ZombieRecord.NO_TARGET, null, true);
+        ZombieRecord fake = s.add(1, 2, 0, (byte) 0, 0, ZombieRecord.FLAG_FAKE_DEAD, 0, ZombieRecord.NO_TARGET,
+            ZombieRecord.NO_TARGET, null, false);
+        Check.equal(0L, out.followId, "no follow target");
+        Check.equal(0L, out.hordeId, "no horde");
+        Check.isTrue(!out.strRolled && !out.straggler, "straggler not rolled yet");
+        Check.isTrue(!out.idle, "outdoor zombie is not idle");
+        Check.isTrue(in.idle, "building zombie starts idle");
+        Check.isTrue(fake.idle, "fake-dead zombie starts idle");
+    }
+
     public static void testIdsAreStableAndNeverReused() {
         Store s = new Store();
         ZombieRecord a = add(s, 1, 2);

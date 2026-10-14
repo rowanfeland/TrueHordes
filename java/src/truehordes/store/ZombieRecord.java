@@ -28,6 +28,26 @@ public final class ZombieRecord {
     /** Seeded inside a building (option BuildingZombiesSeeded). */
     public final boolean building;
 
+    /** ZombieStateFlag.FakeDead (popman.ZombieStateFlag, 42.21). */
+    public static final int FLAG_FAKE_DEAD = 8;
+
+    // Walk state: owned by the off-screen simulation, changed only under the core's lock.
+    /** Heading in radians (0 = +x, east). */
+    public float heading;
+    /** In-game minutes left standing still. */
+    public float pauseMinutes;
+    /** Never joins or follows a horde (rolled once, see strRolled). */
+    public boolean straggler;
+    public boolean strRolled;
+    /** Who this wanderer trails: 0 none, &gt;0 a record id, &lt;0 minus a horde id. */
+    public long followId;
+    /** The horde this zombie last belonged to (0 none); lets it rejoin after a spell as a real zombie. */
+    public long hordeId;
+    /** World hour until which a left-behind or straggling zombie stays put. */
+    public double lingerUntilHours;
+    /** Standing still in a building or lying fake-dead: does nothing until a sound moves it. */
+    public boolean idle;
+
     public ZombieRecord(long id, float x, float y, float z, byte dir, int outfitId, int stateFlags, int persistentId,
                         int targetX, int targetY, byte[] modData, boolean building) {
         this.id = id;
@@ -42,7 +62,29 @@ public final class ZombieRecord {
         this.targetY = targetY;
         this.modData = modData;
         this.building = building;
+        this.heading = headingOf(dir);
+        this.idle = building || (stateFlags & FLAG_FAKE_DEAD) != 0;
     }
+
+    /** IsoDirections ordinal (N, NW, W, SW, S, SE, E, NE; y grows south) to radians (0 = east). */
+    public static float headingOf(byte dir) {
+        return (float) Math.atan2(DIR_Y[dir & 7], DIR_X[dir & 7]);
+    }
+
+    /** Radians to the nearest IsoDirections ordinal. */
+    public static byte dirOf(float heading) {
+        int best = 0;
+        double bestDot = -2;
+        for (int i = 0; i < 8; i++) {
+            double len = Math.hypot(DIR_X[i], DIR_Y[i]);
+            double dot = (DIR_X[i] * Math.cos(heading) + DIR_Y[i] * Math.sin(heading)) / len;
+            if (dot > bestDot) { bestDot = dot; best = i; }
+        }
+        return (byte) best;
+    }
+
+    private static final int[] DIR_X = {0, -1, -1, -1, 0, 1, 1, 1};
+    private static final int[] DIR_Y = {-1, -1, 0, 1, 1, 1, 0, -1};
 
     public float x() { return x; }
 

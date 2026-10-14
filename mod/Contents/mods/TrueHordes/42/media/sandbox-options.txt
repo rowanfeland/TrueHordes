@@ -33,3 +33,63 @@ option TrueHordes.EdgeArrivalMonths
 	page = TrueHordes,
 	translation = TrueHordes_EdgeArrivalMonths,
 }
+
+option TrueHordes.StragglerOneIn
+{
+	type = integer,
+	min = 1,
+	max = 100000,
+	default = 75,
+	page = TrueHordes,
+	translation = TrueHordes_StragglerOneIn,
+}
+
+option TrueHordes.HordeFormSize
+{
+	type = integer,
+	min = 2,
+	max = 1000,
+	default = 10,
+	page = TrueHordes,
+	translation = TrueHordes_HordeFormSize,
+}
+
+option TrueHordes.HordeMinSize
+{
+	type = integer,
+	min = 2,
+	max = 1000,
+	default = 5,
+	page = TrueHordes,
+	translation = TrueHordes_HordeMinSize,
+}
+
+option TrueHordes.FollowChance
+{
+	type = double,
+	min = 0,
+	max = 1,
+	default = 0.01,
+	page = TrueHordes,
+	translation = TrueHordes_FollowChance,
+}
+
+option TrueHordes.OffRoadChance
+{
+	type = double,
+	min = 0,
+	max = 1,
+	default = 0.1,
+	page = TrueHordes,
+	translation = TrueHordes_OffRoadChance,
+}
+
+option TrueHordes.BreakAwayChance
+{
+	type = double,
+	min = 0,
+	max = 1,
+	default = 0.005,
+	page = TrueHordes,
+	translation = TrueHordes_BreakAwayChance,
+}

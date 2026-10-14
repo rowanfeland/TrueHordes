@@ -84,6 +84,25 @@ final class GameEnvImpl implements GameEnv {
         return b.build();
     }
 
+    @Override
+    public truehordes.sim.SimSettings simSettings() {
+        truehordes.sim.SimSettings d = truehordes.sim.SimSettings.defaults();
+        int form = (int) sandboxDouble("TrueHordes.HordeFormSize", d.hordeFormSize());
+        int min = Math.min(form, (int) sandboxDouble("TrueHordes.HordeMinSize", d.hordeMinSize()));
+        return d.toBuilder()
+            .stragglerOneIn(Math.max(1, (int) sandboxDouble("TrueHordes.StragglerOneIn", d.stragglerOneIn())))
+            .hordeFormSize(form)
+            .hordeMinSize(min)
+            .followChancePerHour(sandboxDouble("TrueHordes.FollowChance", d.followChancePerHour()))
+            .offRoadChance(sandboxDouble("TrueHordes.OffRoadChance", d.offRoadChance()))
+            .breakAwayChance(sandboxDouble("TrueHordes.BreakAwayChance", d.breakAwayChance()))
+            .sightSetting(SandboxOptions.instance.lore.sight.getValue())
+            .speedSetting(SandboxOptions.instance.lore.speed.getValue())
+            // GameTime.minutesPerDay is real minutes per in-game day (1440 in-game minutes).
+            .realSecondsPerGameMinute(GameTime.getInstance().getMinutesPerDay() * 60.0 / 1440.0)
+            .build();
+    }
+
     private static String newWorldDir;
     private static boolean newWorldFlag;
 
