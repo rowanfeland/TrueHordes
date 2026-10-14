@@ -17,6 +17,7 @@ public final class TestRunner {
     static final Class<?>[] SUITES = {
         VersionTest.class,
         VisionTest.class,
+        MovementTest.class,
         LogStatsTest.class,
         ClockSchedulerTest.class,
         StoreTest.class,

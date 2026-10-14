@@ -115,6 +115,22 @@ public final class World {
         return g == null || g.blocked(Math.floorDiv(x, 8), Math.floorDiv(y, 8));
     }
 
+    /** The chunk has map data (not void, not past the map's edge). False before the map is built. */
+    public boolean chunkInMap(int chunkX, int chunkY) {
+        Grid g = grid;
+        return g != null && g.info(chunkX, chunkY) != ChunkInfo.UNLOADED;
+    }
+
+    public Terrain chunkTerrain(int chunkX, int chunkY) {
+        Grid g = grid;
+        return g == null ? Terrain.UNKNOWN : g.terrain(chunkX, chunkY);
+    }
+
+    public boolean chunkBlocked(int chunkX, int chunkY) {
+        Grid g = grid;
+        return g == null || g.blocked(chunkX, chunkY);
+    }
+
     public boolean canCross(int chunkX, int chunkY, Dir d) {
         Grid g = grid;
         return g != null && g.canCross(chunkX, chunkY, d);
