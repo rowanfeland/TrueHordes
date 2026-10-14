@@ -21,5 +21,7 @@
     "Sandbox_TrueHordes_BreakAwayChance": "Chance to be left behind",
     "Sandbox_TrueHordes_BreakAwayChance_tooltip": "Chance for each horde member to get left behind when the horde squeezes through an alley or between buildings.",
     "Sandbox_TrueHordes_TrailChance": "Chance to take a trail",
-    "Sandbox_TrueHordes_TrailChance_tooltip": "How often a zombie or horde walking a road turns onto a trail it passes."
+    "Sandbox_TrueHordes_TrailChance_tooltip": "How often a zombie or horde walking a road turns onto a trail it passes.",
+    "Sandbox_TrueHordes_MoanResponseChance": "Chance to notice a horde's moaning",
+    "Sandbox_TrueHordes_MoanResponseChance_tooltip": "Chance per in-game hour that a zombie who can hear a horde turns towards it. Higher makes hordes gather a city faster."
 }
