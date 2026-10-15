@@ -125,10 +125,11 @@ public final class EncountersTest {
         int followed = 0;
         for (int seed = 0; seed < 200; seed++) {
             // Spread the seeds: java.util.Random's first number is nearly the same for small consecutive seeds.
-            Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(0).build(), seed * 0x9E3779B97F4A7C15L);
+            Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(0).bumpFollowChance(0.5).build(),
+                seed * 0x9E3779B97F4A7C15L);
             ZombieRecord a = rig.wanderer(5000, 5000, 0, false);
             ZombieRecord b = rig.wanderer(4998.5f, 5000, 0, false);
-            rig.enc.wanderer(b, 1, 0.01);
+            rig.enc.wanderer(b, LATE, 0.01);
             if (b.followId == a.id) followed++;
         }
         Check.isTrue(followed > 70 && followed < 130, "about half fall in behind on a bump (" + followed + "/200)");
@@ -141,7 +142,7 @@ public final class EncountersTest {
                 seed * 0x9E3779B97F4A7C15L);
             ZombieRecord a = rig.wanderer(5000, 5000, 0, false);
             ZombieRecord b = rig.wanderer(4998.5f, 5000, 0, false);
-            rig.enc.wanderer(b, 1, 0.01);
+            rig.enc.wanderer(b, LATE, 0.01);
             Check.equal(0L, b.followId, "never follows with the chance at 0");
             Check.isTrue(a != null, "added");
         }
@@ -236,5 +237,40 @@ public final class EncountersTest {
         rig.enc.soundEnded(f);
         Check.equal(1, rig.hordes.size(), "8 is too few");
         Check.equal(20, rig.total(), "conservation");
+    }
+
+    /** After the population peak (default day 28) the bump-follow ramp is at full strength. */
+    static final double LATE = 24 * 40;
+
+    /**
+     * User, 2026-10-15: day 1 is pure chaos (no falling in behind on a bump), day 2 about 1-2%, then slowly up to 25% by
+     * day 7, 50% by day 14 and the full chance on the population peak day.
+     */
+    public static void testBumpFollowRampsUpOverTheDays() {
+        Check.isTrue(Encounters.bumpRamp(0.5, 28) == 0, "day 1: none");
+        double d2 = Encounters.bumpRamp(1.5, 28);
+        Check.isTrue(d2 >= 0.01 && d2 <= 0.02, "day 2: 1-2% (" + d2 + ")");
+        Check.isTrue(Math.abs(Encounters.bumpRamp(7, 28) - 0.25) < 1e-9, "day 7: 25%");
+        Check.isTrue(Math.abs(Encounters.bumpRamp(14, 28) - 0.5) < 1e-9, "day 14: 50%");
+        Check.isTrue(Math.abs(Encounters.bumpRamp(21, 28) - 0.75) < 1e-9, "half way to the peak: 75%");
+        Check.isTrue(Encounters.bumpRamp(28, 28) == 1 && Encounters.bumpRamp(90, 28) == 1, "peak day on: full");
+        double prev = 0;
+        for (double d = 0; d < 40; d += 0.25) {
+            double v = Encounters.bumpRamp(d, 28);
+            Check.isTrue(v >= prev, "never goes down");
+            prev = v;
+        }
+        Check.isTrue(Encounters.bumpRamp(20, 10) == 1, "a peak day before day 14 still ends at full");
+    }
+
+    public static void testNoBumpFollowingOnDayOne() {
+        for (int seed = 0; seed < 100; seed++) {
+            Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(0).build(), seed * 0x9E3779B97F4A7C15L);
+            ZombieRecord a = rig.wanderer(5000, 5000, 0, false);
+            ZombieRecord b = rig.wanderer(4998.5f, 5000, 0, false);
+            rig.enc.wanderer(b, 12, 0.01);
+            Check.equal(0L, b.followId, "day 1: nobody falls in behind");
+            Check.isTrue(a != null, "added");
+        }
     }
 }

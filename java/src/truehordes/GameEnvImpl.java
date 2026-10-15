@@ -99,6 +99,7 @@ final class GameEnvImpl implements GameEnv {
             .moanResponsePerHour(sandboxDouble("TrueHordes.MoanResponseChance", d.moanResponsePerHour()))
             .joinChancePerHour(sandboxDouble("TrueHordes.JoinChance", d.joinChancePerHour()))
             .bumpFollowChance(sandboxDouble("TrueHordes.BumpFollowChance", d.bumpFollowChance()))
+            .peakDay(Math.max(1, SandboxOptions.instance.zombieConfig.populationPeakDay.getValue()))
             .buildingStragglerOneIn(Math.max(1, (int) sandboxDouble("TrueHordes.BuildingStragglerOneIn",
                 d.buildingStragglerOneIn())))
             .breakAwayChance(sandboxDouble("TrueHordes.BreakAwayChance", d.breakAwayChance()))

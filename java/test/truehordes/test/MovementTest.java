@@ -114,7 +114,8 @@ public final class MovementTest {
         }
     }
 
-    public static void testTurnsBackAtMapEdgeDeadEnd() {
+    /** A road running off the map's edge: the walker never leaves the map and never stands stuck at the edge. */
+    public static void testMapEdgeDeadEndKeepsMoving() {
         // A road running east off the map's edge, forest around it.
         TextMap m = new TextMap(
             "WWWWWWWWWW",
@@ -125,14 +126,14 @@ public final class MovementTest {
         Movement mv = move(m, 0.0);
         Random rng = new Random(4);
         float x = tile(6), y = tile(2), h = EAST;
-        boolean turned = false;
+        int still = 0;
         for (int i = 0; i < 200; i++) {
             Movement.Step s = mv.advance(x, y, h, 2, 1, 1, false, 0, 0, 0, rng::nextDouble);
+            if (Math.hypot(s.x() - x, s.y() - y) < 0.1) still++;
             x = s.x(); y = s.y(); h = s.heading();
             Check.isTrue(m.inMap(Math.floorDiv((int) x, 8), Math.floorDiv((int) y, 8)), "never leaves the map");
-            if (Math.cos(h) < -0.5) turned = true;
         }
-        Check.isTrue(turned, "turns back along the road at the dead end");
+        Check.isTrue(still < 10, "keeps walking at the map's edge (" + still + " updates standing)");
     }
 
     public static void testOffRoadChanceRespected() {

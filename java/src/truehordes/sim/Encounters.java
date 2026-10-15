@@ -23,6 +23,21 @@ public final class Encounters {
     static final float GATHER_RADIUS = 8f;
     /** Closer than this counts as bumping into someone (tiles). */
     static final float BUMP_RADIUS = 2f;
+
+    /**
+     * How much of the bump-follow chance applies {@code days} in-game days after the start (user, 2026-10-15): day 1 is
+     * pure chaos (none), day 2 rises from 1% to 2%, then slowly up to 25% by day 7, 50% by day 14 and the full chance
+     * on the population peak day (a peak before day 15 is taken as day 15).
+     */
+    public static double bumpRamp(double days, int peakDay) {
+        if (days < 1) return 0;
+        if (days < 2) return 0.01 + 0.01 * (days - 1);
+        if (days < 7) return 0.02 + 0.23 * (days - 2) / 5;
+        if (days < 14) return 0.25 + 0.25 * (days - 7) / 7;
+        int peak = Math.max(peakDay, 15);
+        if (days < peak) return 0.5 + 0.5 * (days - 14) / (peak - 14);
+        return 1;
+    }
     /**
      * Longest follow chain: a chain of HordeFormSize moving together already becomes a horde, so deeper chains are
      * strung-out ones; capping them keeps every chain walk short (in dense towns they grew hundreds deep).
@@ -102,7 +117,7 @@ public final class Encounters {
             for (int i = 0; i < seenWanderers.size(); i++) {
                 ZombieRecord w = seenWanderers.get(i);
                 if (w == r || w.straggler || !moving(w, nowHours) || leads(r, w) || depth(w) >= MAX_CHAIN - 1) continue;
-                if (rng.nextDouble() < s.bumpFollowChance()) r.followId = w.id;
+                if (rng.nextDouble() < s.bumpFollowChance() * bumpRamp(nowHours / 24, s.peakDay())) r.followId = w.id;
                 break;
             }
         }

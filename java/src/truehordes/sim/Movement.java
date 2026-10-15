@@ -56,8 +56,20 @@ public final class Movement {
 
     /** Chance per chunk on a straight road or trail to head off across country (times OffRoadChance). */
     static final double STRAIGHT_LEAVE = 0.05;
-    /** Chance at a junction to turn onto the side road (trails also need the TrailChance roll). */
+    /** Chance at a town junction to turn onto the side road (trails also need the TrailChance roll). */
     static final double JUNCTION_TURN = 0.3;
+    /**
+     * Chance on a highway (a road two or more chunks wide) to turn onto a road leaving it when passing one (user,
+     * 2026-10-15: hordes should stay on the highway like an unstoppable wave).
+     */
+    static final double HIGHWAY_TURN = 0.02;
+    /** Widest road scanned across when looking for a side road (in chunks). */
+    private static final int MAX_LANES = 4;
+    /**
+     * A tiny offset on a returned heading that remembers which way a walker was going when it stepped sideways onto a
+     * road, so that at the road it turns that way rather than back (too small to move it off its line).
+     */
+    private static final float LEAN = 1e-3f;
     /** Chance per chunk that a walker crossing country turns onto a road or trail beside it. */
     static final double ROAD_JOIN = 0.75;
     /** Straight ahead, then 45 degrees either side, then 90 (no garbage per call: this runs millions of times). */
@@ -99,7 +111,8 @@ public final class Movement {
             if (way(cx, cy, d) && rng.getAsDouble() < ROAD_JOIN) {
                 int r = map.rank(cx + DX[d], cy + DY[d]);
                 if (r == 2 && rng.getAsDouble() >= s.trailChance()) continue;
-                return dirAngle(d);
+                // Stepping sideways onto it: lean back towards the old line so it goes on along the road that way.
+                return k == 0 ? dirAngle(d) : dirAngle(d) - Integer.signum(k) * LEAN;
             }
         }
         if (straightOpen(x, y, heading)) return heading;
@@ -127,12 +140,18 @@ public final class Movement {
         return open(cx, cy, back) ? dirAngle(back) : Float.NaN;
     }
 
+    /**
+     * Along a road or trail (user, 2026-10-15: "pick a road, stick with it and just walk straight"; waves don't turn
+     * round). A wide road is one road: its other lanes are never side roads, and on it (a highway) the walker never
+     * wanders off across country and takes a road leaving it only rarely. Bends are followed, never back the way it
+     * came; where the road ends the walker carries straight on across country.
+     */
     private float alongWay(int cx, int cy, int here, float heading, DoubleSupplier rng) {
         int f = dirIndex(heading);
-        boolean ahead = way(cx, cy, f);
-        if (ahead) {
+        boolean highway = here == 1 && wide(cx, cy);
+        if (way(cx, cy, f)) {
             // A straight stretch: keep going; sometimes take a side road at a junction, rarely head off across country.
-            if (rng.getAsDouble() < s.offRoadChance() * STRAIGHT_LEAVE) {
+            if (!highway && rng.getAsDouble() < s.offRoadChance() * STRAIGHT_LEAVE) {
                 float off = offWay(cx, cy, f, rng);
                 if (!Float.isNaN(off)) return off;
             }
@@ -141,34 +160,85 @@ public final class Movement {
             int ways = 0;
             for (int d = 0; d < 8; d += 2) if (way(cx, cy, d)) ways++;
             if (ways < 3) return dirAngle(f);
+            double turn = highway ? HIGHWAY_TURN : JUNCTION_TURN;
             int side = rng.getAsDouble() < 0.5 ? 2 : -2;
             for (int j = 0; j < 2; j++) {
                 int d = Math.floorMod(f + (j == 0 ? side : -side), 8);
-                if (!way(cx, cy, d) || rng.getAsDouble() >= JUNCTION_TURN) continue;
+                if (!branch(cx, cy, f, d) || rng.getAsDouble() >= turn) continue;
                 if (here == 1 && map.rank(cx + DX[d], cy + DY[d]) == 2 && rng.getAsDouble() >= s.trailChance()) continue;
                 return dirAngle(d);
             }
             return dirAngle(f);
         }
-        // The road bends, splits or ends: at this decision point the walker may leave it for open country.
-        if (rng.getAsDouble() < s.offRoadChance()) {
+        // The road bends, splits or ends: at this decision point a walker on a small road may leave it.
+        if (!highway && rng.getAsDouble() < s.offRoadChance()) {
             float off = offWay(cx, cy, f, rng);
             if (!Float.isNaN(off)) return off;
         }
-        int first = rng.getAsDouble() < 0.5 ? 1 : -1;
-        for (int k = 1; k <= 3; k++) {
+        // Round the bend: 45 degrees before 90, only where the road carries on (not onto the far lane of the same
+        // road), and the way it was leaning first.
+        int lean = leanSide(heading, f);
+        int first = lean != 0 ? lean : rng.getAsDouble() < 0.5 ? 1 : -1;
+        for (int k = 1; k <= 2; k++) {
             for (int j = 0; j < 2; j++) {
                 int d = Math.floorMod(f + (j == 0 ? first : -first) * k, 8);
-                if (!way(cx, cy, d)) continue;
+                if (!way(cx, cy, d) || !carriesOn(cx + DX[d], cy + DY[d], d)) continue;
                 if (here == 1 && map.rank(cx + DX[d], cy + DY[d]) == 2 && rng.getAsDouble() >= s.trailChance()) continue;
                 return dirAngle(d);
             }
         }
-        // A dead end: straight on across country if it can, else back the way it came.
-        if (open(cx, cy, f) && rng.getAsDouble() < s.offRoadChance()) return dirAngle(f);
-        int back = Math.floorMod(f + 4, 8);
-        if (way(cx, cy, back) || open(cx, cy, back)) return dirAngle(back);
+        // The road ends: the wave carries straight on across country; if that is blocked, the smallest turn.
+        if (open(cx, cy, f)) return dirAngle(f);
         return smallestTurn(cx, cy, f, rng);
+    }
+
+    private static boolean isWay(int rank) { return rank == 1 || rank == 2; }
+
+    /** The road continues beyond chunk (x, y) in direction d (straight on or 45 degrees either side). */
+    private boolean carriesOn(int x, int y, int d) {
+        for (int k = -1; k <= 1; k++) {
+            int e = Math.floorMod(d + k, 8);
+            if (isWay(map.rank(x + DX[e], y + DY[e]))) return true;
+        }
+        return false;
+    }
+
+    /** Chunk (x, y) is a lane of a road running in direction f: road ahead of and behind it too. */
+    private boolean lane(int x, int y, int f) {
+        return map.rank(x, y) == 1 && map.rank(x + DX[f], y + DY[f]) == 1 && map.rank(x - DX[f], y - DY[f]) == 1;
+    }
+
+    /**
+     * The road here is two or more chunks wide (a highway or main road): this chunk is part of a 2x2 block of road
+     * chunks. Holds at the highway's corners too; town streets one chunk wide never make such a block.
+     */
+    private boolean wide(int cx, int cy) {
+        for (int ox = -1; ox <= 0; ox++) {
+            for (int oy = -1; oy <= 0; oy++) {
+                if (map.rank(cx + ox, cy + oy) == 1 && map.rank(cx + ox + 1, cy + oy) == 1
+                        && map.rank(cx + ox, cy + oy + 1) == 1 && map.rank(cx + ox + 1, cy + oy + 1) == 1) return true;
+            }
+        }
+        return false;
+    }
+
+    /** A road leaves this one towards side d: past this road's own lanes, the next chunk that way is a road or trail. */
+    private boolean branch(int cx, int cy, int f, int d) {
+        if (!way(cx, cy, d)) return false;
+        int x = cx, y = cy;
+        for (int k = 0; k < MAX_LANES; k++) {
+            x += DX[d];
+            y += DY[d];
+            if (!isWay(map.rank(x, y))) return false;
+            if (!lane(x, y, f)) return true;
+        }
+        return false;
+    }
+
+    /** Which side (+1 or -1 in direction steps) a heading leans off its exact direction f, or 0. */
+    private static int leanSide(float heading, int f) {
+        float off = normalise(heading - dirAngle(f));
+        return Math.abs(off) < LEAN / 2 ? 0 : off > 0 ? 1 : -1;
     }
 
     /** A direction off the road into open country (ahead or to a side), or NaN. */
@@ -250,7 +320,10 @@ public final class Movement {
     public Step advance(float x, float y, float heading, float minutes, int members, long walkerId, boolean crawler,
                         float pullX, float pullY, float pullWeight, DoubleSupplier rng) {
         float remaining = speedTilesPerGameMinute(members, s.speedSetting(), walkerId, crawler) * minutes;
-        float h = chooseHeading(x, y, heading, pullX, pullY, pullWeight, rng);
+        // Travelling walkers decide when they enter a chunk, not again on every update inside it (in-game test
+        // 2026-10-15: re-rolling junctions each update turned walkers round at every junction they stood in).
+        float h = pullWeight > 0 || !straightOpen(x, y, heading)
+            ? chooseHeading(x, y, heading, pullX, pullY, pullWeight, rng) : heading;
         if (Float.isNaN(h)) return new Step(x, y, heading, 0, true);
         int tight = 0;
         int cx = chunk(x), cy = chunk(y);
@@ -259,6 +332,16 @@ public final class Movement {
             float seg = Math.min(SEGMENT, remaining);
             float nx = (float) (x + Math.cos(h) * seg), ny = (float) (y + Math.sin(h) * seg);
             int ncx = chunk(nx), ncy = chunk(ny);
+            if (!enterable(cx, cy, ncx, ncy)) {
+                // A diagonal clipped a blocked side chunk: go along the open one of its two parts for this piece.
+                float part = openPart(x, y, h, seg, cx, cy);
+                if (!Float.isNaN(part)) {
+                    nx = (float) (x + Math.cos(part) * seg);
+                    ny = (float) (y + Math.sin(part) * seg);
+                    ncx = chunk(nx);
+                    ncy = chunk(ny);
+                }
+            }
             if (!enterable(cx, cy, ncx, ncy)) {
                 float again = chooseHeading(x, y, h, pullX, pullY, pullWeight, rng);
                 if (Float.isNaN(again)) return new Step(x, y, h, tight, true);
@@ -274,13 +357,29 @@ public final class Movement {
                 cx = ncx;
                 cy = ncy;
                 if (map.tight(cx, cy)) tight++;
-                if (remaining > 0) {
-                    float next = chooseHeading(x, y, h, pullX, pullY, pullWeight, rng);
-                    if (!Float.isNaN(next)) h = next;
-                }
+                // Decide on entering, even at the end of the update (the next update does not decide again).
+                float next = chooseHeading(x, y, h, pullX, pullY, pullWeight, rng);
+                if (!Float.isNaN(next)) h = next;
             }
         }
         return new Step(x, y, h, tight, false);
+    }
+
+    /**
+     * For a diagonal heading whose next piece enters a blocked chunk: the east/west or north/south part of it (the
+     * larger first) whose piece of length {@code seg} stays walkable, or NaN.
+     */
+    private float openPart(float x, float y, float h, float seg, int cx, int cy) {
+        double c = Math.cos(h), sn = Math.sin(h);
+        if (Math.abs(c) < 0.2 || Math.abs(sn) < 0.2) return Float.NaN;
+        float ew = c > 0 ? 0f : (float) Math.PI, ns = sn > 0 ? (float) (Math.PI / 2) : (float) (-Math.PI / 2);
+        float a = Math.abs(c) >= Math.abs(sn) ? ew : ns, b = a == ew ? ns : ew;
+        for (int i = 0; i < 2; i++) {
+            float p = i == 0 ? a : b;
+            int px = chunk((float) (x + Math.cos(p) * seg)), py = chunk((float) (y + Math.sin(p) * seg));
+            if (enterable(cx, cy, px, py)) return p;
+        }
+        return Float.NaN;
     }
 
     /** The roll needed to go from terrain rank {@code from} to {@code to}: road to trail, or road/trail to open ground. */

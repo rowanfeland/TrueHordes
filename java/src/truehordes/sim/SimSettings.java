@@ -8,7 +8,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
                           double offRoadChance, double breakAwayChance, int sightSetting, int speedSetting,
                           double realSecondsPerGameMinute, double trailChance, double moanResponsePerHour,
                           double joinChancePerHour, int buildingStragglerOneIn,
-                          double bumpFollowChance) {
+                          double bumpFollowChance, int peakDay) {
 
     /** Share of the time an off-screen zombie spends walking rather than standing (vanilla zombies idle a lot). */
     public static final double DUTY = 0.5;
@@ -35,6 +35,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         checkChance(moanResponsePerHour, "moanResponsePerHour");
         checkChance(joinChancePerHour, "joinChancePerHour");
         checkChance(bumpFollowChance, "bumpFollowChance");
+        if (peakDay < 1) throw new IllegalArgumentException("peakDay must be at least 1");
         if (!(realSecondsPerGameMinute > 0)) throw new IllegalArgumentException("realSecondsPerGameMinute must be > 0");
     }
 
@@ -45,16 +46,18 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
     /**
      * Defaults: the user's decisions (2026-10-14) and the game's defaults (Normal sight, shamblers, 1-hour days). The
      * horde rates were tuned on the real map (LouisvilleScenario, 30,000 zombies): about half of Louisville in hordes
-     * after 10 days, most after a month, two city-sized hordes after 2 to 3 months.
+     * after 10 days, most after a month, two city-sized hordes after 2 to 3 months. The bump-follow chance is the full
+     * chance reached on the population peak day (vanilla default day 28); it ramps up from none on day 1.
      */
     public static SimSettings defaults() {
-        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 0.5);
+        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 1.0, 28);
     }
 
     public Builder toBuilder() { return new Builder(this); }
 
     public static final class Builder {
-        private int stragglerOneIn, hordeFormSize, hordeMinSize, sightSetting, speedSetting, buildingStragglerOneIn;
+        private int stragglerOneIn, hordeFormSize, hordeMinSize, sightSetting, speedSetting, buildingStragglerOneIn,
+            peakDay;
         private double followChancePerHour, offRoadChance, breakAwayChance, realSecondsPerGameMinute, trailChance,
             moanResponsePerHour, joinChancePerHour, bumpFollowChance;
 
@@ -73,6 +76,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
             joinChancePerHour = s.joinChancePerHour;
             buildingStragglerOneIn = s.buildingStragglerOneIn;
             bumpFollowChance = s.bumpFollowChance;
+            peakDay = s.peakDay;
         }
 
         public Builder stragglerOneIn(int v) { stragglerOneIn = v; return this; }
@@ -89,11 +93,12 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         public Builder joinChancePerHour(double v) { joinChancePerHour = v; return this; }
         public Builder buildingStragglerOneIn(int v) { buildingStragglerOneIn = v; return this; }
         public Builder bumpFollowChance(double v) { bumpFollowChance = v; return this; }
+        public Builder peakDay(int v) { peakDay = v; return this; }
 
         public SimSettings build() {
             return new SimSettings(stragglerOneIn, hordeFormSize, hordeMinSize, followChancePerHour, offRoadChance,
                 breakAwayChance, sightSetting, speedSetting, realSecondsPerGameMinute, trailChance, moanResponsePerHour,
-                joinChancePerHour, buildingStragglerOneIn, bumpFollowChance);
+                joinChancePerHour, buildingStragglerOneIn, bumpFollowChance, peakDay);
         }
     }
 }
