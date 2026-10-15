@@ -134,6 +134,19 @@ public final class EncountersTest {
         Check.isTrue(followed > 70 && followed < 130, "about half fall in behind on a bump (" + followed + "/200)");
     }
 
+    /** The bump-follow chance is a sandbox option: 0 turns falling in behind on a bump off. */
+    public static void testBumpFollowChanceIsAnOption() {
+        for (int seed = 0; seed < 50; seed++) {
+            Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(0).bumpFollowChance(0).build(),
+                seed * 0x9E3779B97F4A7C15L);
+            ZombieRecord a = rig.wanderer(5000, 5000, 0, false);
+            ZombieRecord b = rig.wanderer(4998.5f, 5000, 0, false);
+            rig.enc.wanderer(b, 1, 0.01);
+            Check.equal(0L, b.followId, "never follows with the chance at 0");
+            Check.isTrue(a != null, "added");
+        }
+    }
+
     public static void testWandererBehindHordeDoesNotSee() {
         Rig rig = new Rig();
         Horde h = rig.horde(115, 100, 0, 20);

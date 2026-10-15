@@ -23,8 +23,6 @@ public final class Encounters {
     static final float GATHER_RADIUS = 8f;
     /** Closer than this counts as bumping into someone (tiles). */
     static final float BUMP_RADIUS = 2f;
-    /** Chance that a walker that bumps into another falls in behind it. */
-    static final double BUMP_FOLLOW = 0.5;
     /**
      * Longest follow chain: a chain of HordeFormSize moving together already becomes a horde, so deeper chains are
      * strung-out ones; capping them keeps every chain walk short (in dense towns they grew hundreds deep).
@@ -104,7 +102,7 @@ public final class Encounters {
             for (int i = 0; i < seenWanderers.size(); i++) {
                 ZombieRecord w = seenWanderers.get(i);
                 if (w == r || w.straggler || !moving(w, nowHours) || leads(r, w) || depth(w) >= MAX_CHAIN - 1) continue;
-                if (rng.nextDouble() < BUMP_FOLLOW) r.followId = w.id;
+                if (rng.nextDouble() < s.bumpFollowChance()) r.followId = w.id;
                 break;
             }
         }

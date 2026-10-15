@@ -133,3 +133,13 @@ option TrueHordes.BuildingStragglerOneIn
 	page = TrueHordes,
 	translation = TrueHordes_BuildingStragglerOneIn,
 }
+
+option TrueHordes.BumpFollowChance
+{
+	type = double,
+	min = 0,
+	max = 1,
+	default = 0.5,
+	page = TrueHordes,
+	translation = TrueHordes_BumpFollowChance,
+}
