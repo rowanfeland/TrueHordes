@@ -80,8 +80,9 @@ public final class BuildingHordesTest {
         Store s = new Store();
         for (int i = 0; i < 6; i++) inside(s, 801 + i, 803);
         SimSettings st = noStragglers().toBuilder().moanResponsePerHour(1).build();
-        Simulation sim = new Simulation(s, SimulationTest.openMap(200, -1), st, 5, 0);
-        sim.step(0.1, Long.MAX_VALUE);
+        double late = SimulationTest.LATE; // moaning is noticed only once the forming chances ramp up
+        Simulation sim = new Simulation(s, SimulationTest.openMap(200, -1), st, 5, late);
+        sim.step(late + 0.1, Long.MAX_VALUE);
         Horde g = only(sim);
         List<ZombieRecord> m = new ArrayList<>();
         for (int i = 0; i < 2000; i++) {
@@ -89,7 +90,7 @@ public final class BuildingHordesTest {
                 ZombieRecord.NO_TARGET, null, false));
         }
         sim.restoreHorde(sim.hordes().nextId(), 860, 803, 0, 0, m);
-        SimulationTest.run(sim, 0.2, 2);
+        SimulationTest.run(sim, late + 0.2, 2);
         Check.isTrue(sim.hordes().get(g.id) == null || !g.dormant, "the big horde's moaning set them loose");
     }
 

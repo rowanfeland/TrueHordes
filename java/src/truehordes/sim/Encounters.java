@@ -25,10 +25,14 @@ public final class Encounters {
     static final float BUMP_RADIUS = 2f;
 
     /**
-     * How much of the bump-follow chance applies {@code days} in-game days after the start (user, 2026-10-15): day 1 is
+     * How much of the forming chances (bump-follow, and since the user's option "both" also sight-follow, joining a
+     * horde in sight and noticing moaning) applies {@code days} in-game days after the start (user, 2026-10-15): day 1 is
      * pure chaos (none), day 2 rises from 1% to 2%, then slowly up to 25% by day 7, 50% by day 14 and the full chance
      * on the population peak day (a peak before day 15 is taken as day 15).
      */
+    /** A forming chance (bump, sight-follow, join by sight, moan response) as it applies at {@code nowHours}. */
+    public double ramped(double chance, double nowHours) { return chance * bumpRamp(nowHours / 24, s.peakDay()); }
+
     public static double bumpRamp(double days, int peakDay) {
         if (days < 1) return 0;
         if (days < 2) return 0.01 + 0.01 * (days - 1);
@@ -92,7 +96,7 @@ public final class Encounters {
         seenHordes.clear();
         grid.nearHordes(r.x(), r.y(), radius, addSeenHorde);
         // Joining takes a little time (user, 2026-10-14): a wanderer that sees a horde joins with a chance per hour.
-        double joinP = 1 - Math.pow(1 - s.joinChancePerHour(), dtHours);
+        double joinP = 1 - Math.pow(1 - ramped(s.joinChancePerHour(), nowHours), dtHours);
         for (int i = 0; i < seenHordes.size(); i++) {
             Horde h = seenHordes.get(i);
             if (h.dormant) continue; // a building horde inside is not seen walking
@@ -114,17 +118,22 @@ public final class Encounters {
         if (r.followId == 0 && moving(r, nowHours)) {
             seenWanderers.clear();
             grid.nearWanderers(r.x(), r.y(), BUMP_RADIUS, addSeenWanderer);
+            long touching = 0;
             for (int i = 0; i < seenWanderers.size(); i++) {
                 ZombieRecord w = seenWanderers.get(i);
                 if (w == r || w.straggler || !moving(w, nowHours) || leads(r, w) || depth(w) >= MAX_CHAIN - 1) continue;
-                if (rng.nextDouble() < s.bumpFollowChance() * bumpRamp(nowHours / 24, s.peakDay())) r.followId = w.id;
+                touching = w.id;
+                // One roll when they first touch (user, 2026-10-15), not a new one on every update they stay touching.
+                if (w.id != r.bumpedId && rng.nextDouble() < ramped(s.bumpFollowChance(), nowHours)) r.followId = w.id;
                 break;
             }
+            r.bumpedId = touching;
         }
         // Following: the chance roll comes first, then the zombie looks for someone walking past to fall in behind
         // (the same odds as rolling once per update with a zombie in sight, without searching on every update).
-        if (r.followId == 0 && s.followChancePerHour() > 0 && moving(r, nowHours)
-                && rng.nextDouble() < 1 - Math.pow(1 - s.followChancePerHour(), dtHours)) {
+        double follow = ramped(s.followChancePerHour(), nowHours);
+        if (r.followId == 0 && follow > 0 && moving(r, nowHours)
+                && rng.nextDouble() < 1 - Math.pow(1 - follow, dtHours)) {
             seenWanderers.clear();
             grid.nearWanderers(r.x(), r.y(), radius, addSeenWanderer);
             for (int i = 0; i < seenWanderers.size(); i++) {

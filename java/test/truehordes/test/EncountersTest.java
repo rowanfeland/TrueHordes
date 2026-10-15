@@ -63,14 +63,15 @@ public final class EncountersTest {
     }
 
     public static void testFollowChainFormsAtTen() {
-        Rig rig = new Rig();
+        Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(0).joinChancePerHour(1)
+            .bumpFollowChance(0).build(), 1);
         List<ZombieRecord> line = new ArrayList<>();
         for (int i = 0; i < 10; i++) line.add(rig.wanderer(100 - i * 1.5f, 100, 0, false));
         for (int i = 1; i < 9; i++) line.get(i).followId = line.get(i - 1).id;
-        for (ZombieRecord r : line) rig.enc.wanderer(r, 1, 0.1);
+        for (ZombieRecord r : line) rig.enc.wanderer(r, LATE, 0.1);
         Check.equal(0, rig.hordes.size(), "a chain of 9 is not a horde");
         line.get(9).followId = line.get(8).id;
-        rig.enc.wanderer(line.get(9), 1, 0.1);
+        rig.enc.wanderer(line.get(9), LATE, 0.1);
         Check.equal(1, rig.hordes.size(), "the 10th follower makes a horde");
         Horde h = rig.hordes.all().iterator().next();
         Check.equal(10, h.size(), "all ten are members");
@@ -82,7 +83,7 @@ public final class EncountersTest {
         Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(1).build(), 3);
         ZombieRecord a = rig.wanderer(100, 100, 0, false);
         ZombieRecord b = rig.wanderer(95, 100, 0, false);
-        rig.enc.wanderer(b, 1, 1.0);
+        rig.enc.wanderer(b, LATE, 1.0);
         Check.equal(a.id, b.followId, "a zombie that sees another walking past falls in behind it");
     }
 
@@ -90,7 +91,7 @@ public final class EncountersTest {
         Rig rig = new Rig();
         Horde h = rig.horde(110, 100, 0, 20);
         ZombieRecord r = rig.wanderer(100, 100, 0, false);
-        rig.enc.wanderer(r, 1, 0.1);
+        rig.enc.wanderer(r, LATE, 0.1);
         Check.equal(21, h.size(), "joined");
         Check.equal(h.id, r.hordeId, "knows its horde");
         Check.equal(0, rig.store.size(), "no longer a wanderer");
@@ -103,7 +104,7 @@ public final class EncountersTest {
         int joined = 0;
         for (int i = 0; i < 2000; i++) {
             ZombieRecord r = rig.wanderer(4982, 5000, 0, false); // in sight, not touching even as the horde grows
-            rig.enc.wanderer(r, 1, 1.0);
+            rig.enc.wanderer(r, LATE, 1.0);
             if (rig.store.get(r.id) == null) joined++;
             else rig.store.remove(r.id);
         }
@@ -116,7 +117,7 @@ public final class EncountersTest {
         Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(0).joinChancePerHour(0).build(), 9);
         Horde h = rig.horde(5000, 5000, 0, 100); // spread 7
         ZombieRecord r = rig.wanderer(5003, 5000, (float) Math.PI, false); // inside its circle, facing away
-        rig.enc.wanderer(r, 1, 0.01);
+        rig.enc.wanderer(r, LATE, 0.01);
         Check.equal(101, h.size(), "bumped into it: joined");
     }
 
@@ -152,7 +153,7 @@ public final class EncountersTest {
         Rig rig = new Rig();
         Horde h = rig.horde(115, 100, 0, 20);
         ZombieRecord r = rig.wanderer(100, 100, (float) Math.PI, false);
-        for (int i = 0; i < 200; i++) rig.enc.wanderer(r, 1, 0.1);
+        for (int i = 0; i < 200; i++) rig.enc.wanderer(r, LATE, 0.1);
         Check.equal(20, h.size(), "a horde behind it is not seen");
     }
 
@@ -272,5 +273,37 @@ public final class EncountersTest {
             Check.equal(0L, b.followId, "day 1: nobody falls in behind");
             Check.isTrue(a != null, "added");
         }
+    }
+
+    /** User, 2026-10-15 (option "both"): on day 1 nobody falls in behind a zombie it sees walking past either. */
+    public static void testNoSightFollowingOnDayOne() {
+        Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(1).build(), 3);
+        rig.wanderer(100, 100, 0, false);
+        ZombieRecord b = rig.wanderer(95, 100, 0, false);
+        for (int i = 0; i < 20; i++) rig.enc.wanderer(b, 0.5 * i, 1.0);
+        Check.equal(0L, b.followId, "day 1: no sight-following");
+    }
+
+    /** Joining a horde seen (not touched) is on the same ramp: none on day 1. */
+    public static void testNoJoiningBySightOnDayOne() {
+        Rig rig = new Rig();
+        Horde h = rig.horde(110, 100, 0, 20);
+        ZombieRecord r = rig.wanderer(100, 100, 0, false);
+        for (int i = 0; i < 20; i++) rig.enc.wanderer(r, 0.5 * i, 1.0);
+        Check.equal(20, h.size(), "day 1: seeing a horde does not pull it in");
+    }
+
+    /** A bump is one roll when two zombies first touch, not a new roll on every update they stay touching. */
+    public static void testBumpRolledOncePerContact() {
+        int followed = 0;
+        for (int seed = 0; seed < 200; seed++) {
+            Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(0).bumpFollowChance(0.1).build(),
+                seed * 0x9E3779B97F4A7C15L);
+            ZombieRecord a = rig.wanderer(5000, 5000, 0, false);
+            ZombieRecord b = rig.wanderer(4998.5f, 5000, 0, false);
+            for (int i = 0; i < 30; i++) rig.enc.wanderer(b, LATE, 0.01);
+            if (b.followId == a.id) followed++;
+        }
+        Check.isTrue(followed > 5 && followed < 40, "about 10% over 30 updates touching (" + followed + "/200)");
     }
 }

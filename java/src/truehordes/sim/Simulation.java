@@ -243,7 +243,7 @@ public final class Simulation {
     private void listen(Horde h, double dt) {
         Hearing.Pull p = pull(h.x, h.y, h.id, 0f);
         if (p != null && p.horde() != null
-                && random.getAsDouble() < 1 - Math.pow(1 - s.moanResponsePerHour(), dt / 60.0)) {
+                && random.getAsDouble() < 1 - Math.pow(1 - encounters.ramped(s.moanResponsePerHour(), currentHours), dt / 60.0)) {
             wake(h, p.x(), p.y(), currentHours + INVESTIGATE_HOURS, p.horde().id);
             return;
         }
@@ -408,7 +408,7 @@ public final class Simulation {
             if (r.followId < 0 && hordes.get(-r.followId) == null) r.followId = 0; // the horde it heard is gone
             if (p != null && p.event() == null && p.horde() != null && r.followId != -p.horde().id) {
                 // Moaning is noticed gradually: a chance per hour to turn towards it; until then it is ignored.
-                if (r.straggler || random.getAsDouble() >= 1 - Math.pow(1 - s.moanResponsePerHour(), dt / 60.0)) {
+                if (r.straggler || random.getAsDouble() >= 1 - Math.pow(1 - encounters.ramped(s.moanResponsePerHour(), currentHours), dt / 60.0)) {
                     p = null;
                 } else {
                     r.followId = -p.horde().id;
@@ -504,7 +504,7 @@ public final class Simulation {
             if (h.followHordeId != 0 && hordes.get(h.followHordeId) == null) h.followHordeId = 0;
             if (p != null && p.event() == null && p.horde() != null && h.followHordeId != p.horde().id) {
                 // Like single zombies, a horde notices a louder horde's moaning gradually.
-                if (random.getAsDouble() >= 1 - Math.pow(1 - s.moanResponsePerHour(), dt / 60.0)) p = null;
+                if (random.getAsDouble() >= 1 - Math.pow(1 - encounters.ramped(s.moanResponsePerHour(), currentHours), dt / 60.0)) p = null;
             }
             h.followHordeId = p != null && p.horde() != null ? p.horde().id : 0;
             float px = 0, py = 0, pw = 0;

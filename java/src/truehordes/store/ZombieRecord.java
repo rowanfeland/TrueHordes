@@ -42,6 +42,8 @@ public final class ZombieRecord {
     public boolean strRolled;
     /** Who this wanderer trails: 0 none, &gt;0 a record id, &lt;0 minus a horde id. */
     public long followId;
+    /** The walker it last rolled a bump against (not saved): a bump is one roll per contact, not one per update. */
+    public long bumpedId;
     /** The horde this zombie last belonged to (0 none); lets it rejoin after a spell as a real zombie. */
     public long hordeId;
     /** World hour until which a left-behind or straggling zombie stays put. */

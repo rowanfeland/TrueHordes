@@ -51,6 +51,9 @@ public final class SimulationTest {
         };
     }
 
+    /** Day 40: past the population peak, so forming chances (moaning, following) are at full strength. */
+    static final double LATE = 24 * 40;
+
     static void run(Simulation sim, double fromHours, double hours) {
         for (double t = fromHours; t <= fromHours + hours; t += 1.0 / 60) sim.step(t, Long.MAX_VALUE);
     }
@@ -112,12 +115,12 @@ public final class SimulationTest {
         Store s = new Store();
         // Noticing is certain here: this checks how a follower trails, not how soon it notices.
         Simulation sim = new Simulation(s, roadMap(400, 21, 10),
-            quiet().toBuilder().offRoadChance(0).moanResponsePerHour(1).build(), 4, 0);
+            quiet().toBuilder().offRoadChance(0).moanResponsePerHour(1).build(), 4, LATE);
         Horde leader = horde(sim, 60 * 8, 10 * 8 + 4, 0, 2000);
         Horde follower = horde(sim, 50 * 8, 10 * 8 + 4, 0, 20);
         boolean trailed = false;
-        double t = 0;
-        for (; t < 48 && sim.hordes().get(follower.id) != null; t += 1.0 / 60) {
+        double t = LATE;
+        for (; t < LATE + 48 && sim.hordes().get(follower.id) != null; t += 1.0 / 60) {
             sim.step(t, Long.MAX_VALUE);
             if (follower.followHordeId == leader.id) trailed = true;
         }
