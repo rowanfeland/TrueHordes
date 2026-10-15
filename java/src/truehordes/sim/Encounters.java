@@ -230,6 +230,28 @@ public final class Encounters {
         if (!l.contains(r)) l.add(r);
     }
 
+    /**
+     * A zombie arrived where it heard a sound (tile tx, ty): if enough non-stragglers that heard the same sound are
+     * gathered there, they become a horde.
+     */
+    public void gatherAt(float x, float y, int tx, int ty) {
+        List<ZombieRecord> gathered = new ArrayList<>();
+        grid.nearWanderers(x, y, GATHER_RADIUS, w -> {
+            if (!w.straggler && w.targetX == tx && w.targetY == ty) gathered.add(w);
+        });
+        if (gathered.size() < s.hordeFormSize()) return;
+        for (ZombieRecord r : gathered) {
+            store.remove(r.id);
+            r.followId = 0;
+            r.targetX = ZombieRecord.NO_TARGET;
+            r.targetY = ZombieRecord.NO_TARGET;
+            r.investigateUntilHours = 0;
+        }
+        Horde h = hordes.create(x, y, (float) (rng.nextDouble() * 2 * Math.PI - Math.PI), gathered);
+        grid.putHorde(h);
+        formed++;
+    }
+
     /** {@code e} faded: the non-straggler responders gathered at it become a horde if there are enough. */
     public void soundEnded(SoundEvent e) {
         List<ZombieRecord> l = responders.remove(e.id());

@@ -50,6 +50,8 @@ public final class ZombieRecord {
     public boolean idle;
     /** Scheduling (simulation only, not saved): the in-game minute of its next update and the hour of its last. */
     public long dueMinute = Long.MIN_VALUE;
+    /** Heading to a sound it heard (its target) until this world hour (not saved: a reload forgets it). */
+    public double investigateUntilHours;
     public double simHours = Double.NaN;
 
     public ZombieRecord(long id, float x, float y, float z, byte dir, int outfitId, int stateFlags, int persistentId,

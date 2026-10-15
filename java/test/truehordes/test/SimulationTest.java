@@ -227,6 +227,35 @@ public final class SimulationTest {
         Check.equal("", sim.checkConservation("test"), "conservation");
     }
 
+    /** In-game test 2026-10-15: at fast-forward the simulation fell hours behind; leaders jumped away from followers. */
+    public static void testBigTimeJumpKeepsFollowers() {
+        Store s = new Store();
+        ZombieRecord leader = add(s, 800, 800, 0);
+        ZombieRecord follower = add(s, 798, 800, 0);
+        follower.followId = leader.id;
+        Simulation sim = new Simulation(s, openMap(200, -1), quiet(), 3, 0);
+        sim.step(0.5, Long.MAX_VALUE);
+        sim.step(12.0, Long.MAX_VALUE); // the game clock jumped 11.5 hours
+        Check.equal(leader.id, follower.followId, "still following after a jump of hours");
+        Check.isTrue(Math.hypot(leader.x() - follower.x(), leader.y() - follower.y()) < 48, "and still close");
+    }
+
+    /** In-game test 2026-10-15: zombies far from a test sound never arrived before it ended, so no horde formed. */
+    public static void testSoundGathersZombiesFromFarAway() {
+        Store s = new Store();
+        Random rng = new Random(7);
+        for (int i = 0; i < 30; i++) {
+            double a = rng.nextDouble() * 2 * Math.PI, d = 80 + rng.nextInt(60);
+            add(s, (float) (800 + Math.cos(a) * d), (float) (800 + Math.sin(a) * d), (float) a);
+        }
+        Simulation sim = new Simulation(s, openMap(200, -1), quiet(), 12, 0);
+        sim.addSound(800, 800, 90, 0.5);
+        run(sim, 0, 8);
+        Check.isTrue(sim.hordes().size() >= 1, "zombies that heard it walked there and became a horde ("
+            + sim.hordes().size() + " hordes, " + s.size() + " wanderers left)");
+        Check.equal("", sim.checkConservation("test"), "conservation");
+    }
+
     public static void testRealChunksSkipped() {
         Store s = new Store();
         ZombieRecord r = add(s, 100 * 8 + 4, 100 * 8 + 4, 0);

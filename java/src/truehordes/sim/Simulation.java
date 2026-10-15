@@ -23,6 +23,10 @@ import truehordes.store.ZombieRecord;
 public final class Simulation {
     /** How strongly a follower steers towards the zombie it trails. */
     static final float FOLLOW_PULL = 2.5f;
+    /** Longest stretch of in-game time one update simulates (see elapsedMinutes). */
+    static final double MAX_STEP_MINUTES = 60;
+    /** Zombies keep heading to a sound's spot for this long after it ends, then give up (in-game hours). */
+    static final double INVESTIGATE_HOURS = 6;
     /** A follower walks this far behind the zombie it follows (tiles). */
     static final float TRAIL_GAP = 1.5f;
     /** A follower further than this from its leader has lost it (tiles). */
@@ -261,9 +265,20 @@ public final class Simulation {
         return updated;
     }
 
+    /**
+     * In-game minutes this update simulates: the time since the walker's last update, but at most MAX_STEP_MINUTES.
+     * When the game runs faster than the simulation can follow (fast-forward, sleeping), walkers move a little slower
+     * in game time instead of jumping hours at once, which would break follow chains, joining and gathering.
+     */
     private double elapsedMinutes(double simHours, double now, int interval) {
         if (Double.isNaN(simHours)) return interval;
-        return Math.max(0, Math.min(24 * 60, (now - simHours) * 60));
+        return Math.max(0, Math.min(MAX_STEP_MINUTES, (now - simHours) * 60));
+    }
+
+    /** How far behind the oldest due walker is, in in-game minutes (0 when keeping up). */
+    public long lagMinutes() {
+        Map.Entry<Long, LongStack> e = buckets.firstEntry();
+        return e == null ? 0 : Math.max(0, currentMinute - e.getKey());
     }
 
     private void updateWanderer(ZombieRecord r, double now) {
@@ -304,10 +319,26 @@ public final class Simulation {
                 pw = p.weight();
                 if (p.event() != null) {
                     encounters.responded(p.event(), r);
+                    // It keeps heading for the spot after the sound ends (spec 4.2: converging on a sound).
+                    r.targetX = (int) Math.floor(p.event().x());
+                    r.targetY = (int) Math.floor(p.event().y());
+                    r.investigateUntilHours = p.event().endHours() + INVESTIGATE_HOURS;
                     if (Hearing.dist(r.x(), r.y(), px, py) <= MILL_RADIUS) {
                         r.pauseMinutes = 2 + 3 * rng.nextFloat();
                         walk = false;
                     }
+                }
+            } else if (r.hasTarget() && r.investigateUntilHours > now) {
+                // Still going to where it heard the sound: when 10 or more gather there they become a horde.
+                px = r.targetX + 0.5f;
+                py = r.targetY + 0.5f;
+                pw = Hearing.EVENT_PULL;
+                if (Hearing.dist(r.x(), r.y(), px, py) <= MILL_RADIUS) {
+                    r.pauseMinutes = 2 + 3 * rng.nextFloat();
+                    walk = false;
+                    final float gx = px, gy = py;
+                    internal(() -> encounters.gatherAt(gx, gy, r.targetX, r.targetY));
+                    if (store.get(r.id) != r) return; // it became part of a horde
                 }
             } else if (r.followId > 0) {
                 ZombieRecord t = store.get(r.followId);
@@ -330,8 +361,10 @@ public final class Simulation {
                 } else {
                     store.moved(r, st.x(), st.y());
                     r.heading = st.heading();
-                    r.targetX = ZombieRecord.NO_TARGET; // it walked somewhere else: the old target is stale
-                    r.targetY = ZombieRecord.NO_TARGET;
+                    if (r.investigateUntilHours <= now) {
+                        r.targetX = ZombieRecord.NO_TARGET; // it walked somewhere else: the old target is stale
+                        r.targetY = ZombieRecord.NO_TARGET;
+                    }
                 }
                 r.pauseMinutes = st.boxedIn() ? 10f : Movement.rollPause((float) dt, random);
                 // A straggler only shuffles a little, then lingers where it is for a few hours (spec 4.6).
@@ -480,9 +513,9 @@ public final class Simulation {
         int biggest = 0;
         for (Horde h : hordes.all()) biggest = Math.max(biggest, h.size());
         return String.format(Locale.ROOT,
-            "sim: wanderers %d, hordes %d (biggest %d, %d members), updates %d, queue %d, last step %.2f ms (max %.2f, slowest update %.2f ms: %s), "
+            "sim: behind %d in-game min, wanderers %d, hordes %d (biggest %d, %d members), updates %d, queue %d, last step %.2f ms (max %.2f, slowest update %.2f ms: %s), "
                 + "formed %d, joined %d, merged %d, left behind %d, broke up %d, sounds %d | conservation %s",
-            store.size(), hordes.size(), biggest, hordes.memberCount(), updatesTotal, queued, lastStepNanos / 1e6,
+            lagMinutes(), store.size(), hordes.size(), biggest, hordes.memberCount(), updatesTotal, queued, lastStepNanos / 1e6,
             maxStepNanos / 1e6, maxUpdateNanos / 1e6, maxUpdateWhat, encounters.formed(), encounters.joined(), encounters.merged(), encounters.brokeAway(),
             encounters.dissolved(), events.size(), conservation.summary());
     }

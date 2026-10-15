@@ -59,12 +59,26 @@ public final class SimThread {
         return !t.isAlive();
     }
 
+    /** Pause between slices: short while the simulation is behind the game clock (fast-forward), else the normal one. */
+    public static long pauseMillis(long lagMinutes, long normalMillis) {
+        return lagMinutes > LAG_MINUTES ? CATCH_UP_SLEEP_MILLIS : normalMillis;
+    }
+
+    /** Behind by more than this many in-game minutes: catch up. */
+    static final long LAG_MINUTES = 10;
+    /** Pause between slices while catching up (2 ms slices: about two thirds of one background core). */
+    static final long CATCH_UP_SLEEP_MILLIS = 1;
+
     private void loop() {
         while (running) {
+            long pause = sleepMillis;
             synchronized (lock) {
                 if (!running) break;
                 try {
-                    if (ready.getAsBoolean()) sim.step(nowHours.getAsDouble(), sliceNanos);
+                    if (ready.getAsBoolean()) {
+                        sim.step(nowHours.getAsDouble(), sliceNanos);
+                        pause = pauseMillis(sim.lagMinutes(), sleepMillis);
+                    }
                 } catch (Throwable t) {
                     if (!failedOnce) {
                         failedOnce = true;
@@ -73,7 +87,7 @@ public final class SimThread {
                 }
             }
             try {
-                Thread.sleep(sleepMillis);
+                Thread.sleep(pause);
             } catch (InterruptedException e) {
                 if (!running) break;
             }

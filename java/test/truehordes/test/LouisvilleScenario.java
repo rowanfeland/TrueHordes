@@ -69,6 +69,17 @@ public final class LouisvilleScenario {
         Store s = new Store();
         Random rng = new Random(seed);
         int placed = 0;
+        String fromSave = System.getProperty("save");
+        java.util.List<truehordes.save.LoadResult.SavedHorde> savedHordes = java.util.List.of();
+        if (fromSave != null) {
+            // Start from a real mod save (state.bin): the exact population the game had.
+            truehordes.save.LoadResult lr = truehordes.save.SaveFile.read(Paths.get(fromSave));
+            for (ZombieRecord r : lr.records) s.restore(r);
+            savedHordes = lr.hordes;
+            placed = zombies;
+            System.out.println("from save: " + lr.records.size() + " records, " + lr.hordes.size() + " hordes, hour "
+                + lr.worldAgeHours);
+        }
         while (placed < zombies) {
             float x = x0 + rng.nextInt(size) + 0.5f, y = y0 + rng.nextInt(size) + 0.5f;
             int r = map.rank(Math.floorDiv((int) x, 8), Math.floorDiv((int) y, 8));
@@ -80,6 +91,9 @@ public final class LouisvilleScenario {
             .moanResponsePerHour(moan).build();
         System.out.println("follow " + follow + "/h, join " + join + "/h, moan " + moan + "/h");
         Simulation sim = new Simulation(s, map, settings, seed, 0);
+        for (truehordes.save.LoadResult.SavedHorde h : savedHordes) {
+            sim.restoreHorde(h.id(), h.x(), h.y(), h.heading(), h.pauseMinutes(), h.members());
+        }
         long t0 = System.currentTimeMillis();
         for (int day = 1; day <= days; day++) {
             for (double t = (day - 1) * 24; t < day * 24; t += 1.0 / 60) sim.step(t, Long.MAX_VALUE);
@@ -94,6 +108,9 @@ public final class LouisvilleScenario {
                     boolean inside = h.x >= x0 && h.x < x0 + size && h.y >= y0 && h.y < y0 + size;
                     top.append(h.size()).append(inside ? "" : "*").append(' ');
                 }
+                int following = 0, idle = 0;
+                for (ZombieRecord r : s.all()) { if (r.followId > 0) following++; if (r.idle) idle++; }
+                System.out.printf("  following %d, idle %d%n", following, idle);
                 System.out.printf("day %3d: hordes %4d, in hordes %6d (%.0f%%), wanderers %6d (%d in city), top: %s| %ds%n",
                     day, hs.size(), sim.hordes().memberCount(), 100.0 * sim.hordes().memberCount() / sim.held(), s.size(),
                     inCity, top, (System.currentTimeMillis() - t0) / 1000);
