@@ -38,6 +38,7 @@ public final class HandOver {
      */
     public List<ZombieRecord> layOut(Horde h, Takeover.FloorCheck floors) {
         PlayerNearby loaded = sim.players();
+        if (h.dormant) return layOutDormant(h, floors, loaded);
         List<ZombieRecord> members = new ArrayList<>(h.members);
         int n = members.size();
         int width = Math.max(1, (int) Math.ceil(Math.sqrt(n) / 2));
@@ -73,6 +74,33 @@ public final class HandOver {
                     ZombieRecord r = members.get(i);
                     if (store.get(r.id) != r) leave(r, h.heading, places[i][0], places[i][1]);
                 }
+            } else if (!out.isEmpty()) {
+                sim.grid().moveHorde(h, h.x, h.y, oldSpread);
+            }
+        });
+        laidOut += out.size();
+        return out;
+    }
+
+    /** A building horde's zombies appear where they stand inside, still idle; the rest keep waiting. */
+    private List<ZombieRecord> layOutDormant(Horde h, Takeover.FloorCheck floors, PlayerNearby loaded) {
+        List<ZombieRecord> out = new ArrayList<>();
+        java.util.Set<ZombieRecord> gone = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        float oldSpread = h.spread();
+        sim.internal(() -> {
+            for (ZombieRecord r : new ArrayList<>(h.members)) {
+                int cx = Math.floorDiv((int) Math.floor(r.x()), 8), cy = Math.floorDiv((int) Math.floor(r.y()), 8);
+                if (!loaded.nearChunk(cx, cy)) continue;
+                if (!floors.floor((int) Math.floor(r.x()), (int) Math.floor(r.y()), (int) Math.floor(r.z))) continue;
+                gone.add(r);
+                r.followId = 0;
+                store.restore(r); // same spot, still idle
+                out.add(r);
+            }
+            if (!gone.isEmpty()) sim.hordes().removeMembers(h, gone);
+            if (h.size() == 0) {
+                sim.grid().removeHorde(h, h.x, h.y, oldSpread);
+                sim.hordes().remove(h.id);
             } else if (!out.isEmpty()) {
                 sim.grid().moveHorde(h, h.x, h.y, oldSpread);
             }

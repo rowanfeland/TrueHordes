@@ -121,21 +121,31 @@ function Hordes_MapPanel:drawTerrain()
     end
 end
 
---- Hordes as circles (radius = spread) with their size and a heading arrow; h holds x, y, spread, size, heading.
+--- Hordes as circles (radius = spread) with their size and a heading arrow; h holds x, y, spread, size, heading,
+--- dormant per horde. Building hordes (dormant) are dim, without an arrow.
 function Hordes_MapPanel:drawHordes(h)
     if not h then return end
     local n = h.n or 0
-    for i = 1, n * 5, 5 do
+    for i = 1, n * 6, 6 do
         local cx, cy = self:worldToScreen(h[i], h[i + 1])
-        local r = math.max(3, h[i + 2] * self.zoom)
-        local steps = 24
-        for k = 0, steps - 1 do
-            local a = k / steps * 2 * math.pi
-            self:drawRect(cx + math.cos(a) * r - 1, cy + math.sin(a) * r - 1, 2, 2, 1, 0.75, 0.2, 1.0)
+        local dormant = h[i + 5] == 1
+        if dormant and self.zoom < 1 then
+            -- Zoomed out there can be thousands of building hordes: one dim dot each keeps the map cheap.
+            self:drawRect(cx - 1, cy - 1, 3, 3, 0.5, 0.75, 0.2, 1.0)
+        else
+            local r = math.max(3, h[i + 2] * self.zoom)
+            local alpha = dormant and 0.35 or 1
+            local steps = dormant and 12 or 24
+            for k = 0, steps - 1 do
+                local a = k / steps * 2 * math.pi
+                self:drawRect(cx + math.cos(a) * r - 1, cy + math.sin(a) * r - 1, 2, 2, alpha, 0.75, 0.2, 1.0)
+            end
+            if not dormant then
+                local hx, hy = math.cos(h[i + 4]), math.sin(h[i + 4])
+                for d = 0, r + 6, 2 do self:drawRect(cx + hx * d - 1, cy + hy * d - 1, 2, 2, 1, 1, 1, 1) end
+                self:drawText(tostring(math.floor(h[i + 3])), cx + 4, cy - 14, 1, 1, 1, 1, UIFont.Small)
+            end
         end
-        local hx, hy = math.cos(h[i + 4]), math.sin(h[i + 4])
-        for d = 0, r + 6, 2 do self:drawRect(cx + hx * d - 1, cy + hy * d - 1, 2, 2, 1, 1, 1, 1) end
-        self:drawText(tostring(math.floor(h[i + 3])), cx + 4, cy - 14, 1, 1, 1, 1, UIFont.Small)
     end
 end
 

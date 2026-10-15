@@ -24,6 +24,7 @@ public final class TestRunner {
         SimulationTest.class,
         SimSpeedTest.class,
         HandOverTest.class,
+        BuildingHordesTest.class,
         LogStatsTest.class,
         ClockSchedulerTest.class,
         StoreTest.class,

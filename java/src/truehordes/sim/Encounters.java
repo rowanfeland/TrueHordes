@@ -78,6 +78,7 @@ public final class Encounters {
         double joinP = 1 - Math.pow(1 - s.joinChancePerHour(), dtHours);
         for (int i = 0; i < seenHordes.size(); i++) {
             Horde h = seenHordes.get(i);
+            if (h.dormant) continue; // a building horde inside is not seen walking
             if (Vision.sees(r.x(), r.y(), r.heading, h.x, h.y, h.spread(), radius, random)) {
                 if (random.getAsDouble() < joinP) {
                     join(h, r);
@@ -164,11 +165,12 @@ public final class Encounters {
      * one it merged into) or null if it broke up.
      */
     public Horde horde(Horde h, double nowHours, int tightChunks) {
+        if (h.dormant) return h;
         seenHordes.clear();
         grid.nearHordes(h.x, h.y, h.spread(), addSeenHorde);
         for (int i = 0; i < seenHordes.size(); i++) {
             Horde o = seenHordes.get(i);
-            if (o == h || hordes.get(o.id) == null) continue;
+            if (o == h || o.dormant || hordes.get(o.id) == null) continue;
             h = merge(h, o);
         }
         if (tightChunks > 0 && s.breakAwayChance() > 0) {

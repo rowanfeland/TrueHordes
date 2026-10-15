@@ -21,7 +21,8 @@ public final class LoadResult {
     public final long hordeNextId;
 
     /** A saved horde: its members are whole records. */
-    public record SavedHorde(long id, float x, float y, float heading, float pauseMinutes, List<ZombieRecord> members) {}
+    public record SavedHorde(long id, float x, float y, float heading, float pauseMinutes, List<ZombieRecord> members,
+                             boolean dormant) {}
 
     LoadResult(Status status, double worldAgeHours, long nextId, List<ZombieRecord> records, boolean seeded,
                byte[] population, String message) {

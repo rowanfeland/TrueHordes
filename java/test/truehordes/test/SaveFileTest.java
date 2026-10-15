@@ -188,6 +188,12 @@ public final class SaveFileTest {
         }
         truehordes.sim.Horde h = hs.create(1000.5f, 2000.25f, -0.5f, m);
         h.pauseMinutes = 4f;
+        java.util.List<ZombieRecord> inside = new java.util.ArrayList<>();
+        for (int i = 0; i < 3; i++) {
+            inside.add(new ZombieRecord(600 + i, 50, 60, 0, (byte) 0, 0, 0, 0, ZombieRecord.NO_TARGET,
+                ZombieRecord.NO_TARGET, null, true));
+        }
+        hs.createDormant(52f, 61f, inside);
         SaveFile.writeBytes(f, SaveFile.encode(s, hs, 12.0, true, new byte[] {9, 8}));
         LoadResult r = SaveFile.read(f);
         Check.equal(LoadResult.Status.OK, r.status, "read back");
@@ -200,8 +206,10 @@ public final class SaveFileTest {
         Check.equal(42L, back.followId, "follow");
         Check.equal(7L, back.hordeId, "horde id");
         Check.near(99.5, back.lingerUntilHours, 1e-9, "linger");
-        Check.equal(1, r.hordes.size(), "one horde");
+        Check.equal(2, r.hordes.size(), "a horde and a building horde");
         LoadResult.SavedHorde sh = r.hordes.get(0);
+        Check.isTrue(!sh.dormant() && r.hordes.get(1).dormant(), "building horde stays dormant (format 4)");
+        Check.equal(3, r.hordes.get(1).members().size(), "its zombies");
         Check.equal(h.id, sh.id(), "horde id kept");
         Check.near(1000.5, sh.x(), 1e-4, "x");
         Check.near(2000.25, sh.y(), 1e-4, "y");

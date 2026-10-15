@@ -27,7 +27,7 @@ import truehordes.util.Log;
  */
 public final class SaveFile {
     public static final int MAGIC = 0x54485244; // "THRD"
-    public static final int VERSION = 3;
+    public static final int VERSION = 4;
     /** The smallest header of any version (version 1). */
     private static final int HEADER_BYTES = 4 + 4 + 8 + 8 + 8 + 4;
     private static final int RECORD_BYTES = 8 + 4 * 3 + 1 + 4 * 5 + 1 + 4 + 4 * 2 + 2 + 8 * 3 + 1;
@@ -66,7 +66,7 @@ public final class SaveFile {
         for (ZombieRecord r : store.all()) size += recordSize(r);
         if (hordes != null) {
             for (Horde h : hordes.all()) {
-                size += 8 + 4 * 4 + 4;
+                size += 8 + 4 * 4 + 1 + 4;
                 for (ZombieRecord r : h.members) size += recordSize(r);
             }
         }
@@ -91,6 +91,7 @@ public final class SaveFile {
                 out.putFloat(h.y);
                 out.putFloat(h.heading);
                 out.putFloat(h.pauseMinutes);
+                out.put((byte) (h.dormant ? 1 : 0)); // version 4
                 out.putInt(h.size());
                 for (ZombieRecord r : h.members) putRecord(out, r);
             }
@@ -196,6 +197,7 @@ public final class SaveFile {
                 return decodeV1(in, okStatus);
             case 2:
             case 3:
+            case 4:
                 return decodeV2(in, okStatus, version);
             default:
                 throw new FormatException("unsupported save version " + version);
@@ -238,11 +240,12 @@ public final class SaveFile {
             for (int i = 0; i < hordeCount; i++) {
                 long id = in.readLong();
                 float x = in.readFloat(), y = in.readFloat(), heading = in.readFloat(), pause = in.readFloat();
+                boolean dormant = version >= 4 && in.readBoolean();
                 int n = in.readInt();
                 if (n < 0) throw new FormatException("negative horde size");
                 List<ZombieRecord> members = new ArrayList<>(Math.min(n, 1 << 16));
                 for (int k = 0; k < n; k++) members.add(readRecord(in, version));
-                hordes.add(new LoadResult.SavedHorde(id, x, y, heading, pause, members));
+                hordes.add(new LoadResult.SavedHorde(id, x, y, heading, pause, members, dormant));
             }
         }
         if (in.available() != 0) throw new FormatException("unexpected trailing data");

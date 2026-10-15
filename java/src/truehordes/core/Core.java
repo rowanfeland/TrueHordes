@@ -187,7 +187,7 @@ public final class Core {
         sim = new truehordes.sim.Simulation(store, new truehordes.sim.WorldMapView(world), simSettings, System.nanoTime(),
             now);
         for (LoadResult.SavedHorde h : r.hordes) {
-            sim.restoreHorde(h.id(), h.x(), h.y(), h.heading(), h.pauseMinutes(), h.members());
+            sim.restoreHorde(h.id(), h.x(), h.y(), h.heading(), h.pauseMinutes(), h.members(), h.dormant());
         }
         sim.hordes().setNextId(r.hordeNextId);
         try {

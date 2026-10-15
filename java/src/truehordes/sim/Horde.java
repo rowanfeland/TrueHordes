@@ -17,6 +17,14 @@ public final class Horde {
     public float pauseMinutes;
     /** The louder horde this one is trailing (0 none); informational, for Hordes_hordes(). */
     public long followHordeId;
+    /**
+     * A building horde (user design 2026-10-15): the idle zombies of one building waiting for a sound. It does not
+     * move, moan, merge or take joiners; a sound (or a louder horde's moaning, noticed gradually) sets it loose.
+     */
+    public boolean dormant;
+    /** Where it heard a sound and keeps heading after the sound ends, until investigateUntilHours (not saved). */
+    public float targetX = Float.NaN, targetY = Float.NaN;
+    public double investigateUntilHours;
     public final List<ZombieRecord> members;
     /** Scheduling (not saved): the in-game minute of its next update and the hour of its last. */
     long dueMinute = Long.MIN_VALUE;

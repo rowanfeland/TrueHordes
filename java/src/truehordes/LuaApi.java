@@ -127,10 +127,16 @@ public final class LuaApi {
         synchronized (c) {
             truehordes.sim.Simulation sim = c.simulation();
             if (sim == null) return "not running (state " + c.state() + ")";
-            java.util.List<truehordes.sim.Horde> list = new java.util.ArrayList<>(sim.hordes().all());
+            java.util.List<truehordes.sim.Horde> list = new java.util.ArrayList<>();
+            int dormant = 0, inside = 0;
+            for (truehordes.sim.Horde h : sim.hordes().all()) {
+                if (h.dormant) { dormant++; inside += h.size(); } else list.add(h);
+            }
             list.sort((a, b) -> Integer.compare(b.size(), a.size()));
+            int roaming = sim.hordes().memberCount() - inside;
             StringBuilder sb = new StringBuilder();
-            sb.append(sim.hordes().size()).append(" hordes, ").append(sim.hordes().memberCount()).append(" zombies in hordes");
+            sb.append(list.size()).append(" hordes (").append(roaming).append(" zombies), ").append(dormant)
+                .append(" building hordes waiting (").append(inside).append(" zombies)");
             for (int i = 0; i < Math.min(20, list.size()); i++) {
                 truehordes.sim.Horde h = list.get(i);
                 sb.append(String.format(java.util.Locale.ROOT, "\n#%d: %d zombies at %.0f,%.0f heading %.0f deg, %s%s",
@@ -168,7 +174,7 @@ public final class LuaApi {
                 t.rawset("total", (double) s.total);
                 t.rawset("maxCount", (double) s.maxCount);
                 for (int i = 0; i < s.data.length; i++) t.rawset((double) (i + 1), (double) s.data[i]);
-                // Hordes in view: x, y, spread, size, heading per horde.
+                // Hordes in view: x, y, spread, size, heading, dormant (1 = a building horde) per horde.
                 KahluaTable hs = LuaManager.platform.newTable();
                 int n = 0;
                 truehordes.sim.Simulation sim = c.simulation();
@@ -176,11 +182,12 @@ public final class LuaApi {
                     for (truehordes.sim.Horde h : sim.hordes().all()) {
                         float r = h.spread();
                         if (h.x + r < x0 || h.x - r >= x1 || h.y + r < y0 || h.y - r >= y1) continue;
-                        hs.rawset((double) (n * 5 + 1), (double) h.x);
-                        hs.rawset((double) (n * 5 + 2), (double) h.y);
-                        hs.rawset((double) (n * 5 + 3), (double) r);
-                        hs.rawset((double) (n * 5 + 4), (double) h.size());
-                        hs.rawset((double) (n * 5 + 5), (double) h.heading);
+                        hs.rawset((double) (n * 6 + 1), (double) h.x);
+                        hs.rawset((double) (n * 6 + 2), (double) h.y);
+                        hs.rawset((double) (n * 6 + 3), (double) r);
+                        hs.rawset((double) (n * 6 + 4), (double) h.size());
+                        hs.rawset((double) (n * 6 + 5), (double) h.heading);
+                        hs.rawset((double) (n * 6 + 6), h.dormant ? 1.0 : 0.0);
                         n++;
                     }
                 }

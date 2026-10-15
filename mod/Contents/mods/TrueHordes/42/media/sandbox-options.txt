@@ -123,3 +123,13 @@ option TrueHordes.JoinChance
 	page = TrueHordes,
 	translation = TrueHordes_JoinChance,
 }
+
+option TrueHordes.BuildingStragglerOneIn
+{
+	type = integer,
+	min = 1,
+	max = 100000,
+	default = 10,
+	page = TrueHordes,
+	translation = TrueHordes_BuildingStragglerOneIn,
+}

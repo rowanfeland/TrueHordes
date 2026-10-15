@@ -92,13 +92,16 @@ public final class LouisvilleScenario {
         System.out.println("follow " + follow + "/h, join " + join + "/h, moan " + moan + "/h");
         Simulation sim = new Simulation(s, map, settings, seed, 0);
         for (truehordes.save.LoadResult.SavedHorde h : savedHordes) {
-            sim.restoreHorde(h.id(), h.x(), h.y(), h.heading(), h.pauseMinutes(), h.members());
+            sim.restoreHorde(h.id(), h.x(), h.y(), h.heading(), h.pauseMinutes(), h.members(), h.dormant());
         }
         long t0 = System.currentTimeMillis();
         for (int day = 1; day <= days; day++) {
             for (double t = (day - 1) * 24; t < day * 24; t += 1.0 / 60) sim.step(t, Long.MAX_VALUE);
             if (day % 5 == 0 || day == 1 || day == 2) {
-                List<Horde> hs = new ArrayList<>(sim.hordes().all());
+                List<Horde> hs = new ArrayList<>();
+                int dormant = 0, waiting = 0;
+                for (Horde h : sim.hordes().all()) { if (h.dormant) { dormant++; waiting += h.size(); } else hs.add(h); }
+                System.out.printf("  building hordes %d (%d zombies)%n", dormant, waiting);
                 hs.sort((a, b) -> Integer.compare(b.size(), a.size()));
                 int inCity = 0;
                 for (ZombieRecord r : s.all()) if (r.x() >= x0 && r.x() < x0 + size && r.y() >= y0 && r.y() < y0 + size) inCity++;

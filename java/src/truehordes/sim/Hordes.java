@@ -25,6 +25,14 @@ public final class Hordes {
         return h;
     }
 
+    /** A new dormant building horde (see Horde.dormant). */
+    public Horde createDormant(float x, float y, List<ZombieRecord> memberList) {
+        Horde h = add(new Horde(nextId++, x, y, 0, memberList));
+        h.dormant = true;
+        onCreated.accept(h);
+        return h;
+    }
+
     /** Re-adds a loaded horde with its saved id. */
     public Horde restore(long id, float x, float y, float heading, List<ZombieRecord> memberList) {
         if (byId.containsKey(id)) throw new IllegalStateException("duplicate horde id " + id);

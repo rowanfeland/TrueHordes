@@ -98,6 +98,8 @@ final class GameEnvImpl implements GameEnv {
             .trailChance(sandboxDouble("TrueHordes.TrailChance", d.trailChance()))
             .moanResponsePerHour(sandboxDouble("TrueHordes.MoanResponseChance", d.moanResponsePerHour()))
             .joinChancePerHour(sandboxDouble("TrueHordes.JoinChance", d.joinChancePerHour()))
+            .buildingStragglerOneIn(Math.max(1, (int) sandboxDouble("TrueHordes.BuildingStragglerOneIn",
+                d.buildingStragglerOneIn())))
             .breakAwayChance(sandboxDouble("TrueHordes.BreakAwayChance", d.breakAwayChance()))
             .sightSetting(SandboxOptions.instance.lore.sight.getValue())
             .speedSetting(SandboxOptions.instance.lore.speed.getValue())

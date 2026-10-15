@@ -58,6 +58,10 @@ public final class Simulation {
     private final TreeMap<Long, LongStack> buckets = new TreeMap<>();
     private final List<SoundEvent> events = new ArrayList<>();
     private final Map<Long, List<Horde>> moanIndex = new HashMap<>();
+    /** Idle building zombies not yet grouped into a building horde (grouped at the next step). */
+    private final List<ZombieRecord> pendingIdle = new ArrayList<>();
+    /** The dormant building horde of each chunk (a chunk is about one house). */
+    private final Map<Long, Horde> dormantByChunk = new HashMap<>();
     private PlayerNearby players = NOBODY;
     private long currentMinute;
     private double currentHours;
@@ -82,6 +86,7 @@ public final class Simulation {
             @Override public void added(ZombieRecord r) {
                 grid.putWanderer(r);
                 if (internal == 0) conservation.added(1);
+                if (r.idle && r.building) pendingIdle.add(r);
                 firstSchedule(r);
             }
 
@@ -94,6 +99,7 @@ public final class Simulation {
         });
         for (ZombieRecord r : store.all()) {
             grid.putWanderer(r);
+            if (r.idle && r.building) pendingIdle.add(r);
             firstSchedule(r);
         }
         conservation.reset(held());
@@ -157,7 +163,95 @@ public final class Simulation {
             r.lingerUntilHours = 0;
             schedule(r, currentMinute);
         }, h -> scheduleHorde(h, currentMinute));
+        List<Horde> asleep = new ArrayList<>();
+        grid.nearHordes(x, y, range, h -> { if (h.dormant) asleep.add(h); });
+        for (Horde h : asleep) wake(h, x, y, e.endHours() + INVESTIGATE_HOURS, 0);
         return e;
+    }
+
+    // ---- building hordes ----
+
+    /** Groups idle building zombies added since the last step into their chunk's dormant building horde. */
+    private void groupBuildings() {
+        Map<Long, List<ZombieRecord>> byChunk = new HashMap<>();
+        for (ZombieRecord r : pendingIdle) {
+            if (store.get(r.id) != r || !r.idle) continue;
+            if (!r.strRolled) {
+                r.strRolled = true;
+                r.straggler = rng.nextInt(s.buildingStragglerOneIn()) == 0; // stays inside when the group leaves
+            }
+            if (r.straggler) continue;
+            byChunk.computeIfAbsent(SpatialGrid.key(r.chunkX(), r.chunkY()), k -> new ArrayList<>()).add(r);
+        }
+        pendingIdle.clear();
+        for (Map.Entry<Long, List<ZombieRecord>> e : byChunk.entrySet()) {
+            List<ZombieRecord> list = e.getValue();
+            Horde h = dormantByChunk.get(e.getKey());
+            if (h != null && (hordes.get(h.id) != h || !h.dormant)) h = null;
+            if (h == null && list.size() < 2) continue; // a lone zombie stays an idle zombie
+            Horde target = h;
+            internal(() -> {
+                for (ZombieRecord r : list) store.remove(r.id);
+                if (target == null) {
+                    double sx = 0, sy = 0;
+                    for (ZombieRecord r : list) { sx += r.x(); sy += r.y(); }
+                    Horde g = hordes.createDormant((float) (sx / list.size()), (float) (sy / list.size()), list);
+                    grid.putHorde(g);
+                    dormantByChunk.put(e.getKey(), g);
+                } else {
+                    float old = target.spread();
+                    for (ZombieRecord r : list) hordes.addMember(target, r);
+                    grid.moveHorde(target, target.x, target.y, old);
+                }
+            });
+        }
+    }
+
+    /**
+     * Sets a building horde loose towards (tx, ty): 10 or more come out as a horde, fewer as wanderers heading there
+     * (they may gather into a horde at the spot). {@code followHorde} is the horde whose moaning woke it, or 0.
+     */
+    private void wake(Horde h, float tx, float ty, double investigateUntilHours, long followHorde) {
+        h.dormant = false;
+        if (h.size() >= s.hordeFormSize()) {
+            h.heading = (float) Math.atan2(ty - h.y, tx - h.x);
+            h.targetX = tx;
+            h.targetY = ty;
+            h.investigateUntilHours = investigateUntilHours;
+            h.followHordeId = followHorde;
+            h.pauseMinutes = 0;
+            scheduleHorde(h, currentMinute);
+            return;
+        }
+        List<ZombieRecord> members = new ArrayList<>(h.members);
+        internal(() -> {
+            grid.removeHorde(h);
+            hordes.remove(h.id);
+            for (ZombieRecord r : members) {
+                r.idle = false;
+                r.heading = (float) Math.atan2(ty - r.y(), tx - r.x());
+                r.targetX = (int) Math.floor(tx);
+                r.targetY = (int) Math.floor(ty);
+                r.investigateUntilHours = investigateUntilHours;
+                store.restore(r);
+                schedule(r, currentMinute);
+            }
+        });
+    }
+
+    /** A dormant building horde listens: a louder horde's moaning, noticed gradually, sets it loose. */
+    private void listen(Horde h, double dt) {
+        Hearing.Pull p = pull(h.x, h.y, h.id, 0f);
+        if (p != null && p.horde() != null
+                && random.getAsDouble() < 1 - Math.pow(1 - s.moanResponsePerHour(), dt / 60.0)) {
+            wake(h, p.x(), p.y(), currentHours + INVESTIGATE_HOURS, p.horde().id);
+            return;
+        }
+        if (p != null && p.event() != null) {
+            wake(h, p.x(), p.y(), p.event().endHours() + INVESTIGATE_HOURS, 0);
+            return;
+        }
+        scheduleHorde(h, currentMinute + LevelOfDetail.FAR_MINUTES);
     }
 
     public List<SoundEvent> sounds() { return Collections.unmodifiableList(events); }
@@ -200,7 +294,14 @@ public final class Simulation {
 
     /** Re-adds a saved horde (load): grid and schedule. Not a population change. */
     public Horde restoreHorde(long id, float x, float y, float heading, float pauseMinutes, List<ZombieRecord> members) {
+        return restoreHorde(id, x, y, heading, pauseMinutes, members, false);
+    }
+
+    public Horde restoreHorde(long id, float x, float y, float heading, float pauseMinutes, List<ZombieRecord> members,
+                              boolean dormant) {
         Horde h = hordes.restore(id, x, y, heading, members);
+        h.dormant = dormant;
+        if (dormant) dormantByChunk.put(SpatialGrid.key(chunk(x), chunk(y)), h);
         h.pauseMinutes = pauseMinutes;
         grid.putHorde(h);
         conservation.added(h.size());
@@ -225,6 +326,7 @@ public final class Simulation {
         currentHours = nowHours;
         currentMinute = minuteOf(nowHours);
         expireSounds(nowHours);
+        if (!pendingIdle.isEmpty()) groupBuildings();
         if (currentMinute - moanIndexMinute >= HORDE_INDEX_MINUTES) rebuildMoanIndex();
         int updated = 0, pops = 0;
         while (true) {
@@ -383,6 +485,10 @@ public final class Simulation {
         double dt = elapsedMinutes(h.simHours, now, LevelOfDetail.FAR_MINUTES);
         h.simHours = now;
         h.dueMinute = Long.MIN_VALUE;
+        if (h.dormant) {
+            listen(h, dt);
+            return;
+        }
         int iv = interval(h.x, h.y);
         // Touching the loaded area: the main thread lays out the members whose place is inside it (the rest walk on).
         if (iv < LevelOfDetail.FAR_MINUTES && HandOver.touchesLoaded(h, players)) layoutDue = true;
@@ -401,14 +507,26 @@ public final class Simulation {
             }
             h.followHordeId = p != null && p.horde() != null ? p.horde().id : 0;
             float px = 0, py = 0, pw = 0;
+            if (p != null && p.event() != null) {
+                // Like a wanderer, it keeps heading for the spot after the sound ends.
+                h.targetX = p.event().x();
+                h.targetY = p.event().y();
+                h.investigateUntilHours = p.event().endHours() + INVESTIGATE_HOURS;
+            }
             if (p != null) {
                 px = p.x();
                 py = p.y();
                 pw = p.weight();
-                if (p.event() != null && Hearing.dist(h.x, h.y, px, py) <= MILL_RADIUS + h.spread()) {
-                    h.pauseMinutes = 2 + 3 * rng.nextFloat();
-                    walk = false;
-                }
+            } else if (!Float.isNaN(h.targetX) && h.investigateUntilHours > now) {
+                px = h.targetX;
+                py = h.targetY;
+                pw = Hearing.EVENT_PULL;
+            }
+            if (pw > 0 && (p == null || p.event() != null)
+                    && Hearing.dist(h.x, h.y, px, py) <= MILL_RADIUS + h.spread()) {
+                h.pauseMinutes = 2 + 3 * rng.nextFloat();
+                h.targetX = Float.NaN; // arrived
+                walk = false;
             }
             if (walk) {
                 float ox = h.x, oy = h.y, oldSpread = h.spread();
@@ -482,6 +600,7 @@ public final class Simulation {
     private void rebuildMoanIndex() {
         moanIndex.clear();
         for (Horde h : hordes.all()) {
+            if (h.dormant) continue; // building hordes wait silently
             float r = Hearing.moanRange(h);
             int x0 = Math.floorDiv((int) (h.x - r), CELL), x1 = Math.floorDiv((int) (h.x + r), CELL);
             int y0 = Math.floorDiv((int) (h.y - r), CELL), y1 = Math.floorDiv((int) (h.y + r), CELL);
