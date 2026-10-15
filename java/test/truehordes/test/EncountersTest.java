@@ -102,13 +102,36 @@ public final class EncountersTest {
         Horde h = rig.horde(5000, 5000, 0, 20);
         int joined = 0;
         for (int i = 0; i < 2000; i++) {
-            ZombieRecord r = rig.wanderer(4990, 5000, 0, false);
+            ZombieRecord r = rig.wanderer(4982, 5000, 0, false); // in sight, not touching even as the horde grows
             rig.enc.wanderer(r, 1, 1.0);
             if (rig.store.get(r.id) == null) joined++;
             else rig.store.remove(r.id);
         }
         Check.isTrue(joined > 300 && joined < 500, "about 20% join within an hour of seeing it (" + joined + ")");
         Check.isTrue(h.size() == 20 + joined, "joined ones are members");
+    }
+
+    /** In-game test 2026-10-15: zombies walked into hordes without joining. Touching a horde joins it at once. */
+    public static void testTouchingAHordeJoinsAtOnce() {
+        Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(0).joinChancePerHour(0).build(), 9);
+        Horde h = rig.horde(5000, 5000, 0, 100); // spread 7
+        ZombieRecord r = rig.wanderer(5003, 5000, (float) Math.PI, false); // inside its circle, facing away
+        rig.enc.wanderer(r, 1, 0.01);
+        Check.equal(101, h.size(), "bumped into it: joined");
+    }
+
+    /** In-game test 2026-10-15: no snowball on roads. Bumping into another walker usually means falling in behind. */
+    public static void testBumpingIntoAWalkerOftenFollows() {
+        int followed = 0;
+        for (int seed = 0; seed < 200; seed++) {
+            // Spread the seeds: java.util.Random's first number is nearly the same for small consecutive seeds.
+            Rig rig = new Rig(SimSettings.defaults().toBuilder().followChancePerHour(0).build(), seed * 0x9E3779B97F4A7C15L);
+            ZombieRecord a = rig.wanderer(5000, 5000, 0, false);
+            ZombieRecord b = rig.wanderer(4998.5f, 5000, 0, false);
+            rig.enc.wanderer(b, 1, 0.01);
+            if (b.followId == a.id) followed++;
+        }
+        Check.isTrue(followed > 70 && followed < 130, "about half fall in behind on a bump (" + followed + "/200)");
     }
 
     public static void testWandererBehindHordeDoesNotSee() {

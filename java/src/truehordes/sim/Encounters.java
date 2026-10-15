@@ -21,6 +21,10 @@ public final class Encounters {
     static final float CHAIN_RADIUS = 16f;
     /** Responders within this distance of a sound when it ends count as gathered there (tiles). */
     static final float GATHER_RADIUS = 8f;
+    /** Closer than this counts as bumping into someone (tiles). */
+    static final float BUMP_RADIUS = 2f;
+    /** Chance that a walker that bumps into another falls in behind it. */
+    static final double BUMP_FOLLOW = 0.5;
     /**
      * Longest follow chain: a chain of HordeFormSize moving together already becomes a horde, so deeper chains are
      * strung-out ones; capping them keeps every chain walk short (in dense towns they grew hundreds deep).
@@ -79,6 +83,11 @@ public final class Encounters {
         for (int i = 0; i < seenHordes.size(); i++) {
             Horde h = seenHordes.get(i);
             if (h.dormant) continue; // a building horde inside is not seen walking
+            // Walking into a horde joins it at once (in-game test 2026-10-15); seeing one is a chance per hour.
+            if (Hearing.dist(r.x(), r.y(), h.x, h.y) <= h.spread() + BUMP_RADIUS) {
+                join(h, r);
+                return;
+            }
             if (Vision.sees(r.x(), r.y(), r.heading, h.x, h.y, h.spread(), radius, random)) {
                 if (random.getAsDouble() < joinP) {
                     join(h, r);
@@ -88,6 +97,17 @@ public final class Encounters {
             }
         }
         if (r.followId > 0 && store.get(r.followId) == null) r.followId = 0;
+        // Bumping into another walker: a good chance to fall in behind it (the snowball on roads).
+        if (r.followId == 0 && moving(r, nowHours)) {
+            seenWanderers.clear();
+            grid.nearWanderers(r.x(), r.y(), BUMP_RADIUS, addSeenWanderer);
+            for (int i = 0; i < seenWanderers.size(); i++) {
+                ZombieRecord w = seenWanderers.get(i);
+                if (w == r || w.straggler || !moving(w, nowHours) || leads(r, w) || depth(w) >= MAX_CHAIN - 1) continue;
+                if (rng.nextDouble() < BUMP_FOLLOW) r.followId = w.id;
+                break;
+            }
+        }
         // Following: the chance roll comes first, then the zombie looks for someone walking past to fall in behind
         // (the same odds as rolling once per update with a zombie in sight, without searching on every update).
         if (r.followId == 0 && s.followChancePerHour() > 0 && moving(r, nowHours)

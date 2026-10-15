@@ -18,6 +18,7 @@ public final class TestRunner {
         VersionTest.class,
         VisionTest.class,
         MovementTest.class,
+        TravelTest.class,
         SpatialGridTest.class,
         HearingTest.class,
         EncountersTest.class,

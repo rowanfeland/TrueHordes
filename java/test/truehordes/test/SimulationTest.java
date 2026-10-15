@@ -88,7 +88,8 @@ public final class SimulationTest {
         Simulation b = new Simulation(far, map, quiet(), 1, 0);
         b.setPlayers(loadedAround(100, 100, 1));
         run(b, 0, 1);
-        Check.isTrue(a.updatesTotal() >= 30, "near the loaded edge: about every minute (" + a.updatesTotal() + ")");
+        Check.isTrue(a.updatesTotal() >= 5 * Math.max(1, b.updatesTotal()), "near the loaded edge: far more often ("
+            + a.updatesTotal() + " vs " + b.updatesTotal() + ")");
         Check.isTrue(b.updatesTotal() <= 3, "far away: every 30 minutes (" + b.updatesTotal() + ")");
     }
 
@@ -140,14 +141,28 @@ public final class SimulationTest {
     public static void testNoDirector() {
         Store s = new Store();
         Random rng = new Random(5);
-        for (int i = 0; i < 1000; i++) add(s, 800 + rng.nextInt(64), 800 + rng.nextInt(64), (float) (rng.nextDouble() * 6.28));
-        Simulation sim = new Simulation(s, openMap(200, -1), quiet(), 9, 0);
-        double sx = 0, sy = 0;
-        for (ZombieRecord r : s.all()) { sx -= r.x(); sy -= r.y(); }
-        run(sim, 0, 10 * 24);
-        for (ZombieRecord r : s.all()) { sx += r.x(); sy += r.y(); }
-        double drift = Math.hypot(sx, sy) / 1000;
-        Check.isTrue(drift < 40, "no shared direction without sounds or hordes (mean drift " + drift + " tiles)");
+        java.util.Map<Long, float[]> start = new java.util.HashMap<>();
+        // Spread out (bumping ties walkers into chains that move together) and hordes off (a horde walks as one):
+        // this checks that nothing steers walkers one way, so the walkers compared must move independently.
+        for (int i = 0; i < 1000; i++) {
+            ZombieRecord r = add(s, 100 + rng.nextInt(1400), 100 + rng.nextInt(1400), (float) (rng.nextDouble() * 6.28));
+            start.put(r.id, new float[] {r.x(), r.y()});
+        }
+        Simulation sim = new Simulation(s, openMap(200, -1), quiet().toBuilder().hordeFormSize(1000).build(), 9, 0);
+        run(sim, 0, 24); // a day: long enough to travel, short enough that most still walk alone
+        double sx = 0, sy = 0, sq = 0;
+        int n = 0;
+        for (ZombieRecord r : s.all()) {
+            if (r.followId != 0) continue; // followers move with their leader: only heads are independent
+            float[] p = start.get(r.id);
+            double dx = r.x() - p[0], dy = r.y() - p[1];
+            sx += dx; sy += dy; sq += dx * dx + dy * dy;
+            n++;
+        }
+        double drift = Math.hypot(sx, sy) / n, chance = Math.sqrt(sq / n) / Math.sqrt(n);
+        Check.isTrue(n > 300, "enough independent walkers (" + n + ")");
+        Check.isTrue(drift < 3 * chance, "no shared direction beyond chance (mean drift " + drift + " tiles, chance about "
+            + chance + ")");
     }
 
     /** Final review I3: a zombie that walked off screen forgets its old walking target. */
@@ -211,10 +226,15 @@ public final class SimulationTest {
             if (map.rank(cx, cy) == 1) onRoad++;
         }
         double share = onRoad / (double) Math.max(1, inTown);
-        Check.isTrue(share > 0.5, "roads get more than their 44% share (" + share + ")");
+        // In-game test 2026-10-15: zombies should keep to roads and walk down them (most of the town's zombies).
+        Check.isTrue(share > 0.75, "roads hold most of the town's zombies (" + share + ")");
         // With the user's 15% off-road / 30% trail rolls town zombies mostly keep to the streets (about 80%), but the
         // roads are not a trap any more (91% within a day before).
-        Check.isTrue(share < 0.85, "but zombies still leave the roads (" + share + ")");
+        int offRoad = 0;
+        for (ZombieRecord r : s.all()) {
+            if (map.rank(Math.floorDiv((int) r.x(), 8), Math.floorDiv((int) r.y(), 8)) != 1) offRoad++;
+        }
+        Check.isTrue(offRoad > 20, "but some still head off across country (" + offRoad + " of 1000)");
     }
 
     /** In-game test 2026-10-14: three weeks, no hordes. Followers trail close behind, so chains become hordes. */

@@ -24,8 +24,6 @@ public final class Movement {
     /** Longest straight piece walked before the next map check, in tiles (half a chunk). */
     private static final float SEGMENT = 4f;
     private static final float CRAWLER = 0.35f;
-    /** Chance per in-game minute that a walking walker starts a short pause. */
-    private static final double PAUSE_PER_MINUTE = 1.0 / 120.0;
 
     private final MapView map;
     private final SimSettings s;
@@ -50,7 +48,139 @@ public final class Movement {
      */
     public float chooseHeading(float x, float y, float heading, float pullX, float pullY, float pullWeight,
                                DoubleSupplier rng) {
-        return choose(x, y, heading, pullX, pullY, pullWeight, rng, false);
+        if (pullWeight > 0) return choose(x, y, heading, pullX, pullY, pullWeight, rng, false);
+        return travel(x, y, heading, rng);
+    }
+
+    // ---- travelling (no pull): straight down roads and trails, straight lines across country ----
+
+    /** Chance per chunk on a straight road or trail to head off across country (times OffRoadChance). */
+    static final double STRAIGHT_LEAVE = 0.05;
+    /** Chance at a junction to turn onto the side road (trails also need the TrailChance roll). */
+    static final double JUNCTION_TURN = 0.3;
+    /** Chance per chunk that a walker crossing country turns onto a road or trail beside it. */
+    static final double ROAD_JOIN = 0.75;
+    /** Straight ahead, then 45 degrees either side, then 90 (no garbage per call: this runs millions of times). */
+    private static final int[] AHEAD_AND_SIDES = {0, 1, -1, 2, -2};
+    private static final int[] DX = {1, 1, 0, -1, -1, -1, 0, 1};
+    private static final int[] DY = {0, 1, 1, 1, 0, -1, -1, -1};
+
+    static int dirIndex(float heading) {
+        return Math.floorMod((int) Math.round(heading / (Math.PI / 4)), 8);
+    }
+
+    static float dirAngle(int d) { return normalise((float) (d * Math.PI / 4)); }
+
+    /** The chunk one step in direction d can be entered and the one after it is still inside the map. */
+    private boolean open(int cx, int cy, int d) {
+        int nx = cx + DX[d], ny = cy + DY[d];
+        return map.inMap(nx + DX[d], ny + DY[d]) && enterable(cx, cy, nx, ny);
+    }
+
+    private boolean way(int cx, int cy, int d) {
+        int r = map.rank(cx + DX[d], cy + DY[d]);
+        return (r == 1 || r == 2) && open(cx, cy, d);
+    }
+
+    /**
+     * Where a walker with nothing pulling it goes next (user, in-game test 2026-10-15): on a road or trail it keeps
+     * walking down it, follows bends, sometimes turns at junctions, turns back at dead ends, and now and then heads off
+     * across country; across country it keeps its straight line, turns onto a road or trail it meets, and only turns
+     * aside (the smallest turn that works) when blocked. NaN when boxed in.
+     */
+    private float travel(float x, float y, float heading, DoubleSupplier rng) {
+        int cx = chunk(x), cy = chunk(y);
+        int here = map.rank(cx, cy);
+        if (here == 1 || here == 2) return alongWay(cx, cy, here, heading, rng);
+        // Across country: a road or trail beside the walker, ahead or to the side, is usually taken.
+        int f = dirIndex(heading);
+        for (int k : AHEAD_AND_SIDES) {
+            int d = Math.floorMod(f + k, 8);
+            if (way(cx, cy, d) && rng.getAsDouble() < ROAD_JOIN) {
+                int r = map.rank(cx + DX[d], cy + DY[d]);
+                if (r == 2 && rng.getAsDouble() >= s.trailChance()) continue;
+                return dirAngle(d);
+            }
+        }
+        if (straightOpen(x, y, heading)) return heading;
+        return smallestTurn(cx, cy, f, rng);
+    }
+
+    /** The continuous heading's next two chunks can be walked into. */
+    private boolean straightOpen(float x, float y, float heading) {
+        int cx = chunk(x), cy = chunk(y);
+        int nx = chunk((float) (x + Math.cos(heading) * CHUNK)), ny = chunk((float) (y + Math.sin(heading) * CHUNK));
+        int fx = chunk((float) (x + Math.cos(heading) * CHUNK * 2)), fy = chunk((float) (y + Math.sin(heading) * CHUNK * 2));
+        if (!map.inMap(fx, fy)) return false;
+        if (nx == cx && ny == cy) return true;
+        return enterable(cx, cy, nx, ny);
+    }
+
+    /** Blocked: the smallest turn (45, 90, 135 degrees, either side at random first) that can be walked; else back. */
+    private float smallestTurn(int cx, int cy, int f, DoubleSupplier rng) {
+        int first = rng.getAsDouble() < 0.5 ? 1 : -1;
+        for (int k = 1; k <= 3; k++) {
+            if (open(cx, cy, Math.floorMod(f + first * k, 8))) return dirAngle(Math.floorMod(f + first * k, 8));
+            if (open(cx, cy, Math.floorMod(f - first * k, 8))) return dirAngle(Math.floorMod(f - first * k, 8));
+        }
+        int back = Math.floorMod(f + 4, 8);
+        return open(cx, cy, back) ? dirAngle(back) : Float.NaN;
+    }
+
+    private float alongWay(int cx, int cy, int here, float heading, DoubleSupplier rng) {
+        int f = dirIndex(heading);
+        boolean ahead = way(cx, cy, f);
+        if (ahead) {
+            // A straight stretch: keep going; sometimes take a side road at a junction, rarely head off across country.
+            if (rng.getAsDouble() < s.offRoadChance() * STRAIGHT_LEAVE) {
+                float off = offWay(cx, cy, f, rng);
+                if (!Float.isNaN(off)) return off;
+            }
+            // Side roads only at a real junction (three or more ways meet): at a corner the "side road" is the
+            // road the walker just came along.
+            int ways = 0;
+            for (int d = 0; d < 8; d += 2) if (way(cx, cy, d)) ways++;
+            if (ways < 3) return dirAngle(f);
+            int side = rng.getAsDouble() < 0.5 ? 2 : -2;
+            for (int j = 0; j < 2; j++) {
+                int d = Math.floorMod(f + (j == 0 ? side : -side), 8);
+                if (!way(cx, cy, d) || rng.getAsDouble() >= JUNCTION_TURN) continue;
+                if (here == 1 && map.rank(cx + DX[d], cy + DY[d]) == 2 && rng.getAsDouble() >= s.trailChance()) continue;
+                return dirAngle(d);
+            }
+            return dirAngle(f);
+        }
+        // The road bends, splits or ends: at this decision point the walker may leave it for open country.
+        if (rng.getAsDouble() < s.offRoadChance()) {
+            float off = offWay(cx, cy, f, rng);
+            if (!Float.isNaN(off)) return off;
+        }
+        int first = rng.getAsDouble() < 0.5 ? 1 : -1;
+        for (int k = 1; k <= 3; k++) {
+            for (int j = 0; j < 2; j++) {
+                int d = Math.floorMod(f + (j == 0 ? first : -first) * k, 8);
+                if (!way(cx, cy, d)) continue;
+                if (here == 1 && map.rank(cx + DX[d], cy + DY[d]) == 2 && rng.getAsDouble() >= s.trailChance()) continue;
+                return dirAngle(d);
+            }
+        }
+        // A dead end: straight on across country if it can, else back the way it came.
+        if (open(cx, cy, f) && rng.getAsDouble() < s.offRoadChance()) return dirAngle(f);
+        int back = Math.floorMod(f + 4, 8);
+        if (way(cx, cy, back) || open(cx, cy, back)) return dirAngle(back);
+        return smallestTurn(cx, cy, f, rng);
+    }
+
+    /** A direction off the road into open country (ahead or to a side), or NaN. */
+    private float offWay(int cx, int cy, int f, DoubleSupplier rng) {
+        int side = rng.getAsDouble() < 0.5 ? 1 : -1;
+        for (int j = 0; j < 5; j++) {
+            int k = j == 0 ? 0 : (j % 2 == 1 ? side : -side) * ((j + 1) / 2);
+            int d = Math.floorMod(f + k, 8);
+            int r = map.rank(cx + DX[d], cy + DY[d]);
+            if (r > 2 && open(cx, cy, d)) return dirAngle(d);
+        }
+        return Float.NaN;
     }
 
     private float chooseBehind(float x, float y, float heading, float pullX, float pullY, float pullWeight,
@@ -183,13 +313,6 @@ public final class Movement {
         if (crawler) v *= CRAWLER;
         if (members > 10) v *= Math.max(0.5, 1 - 0.5 * (Math.log10(members) - 1) / 3);
         return (float) v;
-    }
-
-    /** Length in in-game minutes of a pause that starts during {@code minutes} of walking, or 0 (2 to 10 minutes). */
-    public static float rollPause(float minutes, DoubleSupplier rng) {
-        double p = 1 - Math.pow(1 - PAUSE_PER_MINUTE, minutes);
-        if (rng.getAsDouble() >= p) return 0f;
-        return (float) (2 + 8 * rng.getAsDouble());
     }
 
     static long mix(long v) {

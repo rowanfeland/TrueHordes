@@ -468,7 +468,8 @@ public final class Simulation {
                         r.targetY = ZombieRecord.NO_TARGET;
                     }
                 }
-                r.pauseMinutes = st.boxedIn() ? 10f : Movement.rollPause((float) dt, random);
+                // No random pauses (in-game test 2026-10-15: they left zombies standing on roads); only boxed in.
+                r.pauseMinutes = st.boxedIn() ? 10f : 0f;
                 // A straggler only shuffles a little, then lingers where it is for a few hours (spec 4.6).
                 if (r.straggler && (p == null || p.event() == null)) {
                     r.lingerUntilHours = now + STRAGGLER_LINGER_MIN_HOURS + 3 * rng.nextDouble();
@@ -541,7 +542,7 @@ public final class Simulation {
                     tight = st.tightChunks();
                 }
                 grid.moveHorde(h, ox, oy, oldSpread);
-                h.pauseMinutes = st.boxedIn() ? 10f : Movement.rollPause((float) dt, random);
+                h.pauseMinutes = st.boxedIn() ? 10f : 0f;
             }
         }
         final int tightSpots = tight;

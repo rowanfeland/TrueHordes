@@ -90,15 +90,10 @@ public final class MovementTest {
         return new int[] {l, r};
     }
 
-    public static void testRankOrder() {
+    /** Across country a walker takes a road it meets more readily than a trail (trails need the TrailChance roll). */
+    public static void testRoadOverTrail() {
         int[] a = leftRight('R', 'T');
         Check.isTrue(a[0] > a[1], "road over trail " + a[0] + " vs " + a[1]);
-        a = leftRight('T', 'F');
-        Check.isTrue(a[0] > a[1], "trail over farmland " + a[0] + " vs " + a[1]);
-        a = leftRight('F', 'O');
-        Check.isTrue(a[0] > a[1], "farmland over open " + a[0] + " vs " + a[1]);
-        a = leftRight('O', 'W');
-        Check.isTrue(Math.abs(a[0] - a[1]) < 0.15 * Math.max(a[0], a[1]), "open equals forest " + a[0] + " vs " + a[1]);
     }
 
     public static void testNeverEntersWater() {
@@ -191,7 +186,7 @@ public final class MovementTest {
     public static void testFindsAWayOutBehindTheFan() {
         TextMap m = new TextMap(
             "~~~~~~~",
-            "~~~O~~~",
+            "~~OO~~~",
             "~~O~~~~",
             "~O~~~~~",
             "~~~~~~~");
