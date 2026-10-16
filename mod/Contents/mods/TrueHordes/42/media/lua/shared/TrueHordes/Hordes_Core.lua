@@ -33,14 +33,14 @@ function Hordes_save() return call("save") end
 function Hordes_world() return call("world") end
 function Hordes_hordes() return call("hordes") end
 
---- Debug: a test sound (default: where the player stands, 90 dB). Zombies that hear it head there and may form a horde.
-function Hordes_sound(x, y, loudness)
+-- Debug: a real game sound (default: where the player stands, radius 1,000 tiles). Real and held zombies may hear it.
+function Hordes_sound(x, y, radius)
     if x == nil or y == nil then
         local p = getPlayer and getPlayer()
-        if not p then return call("sound", nil, nil, loudness) end
+        if not p then return call("sound", nil, nil, radius) end
         x, y = p:getX(), p:getY()
     end
-    return call("sound", x, y, loudness)
+    return call("sound", x, y, radius)
 end
 
 --- Debug-map data for a rectangle (see LuaApi.snapshot), or nil when the Java core is not running.

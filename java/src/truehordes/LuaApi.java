@@ -103,20 +103,18 @@ public final class LuaApi {
         }
     }
 
-    /** Debug: a sound at (x, y) heard for half an in-game hour (default 90 dB); zombies in range head for it. */
+    /**
+     * Debug: a real game sound at (x, y) with a radius in tiles (default 1,000), made through the game's own
+     * WorldSoundManager.addSound so it reaches real zombies and the off-screen model like any other sound.
+     */
     @LuaMethod(name = "Hordes_j_sound", global = true)
-    public static String sound(Object x, Object y, Object loudness) {
+    public static String sound(Object x, Object y, Object radius) {
         Core c = Hooks.core();
         if (c == null) return NOT_INSTALLED;
-        float db = LuaArgs.toFloat(loudness, 90f);
-        synchronized (c) {
-            truehordes.sim.Simulation sim = c.simulation();
-            if (sim == null) return "not running (state " + c.state() + ")";
-            float sx = LuaArgs.toFloat(x, 0), sy = LuaArgs.toFloat(y, 0);
-            sim.addSound(sx, sy, db, 0.5);
-            return String.format(java.util.Locale.ROOT, "sound at %.0f,%.0f (%.0f dB) heard to about %.0f tiles for 30 in-game minutes",
-                sx, sy, db, truehordes.sim.Hearing.range(db));
-        }
+        int r = Math.max(1, (int) LuaArgs.toFloat(radius, 1000f));
+        int sx = (int) LuaArgs.toFloat(x, 0), sy = (int) LuaArgs.toFloat(y, 0);
+        zombie.WorldSoundManager.instance.addSound(null, sx, sy, 0, r, r);
+        return String.format(java.util.Locale.ROOT, "sound at %d,%d, radius %d tiles (as the game makes it)", sx, sy, r);
     }
 
     /** Debug: the 20 biggest hordes. */

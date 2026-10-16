@@ -9,7 +9,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
                           double realSecondsPerGameMinute, double trailChance, double moanResponsePerHour,
                           double joinChancePerHour, int buildingStragglerOneIn,
                           double bumpFollowChance, int peakDay, double soundEdgeChance,
-                          double soundCertainShare) {
+                          double soundCertainShare, int hearingSetting) {
 
     /** Share of the time an off-screen zombie spends walking rather than standing (vanilla zombies idle a lot). */
     public static final double DUTY = 0.5;
@@ -55,14 +55,14 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
      * chance reached on the population peak day (vanilla default day 28); it ramps up from none on day 1.
      */
     public static SimSettings defaults() {
-        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 1.0, 28, 0.40, 0.25);
+        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 1.0, 28, 0.40, 0.25, 2);
     }
 
     public Builder toBuilder() { return new Builder(this); }
 
     public static final class Builder {
         private int stragglerOneIn, hordeFormSize, hordeMinSize, sightSetting, speedSetting, buildingStragglerOneIn,
-            peakDay;
+            peakDay, hearingSetting;
         private double followChancePerHour, offRoadChance, breakAwayChance, realSecondsPerGameMinute, trailChance,
             moanResponsePerHour, joinChancePerHour, bumpFollowChance, soundEdgeChance, soundCertainShare;
 
@@ -84,6 +84,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
             peakDay = s.peakDay;
             soundEdgeChance = s.soundEdgeChance;
             soundCertainShare = s.soundCertainShare;
+            hearingSetting = s.hearingSetting;
         }
 
         public Builder stragglerOneIn(int v) { stragglerOneIn = v; return this; }
@@ -103,12 +104,13 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         public Builder peakDay(int v) { peakDay = v; return this; }
         public Builder soundEdgeChance(double v) { soundEdgeChance = v; return this; }
         public Builder soundCertainShare(double v) { soundCertainShare = v; return this; }
+        public Builder hearingSetting(int v) { hearingSetting = v; return this; }
 
         public SimSettings build() {
             return new SimSettings(stragglerOneIn, hordeFormSize, hordeMinSize, followChancePerHour, offRoadChance,
                 breakAwayChance, sightSetting, speedSetting, realSecondsPerGameMinute, trailChance, moanResponsePerHour,
                 joinChancePerHour, buildingStragglerOneIn, bumpFollowChance, peakDay, soundEdgeChance,
-                soundCertainShare);
+                soundCertainShare, hearingSetting);
         }
     }
 }

@@ -227,7 +227,7 @@ public final class Simulation {
      */
     private void broadcast(SoundEvent e) {
         e.lastBroadcastMinute = currentMinute;
-        float range = e.radius(), ex = e.x(), ey = e.y();
+        float range = e.radius() * SoundModel.maxReachFactor(s.hearingSetting()), ex = e.x(), ey = e.y();
         List<ZombieRecord> ws = new ArrayList<>();
         grid.wanderersIn(ex - range, ey - range, ex + range, ey + range, r -> {
             if (r.rolledSoundId != e.id() && Hearing.dist(r.x(), r.y(), ex, ey) <= range) ws.add(r);
@@ -245,7 +245,8 @@ public final class Simulation {
     }
 
     private void wandererHears(ZombieRecord r, SoundEvent e) {
-        float level = SoundModel.levelAt(e.loudnessDb(), Hearing.dist(r.x(), r.y(), e.x(), e.y()));
+        float level = SoundModel.levelAt(e.loudnessDb(), Hearing.dist(r.x(), r.y(), e.x(), e.y()))
+            + SoundModel.hearingBoostDb(SoundModel.perZombieHearing(s.hearingSetting(), r.id));
         if (level < SoundModel.THRESHOLD_DB) return;
         if (r.hasTarget() && r.investigateUntilHours > currentHours) {
             float tx = r.targetX + 0.5f, ty = r.targetY + 0.5f;
@@ -280,7 +281,9 @@ public final class Simulation {
      */
     private void hordeHears(Horde h, SoundEvent e) {
         float d = Math.max(1f, Hearing.dist(h.x, h.y, e.x(), e.y()) - h.spread());
-        float level = SoundModel.levelAt(e.loudnessDb(), d);
+        // A horde hears with the setting's usual hearing (Random: Normal).
+        int hs = s.hearingSetting() >= 1 && s.hearingSetting() <= 3 ? s.hearingSetting() : 2;
+        float level = SoundModel.levelAt(e.loudnessDb(), d) + SoundModel.hearingBoostDb(hs);
         if (level < SoundModel.THRESHOLD_DB) return;
         if (!h.dormant && !Float.isNaN(h.targetX) && h.investigateUntilHours > currentHours) {
             if (Hearing.dist(h.targetX, h.targetY, e.x(), e.y()) <= SAME_SPOT) {

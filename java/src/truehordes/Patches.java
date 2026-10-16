@@ -100,4 +100,11 @@ public final class Patches {
         @Patch.OnEnter(skipOn = true)
         public static boolean enter() { return Hooks.rallyOff(); }
     }
+
+    /** Every world sound (every addSound overload; nested ones are taken once): the off-screen model hears it too. */
+    @Patch(className = HookTargets.WSM, methodName = HookTargets.ADD_SOUND)
+    public static class WorldSound {
+        @Patch.OnExit
+        public static void exit(@Patch.Return(readOnly = true) Object sound) { Hooks.onWorldSound(sound); }
+    }
 }

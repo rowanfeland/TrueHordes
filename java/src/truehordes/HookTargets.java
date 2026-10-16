@@ -27,6 +27,9 @@ public final class HookTargets {
     public static final String ROOM_SPOTTED = "roomSpotted";
     /** Vanilla rally groups (sub-project 4): only ZombieGroupManager.update creates them. */
     public static final String GROUP_MANAGER = "zombie.ai.ZombieGroupManager";
+    /** Every world sound zombies can hear goes through WorldSoundManager.addSound (all overloads; sub-project 5a). */
+    public static final String WSM = "zombie.WorldSoundManager";
+    public static final String ADD_SOUND = "addSound";
     public static final String RALLY = "update";
     /** Private ZombiePopulationManager members the takeover calls or reads by reflection. */
     public static final String ADD_STANDING = "addZombieStanding";
@@ -50,6 +53,7 @@ public final class HookTargets {
         {POPMAN, POP_CHUNK_LOADED},
         {VZM, ROOM_SPOTTED},
         {GROUP_MANAGER, RALLY},
+        {WSM, ADD_SOUND},
     };
 
     /** Live map updates. Optional: if missing, the world map still builds from the files. */

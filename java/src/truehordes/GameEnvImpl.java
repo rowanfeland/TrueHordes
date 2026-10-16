@@ -106,6 +106,7 @@ final class GameEnvImpl implements GameEnv {
                 d.buildingStragglerOneIn())))
             .breakAwayChance(sandboxDouble("TrueHordes.BreakAwayChance", d.breakAwayChance()))
             .sightSetting(SandboxOptions.instance.lore.sight.getValue())
+            .hearingSetting(SandboxOptions.instance.lore.hearing.getValue())
             .speedSetting(SandboxOptions.instance.lore.speed.getValue())
             // GameTime.minutesPerDay is real minutes per in-game day (1440 in-game minutes).
             .realSecondsPerGameMinute(GameTime.getInstance().getMinutesPerDay() * 60.0 / 1440.0)

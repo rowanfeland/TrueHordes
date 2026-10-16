@@ -158,4 +158,27 @@ public final class SoundHearingTest {
         Check.isTrue(heading(r, 1000, 1000) || s.get(r.id) == null, "still heading for the sound");
         Check.isTrue(r.x() < 1095, "and walking towards it (" + r.x() + ")");
     }
+
+    /** The game's Hearing setting scales how far zombies hear (Pinpoint x3, Poor x0.45), as vanilla scales a radius. */
+    public static void testHearingSettingScalesReach() {
+        for (int setting = 1; setting <= 3; setting += 2) {
+            Store s = new Store();
+            float at = setting == 1 ? 2000 : 600; // outside the plain circle / inside it
+            ZombieRecord r = SimulationTest.add(s, 1000 + at, 1000, 0);
+            Simulation sim = new Simulation(s, SimulationTest.openMap(400, -1), SimulationTest.quiet().toBuilder()
+                .stragglerOneIn(1_000_000).hearingSetting(setting).build(), 11, LATE);
+            int heard = 0;
+            for (int i = 0; i < 40; i++) {
+                r.targetX = ZombieRecord.NO_TARGET;
+                r.targetY = ZombieRecord.NO_TARGET;
+                r.investigateUntilHours = 0;
+                sim.offerSound(1000, 1000, 850, false, 1, SoundEvent.GUNFIRE);
+                sim.step(LATE + 0.0001 * (i + 1), Long.MAX_VALUE);
+                if (heading(r, 1000, 1000)) heard++;
+                SimulationTest.add(s, 0, 0, 0); // keep ids moving (unused)
+            }
+            if (setting == 1) Check.isTrue(heard > 10, "Pinpoint hears it 2,000 tiles out (" + heard + "/40)");
+            else Check.equal(0, heard, "Poor never hears it 600 tiles out");
+        }
+    }
 }

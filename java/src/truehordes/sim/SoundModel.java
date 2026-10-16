@@ -49,6 +49,25 @@ public final class SoundModel {
         return hive(p * h);
     }
 
+    /**
+     * The game's Hearing setting as loudness: vanilla multiplies a sound's radius (Pinpoint x3, Normal x1, Poor x0.45),
+     * which on this model is a fixed number of dB. {@code hearing} is a per-zombie value 1..3.
+     */
+    public static float hearingBoostDb(int hearing) {
+        double mult = hearing == 1 ? 3.0 : hearing == 3 ? 0.45 : 1.0;
+        return (float) (20 * Math.log10(mult));
+    }
+
+    /** One zombie's hearing under the sandbox setting (Random picks one per zombie from a stable hash), like Sight. */
+    public static int perZombieHearing(int setting, long id) {
+        return Vision.perZombieSight(setting, n -> (int) Math.floorMod(Movement.mix(id ^ 0x4EA2L), (long) n));
+    }
+
+    /** Widest hearing any zombie has under the setting (for finding who is in reach), as a radius multiplier. */
+    public static float maxReachFactor(int setting) {
+        return setting == 3 ? 0.45f : setting == 2 ? 1f : 3f;
+    }
+
     /** Half or more of a horde hearing a sound takes the rest with it. */
     public static double hive(double share) { return share >= 0.5 ? 1 : share; }
 }

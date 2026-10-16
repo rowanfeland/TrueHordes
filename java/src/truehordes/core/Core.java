@@ -54,6 +54,9 @@ public final class Core {
     private volatile double simNowHours;
     /** Mirrors takesOverPopulation() without the lock, for the per-zombie, per-frame rally hook. */
     private volatile boolean rallyOff;
+    /** The running simulation for the sound capture (read lock-free on the main thread), and a tick counter. */
+    private volatile truehordes.sim.Simulation soundSink;
+    private volatile long ticks;
     private double lastConservationHours = Double.NaN;
 
     /** Background slice length and pause (spec 5). */
@@ -112,6 +115,10 @@ public final class Core {
     /** Vanilla rally groups are skipped (lock-free; refreshed every tick). */
     public boolean rallyOff() { return rallyOff && state != State.DISABLED; }
 
+    public truehordes.sim.Simulation soundSink() { return soundSink; }
+
+    public long tickCount() { return ticks; }
+
     /** Permanently switches the mod off for this game session. */
     public synchronized void disable(String reason) {
         state = State.DISABLED;
@@ -124,6 +131,7 @@ public final class Core {
         if (state == State.IDLE && !start()) return;
         world.tick();
         rallyOff = !env.isClient() && env.enabled();
+        ticks++;
         population.tick(env.worldAgeHours());
         simNowHours = env.worldAgeHours();
         if (sim != null && sim.takeLayoutDue()) env.spawnLoadedChunks();
@@ -186,6 +194,7 @@ public final class Core {
         simNowHours = now;
         sim = new truehordes.sim.Simulation(store, new truehordes.sim.WorldMapView(world), simSettings, System.nanoTime(),
             now);
+        soundSink = sim;
         for (LoadResult.SavedHorde h : r.hordes) {
             sim.restoreHorde(h.id(), h.x(), h.y(), h.heading(), h.pauseMinutes(), h.members(), h.dormant());
         }
@@ -260,6 +269,7 @@ public final class Core {
         if (simThread != null) simThread.stop();
         simThread = null;
         sim = null;
+        soundSink = null;
         takeover.setRejoin(null);
         population.setHordeCounter(null);
         lastConservationHours = Double.NaN;

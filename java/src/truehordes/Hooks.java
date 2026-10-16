@@ -28,6 +28,19 @@ public final class Hooks {
         }
     }
 
+    private static final SoundCapture SOUNDS = new SoundCapture();
+
+    /** A world sound was added (main thread, every addSound overload's exit). Lock-free. */
+    public static void onWorldSound(Object sound) {
+        Core c = core;
+        if (c == null || !(sound instanceof zombie.WorldSoundManager.WorldSound w)) return;
+        try {
+            SOUNDS.capture(w, c.tickCount(), c.soundSink());
+        } catch (Throwable t) {
+            Log.errorOnce("hook:sound:" + t.getClass().getName(), "sound capture failed", t);
+        }
+    }
+
     public static void onSave() {
         Core c = core;
         if (c == null) return;
