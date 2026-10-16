@@ -61,7 +61,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
      * hordes by day 7 (LouisvilleScenario, 30,000).
      */
     public static SimSettings defaults() {
-        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 0.03, 28, 0.40, 0.25, 2, 0.05, 0.02, 7);
+        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 0.03, 28, 0.40, 0.25, 2, 0.05, 0.03, 7);
     }
 
     public Builder toBuilder() { return new Builder(this); }

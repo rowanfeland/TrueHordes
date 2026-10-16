@@ -29,7 +29,7 @@
     "Sandbox_TrueHordes_BuildingStragglerOneIn": "Building stragglers: 1 in N stay inside",
     "Sandbox_TrueHordes_BuildingStragglerOneIn_tooltip": "The zombies in a building wait together until a sound sets them loose. This share never leaves with them, so an emptied building may still hold one. 10 = 1 in 10.",
     "Sandbox_TrueHordes_BumpFollowChance": "Chance to follow a zombie it bumps into (at peak)",
-    "Sandbox_TrueHordes_BumpFollowChance_tooltip": "When a walking zombie bumps into another, the chance it falls in behind it, reached on the population peak day. It ramps up: none on day 1, 1-2% on day 2, a quarter of it by day 7, half by day 14. Chains of 10 become hordes, so higher makes hordes form faster.",
+    "Sandbox_TrueHordes_BumpFollowChance_tooltip": "When a walking zombie bumps into another, the chance it falls in behind it, reached on the population peak day. It ramps up: none on day 1, 1-2 percent on day 2, a quarter of it by day 7, half by day 14. Chains of 10 become hordes, so higher makes hordes form faster.",
     "Sandbox_TrueHordes_SoundEdgeChance": "Chance to hear a sound at the edge of its reach",
     "Sandbox_TrueHordes_SoundEdgeChance_tooltip": "A lone zombie right at the edge of a sound's circle hears it with this chance; closer in it rises along the sound's fading energy to certain. Hordes hear less: their own moaning drowns sounds out.",
     "Sandbox_TrueHordes_SoundCertainShare": "Share of a sound's reach where every zombie hears it",
@@ -37,5 +37,5 @@
     "Sandbox_TrueHordes_TravellerShare": "Share of lone zombies that travel",
     "Sandbox_TrueHordes_TravellerShare_tooltip": "Most lone zombies mill about their neighbourhood (about 150 tiles); this share are travellers that walk the roads between towns and ignore the lockdown. Hordes make the real crossings.",
     "Sandbox_TrueHordes_LockdownDays": "Day a 500-zombie town horde runs out of food",
-    "Sandbox_TrueHordes_LockdownDays_tooltip": "Town hordes roam only their town until they run out of food, then leave along the roads. A horde of 500 leaves around this day; bigger hordes sooner, smaller ones later (each varies by 20%). 0 = no lockdown."
+    "Sandbox_TrueHordes_LockdownDays_tooltip": "Town hordes roam only their town until they run out of food, then leave along the roads. A horde of 500 leaves around this day; bigger hordes sooner, smaller ones later (each varies by 20 percent). 0 = no lockdown."
 }

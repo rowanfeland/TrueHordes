@@ -18,7 +18,7 @@ import truehordes.store.ZombieRecord;
  */
 public final class Encounters {
     /** Followers further than this from the head of their chain do not count as moving together (tiles). */
-    static final float CHAIN_RADIUS = 16f;
+    static final float CHAIN_RADIUS = 40f;
     /** Responders within this distance of a sound when it ends count as gathered there (tiles). */
     static final float GATHER_RADIUS = 8f;
     /** Closer than this counts as bumping into someone (tiles). */
@@ -194,16 +194,25 @@ public final class Encounters {
                 n++;
             }
             if (n < CROWD_MIN) return;
-            // Fall in behind the one nearest the middle of the group: the whole cluster picks much the same leader,
-            // so its followers gather behind it and 10 of them become a horde (formChain).
+            // Fall in with the biggest group in reach (the head with the most followers here), else behind the one
+            // nearest the middle: groups snowball, and 10 moving together become a horde (formChain). In-game test
+            // 2026-10-16: picking only the middle one gave thousands of separate one-follower chains and no hordes.
             float cx = (float) (sx / n), cy = (float) (sy / n);
             ZombieRecord lead = null;
             float leadD = Float.MAX_VALUE;
+            int leadN = 0;
+            groupCount.clear();
+            for (int i = 0; i < seenWanderers.size(); i++) {
+                ZombieRecord w = seenWanderers.get(i);
+                if (w.followId > 0) groupCount.merge(head(w).id, 1, Integer::sum);
+            }
             for (int i = 0; i < seenWanderers.size(); i++) {
                 ZombieRecord w = seenWanderers.get(i);
                 if (w == r || w.straggler || !moving(w, nowHours) || leads(r, w) || depth(w) >= MAX_CHAIN - 1) continue;
+                int g = w.followId == 0 ? groupCount.getOrDefault(w.id, 0) : -1;
                 float d = Hearing.dist(cx, cy, w.x(), w.y());
-                if (d < leadD) {
+                if (g > leadN || (g == leadN && d < leadD)) {
+                    leadN = g;
                     leadD = d;
                     lead = w;
                 }
@@ -221,6 +230,7 @@ public final class Encounters {
     }
 
     int drifted;
+    private final Map<Long, Integer> groupCount = new HashMap<>();
 
     /** True if {@code w} already trails {@code r} (directly or down the chain): following it would make a loop. */
     private boolean leads(ZombieRecord r, ZombieRecord w) {
