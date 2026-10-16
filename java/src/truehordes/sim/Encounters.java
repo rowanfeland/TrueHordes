@@ -334,7 +334,7 @@ public final class Encounters {
             }
             if (h.spread() != old) grid.moveHorde(h, h.x, h.y, old);
         }
-        if (h.size() < s.hordeMinSize()) {
+        if (h.size() < s.hordeMinSize() && !(h.keepUntilHours > nowHours)) {
             dissolve(h, nowHours);
             return null;
         }

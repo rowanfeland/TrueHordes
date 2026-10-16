@@ -165,4 +165,37 @@ public final class HandOverTest {
         Check.equal(held, sim.held(), "held unchanged by the death");
         Check.equal("", sim.checkConservation("test"), "conservation counts the spawned zombies as gone");
     }
+
+    /**
+     * In-game test 2026-10-16: a horde that went fully real and was then left behind came back as lone zombies. Its
+     * members now re-form it (same id) as they unload, and it is not broken up while they gather.
+     */
+    public static void testLeftBehindRealHordeReforms() {
+        Store s = new Store();
+        Simulation sim = sim(s);
+        Horde h = horde(sim, 500, 500, 0, 30);
+        long id = h.id;
+        Takeover t = new Takeover(s);
+        t.setRejoin(sim.handOver()::rejoin);
+        sim.setPlayers(allLoaded(new Store()).players());
+        sim.handOver().layOut(h, ALL_FLOOR);
+        int cx = Math.floorDiv(500, 8), cy = Math.floorDiv(500, 8);
+        List<ZombieRecord> spawned = new ArrayList<>();
+        for (int x = cx - 4; x <= cx + 4; x++) {
+            for (int y = cy - 4; y <= cy + 4; y++) spawned.addAll(t.arrivals(x, y, i2 -> false, ALL_FLOOR));
+        }
+        Check.equal(30, spawned.size(), "all real");
+        Check.isTrue(sim.hordes().get(id) == null, "no held horde left");
+        sim.setPlayers(sim(new Store()).players()); // the player left: nothing loaded
+        for (int i = 0; i < spawned.size(); i++) {
+            ZombieRecord r = spawned.get(i);
+            t.taken(new ZombieSnapshot(r.x(), r.y(), 0, (byte) 0, 7, 4, 0, ZombieRecord.NO_TARGET, ZombieRecord.NO_TARGET,
+                null), id);
+            if (i == 0) sim.step(sim.currentHours() + 0.25, Long.MAX_VALUE); // a horde update while it gathers
+        }
+        Horde back = sim.hordes().get(id);
+        Check.isTrue(back != null && back.size() == 30, "the horde re-formed (" + (back == null ? 0 : back.size()) + ")");
+        Check.equal(0, s.size(), "no lone zombies left over");
+        Check.equal("", sim.checkConservation("test"), "conservation");
+    }
 }

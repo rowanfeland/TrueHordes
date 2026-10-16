@@ -23,6 +23,13 @@ public final class HandOver {
 
     private final Simulation sim;
     private final Store store;
+    /** Hordes wholly made real, by id, with their heading: waiting for members to unload and re-form them. */
+    private final java.util.Map<Long, Float> realHordes = new java.util.HashMap<>();
+    /** How long a horde whose members are coming back off screen is not broken up for being small (in-game hours). */
+    static final double GATHER_HOURS = 1;
+
+    /** A horde that has been real broke up off screen: members still real re-form it when they unload. */
+    public void rememberReal(Horde h) { realHordes.put(h.id, h.heading); }
     private int laidOut, rejoined;
 
     public HandOver(Simulation sim, Store store) {
@@ -66,14 +73,16 @@ public final class HandOver {
                 leave(r, h.heading, spot[0], spot[1]);
                 out.add(r);
             }
-            if (!gone.isEmpty()) sim.hordes().removeMembers(h, gone);
-            if (h.size() < sim.settings().hordeMinSize()) {
+            if (!gone.isEmpty()) {
+                sim.hordes().removeMembers(h, gone);
+                h.wasReal = true; // its members re-form it when they unload (user, 2026-10-16)
+                h.keepUntilHours = sim.currentHours() + GATHER_HOURS;
+            }
+            if (h.size() == 0) {
+                // Wholly real: its members re-form it under the same id as they unload (rejoin).
                 sim.grid().removeHorde(h, h.x, h.y, oldSpread);
                 sim.hordes().remove(h.id);
-                for (int i = 0; i < n; i++) {
-                    ZombieRecord r = members.get(i);
-                    if (store.get(r.id) != r) leave(r, h.heading, places[i][0], places[i][1]);
-                }
+                realHordes.put(h.id, h.heading);
             } else if (!out.isEmpty()) {
                 sim.grid().moveHorde(h, h.x, h.y, oldSpread);
             }
@@ -170,7 +179,22 @@ public final class HandOver {
     public boolean rejoin(ZombieRecord taken) {
         if (taken.hordeId == 0 || store.get(taken.id) != taken) return false;
         Horde h = sim.hordes().get(taken.hordeId);
-        if (h == null) return false;
+        if (h == null) {
+            Float heading = realHordes.remove(taken.hordeId);
+            if (heading == null) return false;
+            // The first member back re-forms its wholly real horde where it stands; the rest rejoin it.
+            sim.internal(() -> {
+                store.remove(taken.id);
+                taken.followId = 0;
+                taken.idle = false;
+                Horde back = sim.reformHorde(taken.hordeId, taken.x(), taken.y(), heading, taken);
+                back.wasReal = true;
+                back.keepUntilHours = sim.currentHours() + GATHER_HOURS;
+            });
+            rejoined++;
+            return true;
+        }
+        h.keepUntilHours = Math.max(h.keepUntilHours, sim.currentHours() + GATHER_HOURS);
         float reach = 2 * h.spread() + REJOIN_MARGIN;
         if (Hearing.dist(taken.x(), taken.y(), h.x, h.y) > reach) return false;
         sim.internal(() -> {

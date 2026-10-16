@@ -601,6 +601,14 @@ public final class Simulation {
         return h;
     }
 
+    /** Re-forms a wholly real horde from its first member to unload (not a population change: it was held as a wanderer). */
+    Horde reformHorde(long id, float x, float y, float heading, ZombieRecord first) {
+        Horde h = hordes.restore(id, x, y, heading, new ArrayList<>(List.of(first)));
+        grid.putHorde(h);
+        scheduleHorde(h, currentMinute + LevelOfDetail.EDGE_MINUTES);
+        return h;
+    }
+
     private void push(long minute, long key) {
         buckets.computeIfAbsent(minute, k -> new LongStack()).push(key);
         queued++;
@@ -875,6 +883,7 @@ public final class Simulation {
         Horde[] survivor = new Horde[1];
         internal(() -> survivor[0] = encounters.horde(h, now, tightSpots));
         Horde sv = survivor[0];
+        if (sv == null && h.wasReal && hordes.get(h.id) == null) handOver.rememberReal(h);
         if (sv != null && hordes.get(sv.id) == sv && (sv.dueMinute == Long.MIN_VALUE || sv.dueMinute < currentMinute)) {
             scheduleHorde(sv, currentMinute + interval(sv.x, sv.y));
         }

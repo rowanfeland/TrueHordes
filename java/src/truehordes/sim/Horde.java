@@ -22,6 +22,12 @@ public final class Horde {
      * move, moan, merge or take joiners; a sound (or a louder horde's moaning, noticed gradually) sets it loose.
      */
     public boolean dormant;
+    /**
+     * It has been real (user, 2026-10-16): members coming back off screen re-form it, and while they gather (until
+     * keepUntilHours) it is not broken up for being small. Not saved.
+     */
+    public boolean wasReal;
+    public double keepUntilHours;
     /** Where it heard a sound and keeps heading after the sound ends, until investigateUntilHours (not saved). */
     public float targetX = Float.NaN, targetY = Float.NaN;
     public double investigateUntilHours;
