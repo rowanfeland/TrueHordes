@@ -528,11 +528,18 @@ public final class Simulation {
      * The loudest walking horde of at least {@code minSize} whose moaning reaches (px, py) on the same falloff (from its
      * circle's edge): {x, y, level dB, size}, or null. For the player hearing big hordes just outside the loaded area.
      */
+    /**
+     * How much further the player hears a horde than zombies do (in-game test 2026-10-16: at the zombie level a 500
+     * horde reached about 70 tiles, inside the loaded area, so held hordes were never heard). +18 dB: a lone zombie
+     * about 25 tiles, 100 about 250 tiles, 500 about 560 tiles.
+     */
+    static final float PLAYER_EAR_DB = 18f;
+
     public float[] loudestMoanAt(float px, float py, int minSize) {
         float[] best = null;
         for (Horde h : hordes.all()) {
             if (h.dormant || h.size() < minSize) continue;
-            float level = SoundModel.levelAt(h.loudnessDb(), Math.max(1f, Hearing.dist(px, py, h.x, h.y) - h.spread()));
+            float level = SoundModel.levelAt(h.loudnessDb() + PLAYER_EAR_DB, Math.max(1f, Hearing.dist(px, py, h.x, h.y) - h.spread()));
             if (level < SoundModel.THRESHOLD_DB || (best != null && level <= best[2])) continue;
             best = new float[] {h.x, h.y, level, h.size()};
         }

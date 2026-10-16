@@ -214,5 +214,8 @@ public final class SoundHearingTest {
         Check.isTrue(m != null && m[0] == big.x && m[1] == big.y, "the big one 150 tiles away");
         Check.isTrue(m[2] > SoundModel.THRESHOLD_DB, "audible (" + m[2] + " dB)");
         Check.isTrue(sim.loudestMoanAt(5000, 5000, 50) == null, "nothing audible out here");
+        // In-game test 2026-10-16: held hordes sit outside the loaded area, so they must carry well beyond it.
+        SimulationTest.horde(sim, 8000, 8300, 0, 500);
+        Check.isTrue(sim.loudestMoanAt(8000, 8000, 50) != null, "a 500 horde 300 tiles away is heard");
     }
 }
