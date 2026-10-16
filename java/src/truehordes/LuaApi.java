@@ -56,6 +56,127 @@ public final class LuaApi {
         }
     }
 
+    /** The map the debug map draws: the core's, or on an MP client the steering's own copy (sub-project 7). */
+    private static truehordes.world.World mapWorld(Core c) {
+        truehordes.world.World w = Hooks.PILOTS.clientWorld();
+        return zombie.network.GameClient.client && w != null ? w : c.world();
+    }
+
+    // ---- multiplayer (sub-project 7): the Lua net layer calls these ----
+
+    /** MP client, every tick: steer the zombies this client owns. */
+    @LuaMethod(name = "Hordes_j_clientTick", global = true)
+    public static void clientTick() {
+        try {
+            Hooks.PILOTS.clientTick(System.currentTimeMillis());
+        } catch (Throwable t) {
+            Log.errorOnce("lua:clientTick:" + t.getClass().getName(), "MP client tick failed", t);
+        }
+    }
+
+    /** MP client: the messages for the server since the last call, as a list of {k, o, x, y, v}. */
+    @LuaMethod(name = "Hordes_j_mpOut", global = true)
+    public static KahluaTable mpOut() {
+        KahluaTable t = LuaManager.platform.newTable();
+        int n = 0;
+        double[] m;
+        while (n < 64 && (m = Hooks.PILOTS.takeOut()) != null) {
+            KahluaTable e = LuaManager.platform.newTable();
+            e.rawset("k", m[0]);
+            e.rawset("o", m[1]);
+            e.rawset("x", m[2]);
+            e.rawset("y", m[3]);
+            e.rawset("v", m[4]);
+            t.rawset((double) (++n), e);
+        }
+        t.rawset("n", (double) n);
+        return t;
+    }
+
+    /** MP client: the server's tags for the zombies near the player (see Pilots.applyTags). */
+    @LuaMethod(name = "Hordes_j_mpApplyTags", global = true)
+    public static void mpApplyTags(Object tags, Object px, Object py, Object radius) {
+        try {
+            if (!(tags instanceof KahluaTable t)) return;
+            int n = LuaArgs.toInt(t.rawget("n"), 0);
+            double[] rows = new double[n];
+            for (int i = 0; i < n; i++) {
+                Object v = t.rawget((double) (i + 1));
+                rows[i] = v instanceof Double d ? d : Double.NaN;
+            }
+            Hooks.PILOTS.applyTags(rows, LuaArgs.toFloat(px, 0), LuaArgs.toFloat(py, 0), LuaArgs.toFloat(radius, 90));
+        } catch (Throwable t) {
+            Log.errorOnce("lua:mpApplyTags:" + t.getClass().getName(), "applying the server's horde tags failed", t);
+        }
+    }
+
+    /** Server: tags of the zombies near (x, y) for that player's client; NaN lures are sent as the string "n". */
+    @LuaMethod(name = "Hordes_j_mpTags", global = true)
+    public static KahluaTable mpTags(Object x, Object y, Object radius) {
+        KahluaTable t = LuaManager.platform.newTable();
+        try {
+            double[] rows = Hooks.PILOTS.tagsFor(LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0), LuaArgs.toFloat(radius, 90));
+            for (int i = 0; i < rows.length; i++) t.rawset((double) (i + 1), Double.isNaN(rows[i]) ? (Object) "n" : (Object) rows[i]);
+            t.rawset("n", (double) rows.length);
+        } catch (Throwable e) {
+            Log.errorOnce("lua:mpTags:" + e.getClass().getName(), "building horde tags failed", e);
+            t.rawset("n", 0.0);
+        }
+        return t;
+    }
+
+    /** Server: a client's zombie heard a sound and is heading there. */
+    @LuaMethod(name = "Hordes_j_mpLure", global = true)
+    public static void mpLure(Object o, Object x, Object y) {
+        try {
+            Hooks.PILOTS.clientLure(LuaArgs.toInt(o, -1), LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0));
+        } catch (Throwable t) {
+            Log.errorOnce("lua:mpLure:" + t.getClass().getName(), "client lure failed", t);
+        }
+    }
+
+    /** Server: a client's zombie walked to the loaded edge heading out; (x, y) is just past it. */
+    @LuaMethod(name = "Hordes_j_mpOff", global = true)
+    public static void mpOff(Object o, Object x, Object y, Object heading) {
+        Core c = Hooks.core();
+        if (c == null) return;
+        try {
+            Hooks.PILOTS.clientOff(c, LuaArgs.toInt(o, -1), LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0),
+                LuaArgs.toFloat(heading, 0));
+        } catch (Throwable t) {
+            Log.errorOnce("lua:mpOff:" + t.getClass().getName(), "client walk-off failed", t);
+        }
+    }
+
+    /** Server: event audio for the clients since the last call, as a list of {s, x, y, r}. */
+    @LuaMethod(name = "Hordes_j_mpAudio", global = true)
+    public static KahluaTable mpAudio() {
+        KahluaTable t = LuaManager.platform.newTable();
+        int n = 0;
+        Object[] a;
+        while (n < 32 && (a = Hooks.EVENTS.audio.poll()) != null) {
+            KahluaTable e = LuaManager.platform.newTable();
+            e.rawset("s", a[0]);
+            e.rawset("x", (double) (Float) a[1]);
+            e.rawset("y", (double) (Float) a[2]);
+            e.rawset("r", (double) (Float) a[3]);
+            t.rawset((double) (++n), e);
+        }
+        t.rawset("n", (double) n);
+        return t;
+    }
+
+    /** MP client: play an event the server ran, at this player's distance from it. */
+    @LuaMethod(name = "Hordes_j_playEvent", global = true)
+    public static void playEvent(Object sound, Object x, Object y, Object radius) {
+        try {
+            if (!(sound instanceof String s)) return;
+            Hooks.EVENTS.play(s, LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0), LuaArgs.toFloat(radius, 600));
+        } catch (Throwable t) {
+            Log.errorOnce("lua:playEvent:" + t.getClass().getName(), "event audio failed", t);
+        }
+    }
+
     @LuaMethod(name = "Hordes_j_world", global = true)
     public static String world() {
         Core c = Hooks.core();
@@ -68,7 +189,7 @@ public final class LuaApi {
         Core c = Hooks.core();
         if (c == null) return null;
         try {
-            TerrainSample s = c.world().terrainSample((int) LuaArgs.toFloat(minX, 0), (int) LuaArgs.toFloat(minY, 0),
+            TerrainSample s = mapWorld(c).terrainSample((int) LuaArgs.toFloat(minX, 0), (int) LuaArgs.toFloat(minY, 0),
                 (int) LuaArgs.toFloat(maxX, 0), (int) LuaArgs.toFloat(maxY, 0), LuaArgs.toInt(step, 8));
             if (s == null) return null;
             KahluaTable t = LuaManager.platform.newTable();
@@ -89,9 +210,9 @@ public final class LuaApi {
     @LuaMethod(name = "Hordes_j_tiles", global = true)
     public static KahluaTable tiles(Object minX, Object minY, Object maxX, Object maxY, Object max) {
         Core c = Hooks.core();
-        if (c == null || !c.world().ready()) return null;
+        if (c == null || !mapWorld(c).ready()) return null;
         try {
-            int[] s = c.world().tileSample((int) LuaArgs.toFloat(minX, 0), (int) LuaArgs.toFloat(minY, 0),
+            int[] s = mapWorld(c).tileSample((int) LuaArgs.toFloat(minX, 0), (int) LuaArgs.toFloat(minY, 0),
                 (int) LuaArgs.toFloat(maxX, 0), (int) LuaArgs.toFloat(maxY, 0), LuaArgs.toInt(max, 20000));
             KahluaTable t = LuaManager.platform.newTable();
             t.rawset("n", (double) (s.length / 3));

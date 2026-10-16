@@ -27,7 +27,9 @@ import zombie.characters.IsoPlayer;
 import zombie.characters.IsoZombie;
 import zombie.iso.IsoGridSquare;
 import zombie.iso.IsoWorld;
+import zombie.network.GameClient;
 import zombie.network.GameServer;
+import zombie.network.ServerMap;
 
 /**
  * Steers real zombies by the simulation's rules (sub-project 6 spec goals 1-7): every real zombie has a {@link Pilot};
@@ -80,23 +82,169 @@ final class Pilots {
 
     static double nowHours() { return GameTime.getInstance().getWorldAgeHours(); }
 
+    /** Multiplayer (sub-project 7): the id clients and server agree on is the zombie's online id. */
+    static boolean mp() { return GameServer.server || GameClient.client; }
+
+    static long idOf(IsoZombie z) {
+        if (mp()) return z.getOnlineID();
+        return z.persistentId != 0 ? z.persistentId : System.identityHashCode(z);
+    }
+
+    /**
+     * Single player: forming and steering. Dedicated server (sub-project 7): forming only (the server is the brain:
+     * hordes, follows, lures; it tells each client in tags); the clients that own the zombies steer them.
+     */
     void tick(Core c, long nowMs) {
         if (!c.ownsPopulation()) return;
         core = c;
         SimSettings s = c.simSettings();
         truehordes.sim.MapView map = c.mapView();
         if (s == null || map == null) return;
-        if (movement == null || movementSettings != s || movementMap != map) {
-            movement = new Movement(map, s);
-            movementSettings = s;
-            movementMap = map;
-        }
         double now = nowHours();
         List<IsoZombie> list = IsoWorld.instance.currentCell.getZombieList();
         if (nowMs - lastCrowdMs >= 1000) {
             lastCrowdMs = nowMs;
             crowd(c, list, s, now);
         }
+        if (GameServer.server) return;
+        steer(list, nowMs, now, s, map, false);
+    }
+
+    // ---- multiplayer client (sub-project 7) ----
+
+    private truehordes.world.World clientWorld;
+    private SimSettings clientSettings;
+    private truehordes.sim.MapView clientMap;
+    private final java.util.ArrayDeque<double[]> out = new java.util.ArrayDeque<>();
+    /** Outgoing message kinds: a lure the zombie heard, a zombie walked off the loaded edge. */
+    static final int OUT_LURE = 1, OUT_OFF = 2;
+
+    /** The client's own copy of the map (built in the background on first use; the pilots' Movement needs it). */
+    truehordes.world.World clientWorld() { return clientWorld; }
+
+    /** MP client, every tick (from Lua): steer the zombies this client owns by the tags the server sends. */
+    void clientTick(long nowMs) {
+        if (!GameClient.client) return;
+        try {
+            if (clientWorld == null) {
+                GameEnvImpl env = new GameEnvImpl();
+                clientSettings = env.simSettings();
+                truehordes.world.WorldSource src = env.worldSource();
+                if (src == null) return;
+                clientWorld = new truehordes.world.World();
+                clientWorld.start(src);
+                readSettings();
+                Log.info("MP client: building the map copy the real-zombie steering uses");
+            }
+            clientWorld.tick();
+            Hooks.EVENTS.tickAudio();
+            if (!clientWorld.ready()) return;
+            if (clientMap == null) clientMap = new truehordes.sim.WorldMapView(clientWorld);
+            double now = nowHours();
+            List<IsoZombie> list = IsoWorld.instance.currentCell.getZombieList();
+            if (nowMs - lastCrowdMs >= 1000) {
+                lastCrowdMs = nowMs;
+                List<Pilot> ps = new ArrayList<>(list.size());
+                byId.clear();
+                for (IsoZombie z : list) {
+                    if (z == null || z.isDead() || z.isReanimatedPlayer()) continue;
+                    Pilot p = pilot(z);
+                    p.id = idOf(z);
+                    p.x = z.getX();
+                    p.y = z.getY();
+                    ps.add(p);
+                    byId.put(p.id, p);
+                }
+                groups = Crowd.groups(ps);
+            }
+            steer(list, nowMs, now, clientSettings, clientMap, true);
+        } catch (Throwable t) {
+            Log.errorOnce("pilots:client:" + t.getClass().getName(), "MP client steering failed", t);
+        }
+    }
+
+    /** The next message for the server (MP client): {kind, onlineId, x, y, until-or-heading}, or null. */
+    double[] takeOut() { return out.poll(); }
+
+    static final int TAG_STRIDE = 9;
+
+    /**
+     * MP client: the server's word on the zombies near this player (rows of TAG_STRIDE: online id, horde, follow,
+     * dormant, straggler, lure x, lure y, lure until, heading). Zombies near the player it does not list are loners.
+     */
+    void applyTags(double[] rows, float px, float py, float radius) {
+        java.util.Set<Long> listed = new java.util.HashSet<>();
+        for (int i = 0; i + TAG_STRIDE - 1 < rows.length; i += TAG_STRIDE) {
+            IsoZombie z = GameClient.IDToZombieMap.get((short) rows[i]);
+            if (z == null) continue;
+            Pilot p = pilot(z);
+            p.id = idOf(z);
+            listed.add(p.id);
+            p.hordeId = (long) rows[i + 1];
+            p.followId = (long) rows[i + 2];
+            p.dormant = rows[i + 3] != 0;
+            p.straggler = rows[i + 4] != 0;
+            if (!Double.isNaN(rows[i + 5]) && rows[i + 7] > p.lureUntilHours + 0.01) {
+                p.lure((float) rows[i + 5], (float) rows[i + 6], rows[i + 7], p.lureDb);
+            }
+            if (Float.isNaN(p.wpX)) p.heading = (float) rows[i + 8];
+        }
+        for (java.util.Map.Entry<IsoZombie, Pilot> e : pilots.entrySet()) {
+            Pilot p = e.getValue();
+            if (listed.contains(p.id) || Math.hypot(p.x - px, p.y - py) > radius) continue;
+            p.hordeId = 0;
+            p.followId = 0;
+        }
+    }
+
+    /** Server: tags of the zombies within {@code radius} of (px, py) that are not plain loners. */
+    double[] tagsFor(float px, float py, float radius) {
+        List<double[]> rows = new ArrayList<>();
+        double now = nowHours();
+        for (java.util.Map.Entry<IsoZombie, Pilot> e : pilots.entrySet()) {
+            IsoZombie z = e.getKey();
+            Pilot p = e.getValue();
+            if (z == null || Math.hypot(z.getX() - px, z.getY() - py) > radius) continue;
+            boolean lured = p.lured(now);
+            if (p.hordeId == 0 && p.followId == 0 && !p.dormant && !p.straggler && !lured) continue;
+            rows.add(new double[] {z.getOnlineID(), p.hordeId, p.followId, p.dormant ? 1 : 0, p.straggler ? 1 : 0,
+                lured ? p.lureX : Double.NaN, lured ? p.lureY : Double.NaN, lured ? p.lureUntilHours : 0, p.heading});
+        }
+        double[] flat = new double[rows.size() * TAG_STRIDE];
+        for (int i = 0; i < rows.size(); i++) System.arraycopy(rows.get(i), 0, flat, i * TAG_STRIDE, TAG_STRIDE);
+        return flat;
+    }
+
+    /** Server: a client's zombie heard a sound (vanilla sent it there); it and its horde head there. */
+    void clientLure(int onlineId, float x, float y) {
+        IsoZombie z = ServerMap.instance.zombieMap.get((short) onlineId);
+        if (z != null) heard(z, x, y, SoundModel.THRESHOLD_DB + 20);
+    }
+
+    /** Server: a client's zombie reached the loaded edge heading out; the mod takes it just past the edge. */
+    void clientOff(Core c, int onlineId, float x, float y, float heading) {
+        IsoZombie z = ServerMap.instance.zombieMap.get((short) onlineId);
+        if (z == null) return;
+        Pilot p = pilot(z);
+        p.heading = heading;
+        if (PopulationBridge.walkOff(c, z, x, y)) {
+            pilots.remove(z);
+            walkedOff++;
+        }
+    }
+
+    // ---- steering (single player, and MP clients for the zombies they own) ----
+
+    private boolean steeringClient;
+
+    private void steer(List<IsoZombie> list, long nowMs, double now, SimSettings s, truehordes.sim.MapView map,
+                       boolean client) {
+        if (movement == null || movementSettings != s || movementMap != map) {
+            movement = new Movement(map, s);
+            movementSettings = s;
+            movementMap = map;
+        }
+        steeringClient = client;
         int n = list.size();
         if (n == 0) return;
         long t0 = System.nanoTime();
@@ -105,9 +253,11 @@ final class Pilots {
             if (cursor >= n) cursor = 0;
             IsoZombie z = list.get(cursor++);
             if (z == null || z.isDead() || z.isReanimatedPlayer()) continue;
+            if (client && z.isRemoteZombie()) continue; // another player's machine runs it
             Pilot p = pilot(z);
             p.x = z.getX();
             p.y = z.getY();
+            soundPath(z, p, now, client);
             if (busy(z)) {
                 p.wpX = Float.NaN;
                 continue;
@@ -120,10 +270,27 @@ final class Pilots {
         }
     }
 
+    /**
+     * Vanilla sent the zombie to a sound (MP clients run vanilla hearing): that spot is its lure for the usual six
+     * hours, as off screen; an MP client tells the server, which sends the whole horde.
+     */
+    private void soundPath(IsoZombie z, Pilot p, double now, boolean client) {
+        State st = z.getCurrentState();
+        if (st != PathFindState.instance() && st != WalkTowardState.instance()) return;
+        if (!z.getPathFindBehavior2().isGoalSound()) return;
+        float tx = z.getPathTargetX() + 0.5f, ty = z.getPathTargetY() + 0.5f;
+        if (p.lured(now) && Crowd_dist(p.lureX, p.lureY, tx, ty) < 4f) return;
+        p.lure(tx, ty, now + INVESTIGATE_HOURS, SoundModel.THRESHOLD_DB + 20);
+        p.wpX = tx;
+        p.wpY = ty;
+        p.nextOrderMs = System.currentTimeMillis() + 8000;
+        if (client) out.add(new double[] {OUT_LURE, z.getOnlineID(), tx, ty, p.lureUntilHours});
+    }
+
     Pilot pilot(IsoZombie z) {
         Pilot p = pilots.get(z);
         if (p == null) {
-            p = new Pilot(z.persistentId != 0 ? z.persistentId : System.identityHashCode(z));
+            p = new Pilot(idOf(z));
             p.heading = z.getForwardDirection().getDirection();
             p.crawler = z.isCrawling();
             readModData(z, p);
@@ -134,7 +301,7 @@ final class Pilots {
 
     /** A held record just made real as {@code z}: its pilot carries the record's state. */
     void adopt(IsoZombie z, ZombieRecord r) {
-        Pilot p = new Pilot(z.persistentId != 0 ? z.persistentId : System.identityHashCode(z));
+        Pilot p = new Pilot(idOf(z));
         p.x = r.x();
         p.y = r.y();
         p.heading = r.heading;
@@ -330,6 +497,12 @@ final class Pilots {
             }
             if (Crowd_dist(p.x, p.y, ex, ey) < EDGE && z.getZ() < 1f && z.getCurrentBuilding() == null) {
                 p.heading = (float) Math.atan2(dy, dx);
+                if (steeringClient) {
+                    // MP: the server takes it (it owns the population); stop steering it meanwhile.
+                    out.add(new double[] {OUT_OFF, z.getOnlineID(), ox, oy, p.heading});
+                    p.waitUntilHours = now + 0.25;
+                    return;
+                }
                 if (PopulationBridge.walkOff(c, z, ox, oy)) {
                     pilots.remove(z);
                     walkedOff++;
@@ -368,6 +541,7 @@ final class Pilots {
         for (IsoZombie z : list) {
             if (z == null || z.isDead() || z.isReanimatedPlayer()) continue;
             Pilot p = pilot(z);
+            p.id = idOf(z);
             p.x = z.getX();
             p.y = z.getY();
             ps.add(p);

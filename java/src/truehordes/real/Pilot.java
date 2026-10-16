@@ -6,7 +6,7 @@ package truehordes.real;
  */
 public final class Pilot {
     /** Stable id (the zombie's persistent id) for its speed class and rolls. */
-    public final long id;
+    public long id;
     public float x, y;
     public float heading;
     public long hordeId;

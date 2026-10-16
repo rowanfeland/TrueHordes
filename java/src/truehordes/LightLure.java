@@ -149,9 +149,9 @@ final class LightLure {
     }
 
     private void flashlights(IsoCell cell) {
-        for (int i = 0; i < IsoPlayer.numPlayers; i++) {
-            IsoPlayer p = IsoPlayer.players[i];
-            if (p == null || !p.isAlive()) continue;
+        List<IsoPlayer> all = EventDirector.livePlayers();
+        for (int i = 0; i < all.size(); i++) {
+            IsoPlayer p = all.get(i);
             InventoryItem item = p.getActiveLightItem();
             if (item == null || !item.isTorchCone()) continue;
             float dist = item.getLightDistance(), dot = item.getTorchDot();

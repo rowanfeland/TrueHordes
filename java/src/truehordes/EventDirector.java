@@ -203,6 +203,11 @@ final class EventDirector {
 
     /** Positional audio at the event's real spot, at the same falloff zombies hear (within the sounds' 1,000 tiles). */
     void play(String sound, float x, float y, float radius) {
+        if (zombie.network.GameServer.server) {
+            // Dedicated server (sub-project 7): no audio here; every client plays it at its own player's distance.
+            if (audio.size() < 256) audio.add(new Object[] {sound, x, y, radius});
+            return;
+        }
         IsoPlayer p = anyPlayer();
         if (p == null || p.hasTrait(zombie.scripting.objects.CharacterTrait.DEAF)) return;
         float d = (float) Math.hypot(x - p.getX(), y - p.getY());
@@ -221,6 +226,12 @@ final class EventDirector {
         e.tick();
         emitters.add(e);
     }
+
+    /** Event audio waiting to be sent to the clients (dedicated server): {sound, x, y, radius}. */
+    final java.util.concurrent.ConcurrentLinkedQueue<Object[]> audio = new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+    /** MP client: keeps event audio playing (the server runs the events, the client only plays them). */
+    void tickAudio() { tickEmitters(); }
 
     private void tickEmitters() {
         for (int i = emitters.size() - 1; i >= 0; i--) {
@@ -345,22 +356,32 @@ final class EventDirector {
 
     // ---- players ----
 
+    /** A living player: a local one, or on a dedicated server any connected one at random (sub-project 7). */
     static IsoPlayer anyPlayer() {
+        List<IsoPlayer> ps = livePlayers();
+        if (ps.isEmpty()) return null;
+        return zombie.network.GameServer.server ? ps.get(ThreadLocalRandom.current().nextInt(ps.size())) : ps.get(0);
+    }
+
+    /** Every living player this game runs: local players, or all connected players on a dedicated server. */
+    static List<IsoPlayer> livePlayers() {
+        List<IsoPlayer> out = new ArrayList<>();
+        if (zombie.network.GameServer.server) {
+            for (IsoPlayer p : zombie.network.GameServer.getPlayers()) if (p != null && p.isAlive()) out.add(p);
+            return out;
+        }
         for (int i = 0; i < IsoPlayer.numPlayers; i++) {
             IsoPlayer p = IsoPlayer.players[i];
-            if (p != null && p.isAlive()) return p;
+            if (p != null && p.isAlive()) out.add(p);
         }
-        return null;
+        return out;
     }
 
     static float[] players() {
         List<Float> xy = new ArrayList<>();
-        for (int i = 0; i < IsoPlayer.numPlayers; i++) {
-            IsoPlayer p = IsoPlayer.players[i];
-            if (p != null && p.isAlive()) {
-                xy.add(p.getX());
-                xy.add(p.getY());
-            }
+        for (IsoPlayer p : livePlayers()) {
+            xy.add(p.getX());
+            xy.add(p.getY());
         }
         float[] out = new float[xy.size()];
         for (int i = 0; i < out.length; i++) out[i] = xy.get(i);
