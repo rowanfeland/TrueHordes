@@ -74,13 +74,15 @@ final class Pilots {
     }
 
     String stats() {
-        return "pilots " + pilots.size() + ", real hordes " + groups.size() + ", orders " + orders;
+        return "pilots " + pilots.size() + ", real hordes " + groups.size() + ", orders " + orders + ", walked off "
+            + walkedOff;
     }
 
     static double nowHours() { return GameTime.getInstance().getWorldAgeHours(); }
 
     void tick(Core c, long nowMs) {
         if (!c.ownsPopulation()) return;
+        core = c;
         SimSettings s = c.simSettings();
         truehordes.sim.MapView map = c.mapView();
         if (s == null || map == null) return;
@@ -247,7 +249,13 @@ final class Pilots {
         return null;
     }
 
+    /** A zombie this close to the loaded edge, heading out, is taken off screen (tiles). */
+    static final float EDGE = 4f;
+    private int walkedOff;
+    private Core core;
+
     private void order(Pilot p, IsoZombie z, long nowMs, double now, SimSettings s) {
+        Core c = core;
         float tx, ty;
         if (!Float.isNaN(p.lureX) && p.lureUntilHours <= now) {
             // Done investigating: it settles where the sound took it.
@@ -304,6 +312,32 @@ final class Pilots {
             tx = st.x();
             ty = st.y();
             p.heading = st.boxedIn() ? p.heading + (float) Math.PI : st.heading();
+        }
+        // The loaded edge (sub-project 6, user's test: real zombies never left): the game cannot path into unloaded
+        // ground, so the waypoint stops at the last loaded tile on the way; at the edge the mod takes the zombie.
+        if (!PopulationBridge.loadedAt(tx, ty)) {
+            float dx = tx - p.x, dy = ty - p.y, len = (float) Math.hypot(dx, dy);
+            float ex = p.x, ey = p.y, ox = tx, oy = ty;
+            for (float t = 2; t < len; t += 2) {
+                float qx = p.x + dx / len * t, qy = p.y + dy / len * t;
+                if (!PopulationBridge.loadedAt(qx, qy)) {
+                    ox = p.x + dx / len * (t + 2);
+                    oy = p.y + dy / len * (t + 2);
+                    break;
+                }
+                ex = qx;
+                ey = qy;
+            }
+            if (Crowd_dist(p.x, p.y, ex, ey) < EDGE && z.getZ() < 1f && z.getCurrentBuilding() == null) {
+                p.heading = (float) Math.atan2(dy, dx);
+                if (PopulationBridge.walkOff(c, z, ox, oy)) {
+                    pilots.remove(z);
+                    walkedOff++;
+                    return;
+                }
+            }
+            tx = ex;
+            ty = ey;
         }
         z.pathToLocation((int) Math.floor(tx), (int) Math.floor(ty), (int) Math.floor(z.getZ()));
         p.wpX = tx;

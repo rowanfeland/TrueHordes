@@ -186,6 +186,36 @@ final class PopulationBridge {
         z.removeFromSquare();
     }
 
+    /** Tile (x, y) lies in a loaded chunk. */
+    static boolean loadedAt(float x, float y) {
+        return loaded.contains(key(Math.floorDiv((int) Math.floor(x), 8), Math.floorDiv((int) Math.floor(y), 8)));
+    }
+
+    /**
+     * A piloted zombie reached the loaded area's edge heading out: the mod takes it (the game cannot path a zombie into
+     * unloaded ground, so it never walked off by itself). It carries on off screen with its heading and horde.
+     */
+    static boolean walkOff(Core c, IsoZombie z, float outX, float outY) {
+        if (c == null || z == null || z.isReanimatedPlayer() || !c.ownsPopulation()) return false;
+        try {
+            synchronized (c) {
+                // Held just past the edge (inside it, the simulation would hand it straight back).
+                z.setX(outX);
+                z.setY(outY);
+                ZombiePopulationManager.saveLock.lock();
+                try {
+                    take(c, z, false);
+                } finally {
+                    ZombiePopulationManager.saveLock.unlock();
+                }
+            }
+            return true;
+        } catch (Throwable t) {
+            Log.errorOnce("bridge:walkoff:" + t.getClass().getName(), "taking a zombie off the loaded edge failed", t);
+            return false;
+        }
+    }
+
     private static void markLoaded(int cx, int cy) {
         if (loaded.add(key(cx, cy))) loadedPerCell.merge(key(Math.floorDiv(cx, 32), Math.floorDiv(cy, 32)), 1, Integer::sum);
     }

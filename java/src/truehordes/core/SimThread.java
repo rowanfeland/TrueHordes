@@ -67,7 +67,7 @@ public final class SimThread {
     /** Behind by more than this many in-game minutes: catch up. */
     static final long LAG_MINUTES = 10;
     /** Pause between slices while catching up (2 ms slices: about two thirds of one background core). */
-    static final long CATCH_UP_SLEEP_MILLIS = 2;
+    static final long CATCH_UP_SLEEP_MILLIS = 1;
 
     private void loop() {
         while (running) {
