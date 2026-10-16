@@ -48,6 +48,8 @@ public final class ZombieRecord {
     public long rolledSoundId;
     /** Source loudness of the sound it is heading for (not saved), for the 6 dB switch rule. */
     public float targetDb;
+    /** Where a milling zombie calls home (not saved: after a load, where it stands); NaN = not set yet (round 8). */
+    public float homeX = Float.NaN, homeY = Float.NaN;
     /** The horde this zombie last belonged to (0 none); lets it rejoin after a spell as a real zombie. */
     public long hordeId;
     /** World hour until which a left-behind or straggling zombie stays put. */

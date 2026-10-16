@@ -33,5 +33,7 @@
     "Sandbox_TrueHordes_SoundEdgeChance": "Chance to hear a sound at the edge of its reach",
     "Sandbox_TrueHordes_SoundEdgeChance_tooltip": "A lone zombie right at the edge of a sound's circle hears it with this chance; closer in it rises along the sound's fading energy to certain. Hordes hear less: their own moaning drowns sounds out.",
     "Sandbox_TrueHordes_SoundCertainShare": "Share of a sound's reach where every zombie hears it",
-    "Sandbox_TrueHordes_SoundCertainShare_tooltip": "Inside this share of a sound's circle (0.25 = the inner quarter) every lone zombie hears it; beyond, the chance fades with the sound's energy down to the edge chance."
+    "Sandbox_TrueHordes_SoundCertainShare_tooltip": "Inside this share of a sound's circle (0.25 = the inner quarter) every lone zombie hears it; beyond, the chance fades with the sound's energy down to the edge chance.",
+    "Sandbox_TrueHordes_TravellerShare": "Share of lone zombies that travel",
+    "Sandbox_TrueHordes_TravellerShare_tooltip": "Most lone zombies mill about their neighbourhood (about 150 tiles); this share are travellers that walk the roads between towns and ignore the lockdown. Hordes make the real crossings."
 }

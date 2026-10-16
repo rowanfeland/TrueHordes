@@ -100,6 +100,7 @@ final class GameEnvImpl implements GameEnv {
             .joinChancePerHour(sandboxDouble("TrueHordes.JoinChance", d.joinChancePerHour()))
             .bumpFollowChance(sandboxDouble("TrueHordes.BumpFollowChance", d.bumpFollowChance()))
             .soundEdgeChance(sandboxDouble("TrueHordes.SoundEdgeChance", d.soundEdgeChance()))
+            .travellerShare(sandboxDouble("TrueHordes.TravellerShare", d.travellerShare()))
             .soundCertainShare(Math.max(0.01, sandboxDouble("TrueHordes.SoundCertainShare", d.soundCertainShare())))
             .peakDay(Math.max(1, SandboxOptions.instance.zombieConfig.populationPeakDay.getValue()))
             .buildingStragglerOneIn(Math.max(1, (int) sandboxDouble("TrueHordes.BuildingStragglerOneIn",

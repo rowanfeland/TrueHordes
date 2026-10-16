@@ -163,3 +163,13 @@ option TrueHordes.SoundCertainShare
 	page = TrueHordes,
 	translation = TrueHordes_SoundCertainShare,
 }
+
+option TrueHordes.TravellerShare
+{
+	type = double,
+	min = 0,
+	max = 1,
+	default = 0.05,
+	page = TrueHordes,
+	translation = TrueHordes_TravellerShare,
+}

@@ -188,11 +188,13 @@ public final class SimulationTest {
         run(sim, 0, 24);
         float strayed = Math.abs(str.x() - 800) + Math.abs(str.y() - 800);
         float walked = Math.abs(w.x() - 800) + Math.abs(w.y() - 1200);
-        Check.isTrue(strayed * 3 < walked, "a straggler stays close (" + strayed + " vs " + walked + " tiles)");
-        float before = Math.abs(str.x() - 900);
-        sim.addSound(900, str.y(), 90, 1);
+        // Round 8: everyone mills now, so the straggler is checked against its neighbourhood rather than a walker.
+        Check.isTrue(strayed < 200, "a straggler stays close (" + strayed + " tiles; walker " + walked + ")");
+        float sx = str.x() + 100; // 100 tiles from wherever it lingers now
+        float before = Math.abs(str.x() - sx);
+        sim.addSound(sx, str.y(), 90, 1);
         run(sim, 24, 1);
-        Check.isTrue(Math.abs(str.x() - 900) < before, "but it heads for a real sound");
+        Check.isTrue(Math.abs(str.x() - sx) < before, "but it heads for a real sound");
     }
 
     /** A town of 30x30 chunks, a road every 4th row and column (about 44% of its chunks), open ground around. */

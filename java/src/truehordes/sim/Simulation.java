@@ -480,6 +480,14 @@ public final class Simulation {
 
     public double currentHours() { return currentHours; }
 
+    /** A milling zombie wanders within about this many tiles of home (round 8, user: 150). */
+    static final float HOME_RADIUS = 150f;
+
+    /** Whether lone zombie {@code id} is a traveller (stable per zombie, so nothing is saved). */
+    public static boolean traveller(long id, double share) {
+        return (Movement.mix(id ^ 0x7A11L) & 0xFFFFFFL) / (double) 0x1000000L < share;
+    }
+
     /** Chunks held walkers walked into since the last call (the main thread makes them real there). */
     public long[] takeArrivals() {
         long[] out = new long[arrivals.size()];
@@ -716,8 +724,15 @@ public final class Simulation {
             }
             if (walk) {
                 boolean crawler = (r.stateFlags & 2) != 0;
-                Movement.Step st = movement.advance(r.x(), r.y(), r.heading, (float) dt, 1, r.id, crawler, px, py, pw,
-                    random);
+                if (Float.isNaN(r.homeX)) {
+                    r.homeX = r.x();
+                    r.homeY = r.y();
+                }
+                // Round 8: most lone zombies mill about home; travellers (and anything with a pull) walk on.
+                Movement.Step st = pw == 0 && !traveller(r.id, s.travellerShare())
+                    ? movement.advanceHome(r.x(), r.y(), r.heading, (float) dt, r.id, crawler, r.homeX, r.homeY,
+                        HOME_RADIUS, random)
+                    : movement.advance(r.x(), r.y(), r.heading, (float) dt, 1, r.id, crawler, px, py, pw, random);
                 if (players.nearChunk(chunk(st.x()), chunk(st.y()))) {
                     // Into the loaded area (round 8): the main thread makes it real there (or keeps it held at the
                     // spot if the game refuses).
@@ -727,15 +742,18 @@ public final class Simulation {
                 } else {
                     store.moved(r, st.x(), st.y());
                     r.heading = st.heading();
-                    if (r.investigateUntilHours <= now) {
+                    if (r.investigateUntilHours <= now && r.hasTarget()) {
                         r.targetX = ZombieRecord.NO_TARGET; // it walked somewhere else: the old target is stale
                         r.targetY = ZombieRecord.NO_TARGET;
+                        r.homeX = r.x(); // done investigating: it settles where the sound took it
+                        r.homeY = r.y();
                     }
                 }
                 // No random pauses (in-game test 2026-10-15: they left zombies standing on roads); only boxed in.
                 r.pauseMinutes = st.boxedIn() ? 10f : 0f;
                 // A straggler only shuffles a little, then lingers where it is for a few hours (spec 4.6).
-                if (r.straggler && (p == null || p.event() == null)) {
+                // (Not while it is still heading for a sound it heard: sounds are targets since sub-project 5a.)
+                if (r.straggler && (p == null || p.event() == null) && !(r.hasTarget() && r.investigateUntilHours > now)) {
                     r.lingerUntilHours = now + STRAGGLER_LINGER_MIN_HOURS + 3 * rng.nextDouble();
                 }
             }

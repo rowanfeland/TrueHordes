@@ -49,7 +49,33 @@ public final class Movement {
     public float chooseHeading(float x, float y, float heading, float pullX, float pullY, float pullWeight,
                                DoubleSupplier rng) {
         if (pullWeight > 0) return choose(x, y, heading, pullX, pullY, pullWeight, rng, false);
+        if (homeRadius > 0) {
+            // Milling (round 8): past the home radius each decision bends homewards with a growing chance; a soft
+            // pull through the same scored fan, never a wall.
+            float d = (float) Math.hypot(x - homeX, y - homeY);
+            if (d > homeRadius && rng.getAsDouble() < Math.min(1.0, (d - homeRadius) / homeRadius)) {
+                return choose(x, y, heading, homeX, homeY, HOME_PULL, rng, false);
+            }
+        }
         return travel(x, y, heading, rng);
+    }
+
+    /** How strongly home steers a miller that has wandered past its radius (a Movement pull weight). */
+    static final float HOME_PULL = 4f;
+    /** A miller's home for the advance in progress (0 radius = none; one simulation thread). */
+    private float homeX, homeY, homeRadius;
+
+    /** Like advance, for a milling zombie: wanders freely within {@code radius} of home, bends back beyond it. */
+    public Step advanceHome(float x, float y, float heading, float minutes, long walkerId, boolean crawler,
+                            float hx, float hy, float radius, DoubleSupplier rng) {
+        homeX = hx;
+        homeY = hy;
+        homeRadius = radius;
+        try {
+            return advance(x, y, heading, minutes, 1, walkerId, crawler, 0, 0, 0, rng);
+        } finally {
+            homeRadius = 0;
+        }
     }
 
     // ---- travelling (no pull): straight down roads and trails, straight lines across country ----

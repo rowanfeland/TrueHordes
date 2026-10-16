@@ -264,6 +264,8 @@ public final class Encounters {
         r.pauseMinutes = 0;
         r.heading = h.heading;
         r.lingerUntilHours = lingerUntilHours;
+        r.homeX = Float.NaN; // left behind: home is where it is now
+        r.homeY = Float.NaN;
         store.restore(r);
         store.moved(r, (float) (h.x + Math.cos(a) * d), (float) (h.y + Math.sin(a) * d));
     }
