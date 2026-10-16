@@ -145,7 +145,82 @@ public final class Encounters {
             }
         }
         if (r.followId > 0) formChain(r, nowHours);
+        else crowdDrift(r, nowHours, dtHours);
     }
+
+    /** How far a milling zombie notices a group of others (hears their shuffling and moaning), in tiles. */
+    static final float CROWD_RADIUS = 40f;
+    /** Others it takes to make a group worth drifting to. */
+    static final int CROWD_MIN = 3;
+    /** How long a drifting zombie keeps heading for the group (in-game hours). */
+    static final double DRIFT_HOURS = 3;
+
+    /**
+     * Round 8: a milling zombie now and then drifts towards a group nearby (a chance per hour, ramped by the days like
+     * following): a horde it notices, else the middle of a cluster of millers, snapped to that chunk's centre so drifters
+     * from the same cluster meet at one spot, where 10 or more become a horde (gatherAt).
+     */
+    private void crowdDrift(ZombieRecord r, double nowHours, double dtHours) {
+        double p = ramped(s.crowdDriftPerHour(), nowHours);
+        if (p <= 0 || r.straggler || !moving(r, nowHours) || (r.hasTarget() && r.investigateUntilHours > nowHours)) return;
+        if (Simulation.traveller(r.id, s.travellerShare())) return;
+        if (rng.nextDouble() >= 1 - Math.pow(1 - p, dtHours)) return;
+        Horde best = null;
+        float bestD = Float.MAX_VALUE;
+        seenHordes.clear();
+        grid.nearHordes(r.x(), r.y(), CROWD_RADIUS, addSeenHorde);
+        for (int i = 0; i < seenHordes.size(); i++) {
+            Horde h = seenHordes.get(i);
+            float d = Hearing.dist(r.x(), r.y(), h.x, h.y);
+            if (!h.dormant && d < bestD) {
+                bestD = d;
+                best = h;
+            }
+        }
+        float tx, ty;
+        if (best != null) {
+            tx = best.x;
+            ty = best.y;
+        } else {
+            seenWanderers.clear();
+            grid.nearWanderers(r.x(), r.y(), CROWD_RADIUS, addSeenWanderer);
+            double sx = 0, sy = 0;
+            int n = 0;
+            for (int i = 0; i < seenWanderers.size(); i++) {
+                ZombieRecord w = seenWanderers.get(i);
+                if (w == r || w.straggler) continue;
+                sx += w.x();
+                sy += w.y();
+                n++;
+            }
+            if (n < CROWD_MIN) return;
+            // Fall in behind the one nearest the middle of the group: the whole cluster picks much the same leader,
+            // so its followers gather behind it and 10 of them become a horde (formChain).
+            float cx = (float) (sx / n), cy = (float) (sy / n);
+            ZombieRecord lead = null;
+            float leadD = Float.MAX_VALUE;
+            for (int i = 0; i < seenWanderers.size(); i++) {
+                ZombieRecord w = seenWanderers.get(i);
+                if (w == r || w.straggler || !moving(w, nowHours) || leads(r, w) || depth(w) >= MAX_CHAIN - 1) continue;
+                float d = Hearing.dist(cx, cy, w.x(), w.y());
+                if (d < leadD) {
+                    leadD = d;
+                    lead = w;
+                }
+            }
+            if (lead == null) return;
+            r.followId = lead.id;
+            drifted++;
+            return;
+        }
+        r.targetX = (int) Math.floor(tx);
+        r.targetY = (int) Math.floor(ty);
+        r.targetDb = 0; // any real sound outranks drifting
+        r.investigateUntilHours = nowHours + DRIFT_HOURS;
+        drifted++;
+    }
+
+    int drifted;
 
     /** True if {@code w} already trails {@code r} (directly or down the chain): following it would make a loop. */
     private boolean leads(ZombieRecord r, ZombieRecord w) {

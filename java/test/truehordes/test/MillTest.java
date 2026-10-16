@@ -67,8 +67,24 @@ public final class MillTest {
         // 180 tiles away (a walk within the 6 hours it keeps investigating), loud enough to be certain.
         sim.offerSound(200 * 8 + 4 + 180, 50 * 8 + 4, 3000, false, 1, SoundEvent.GUNFIRE);
         SimulationTest.run(sim, 0.001, 60);
-        double fromSpot = Math.hypot(r.x() - (200 * 8 + 4 + 180), r.y() - (50 * 8 + 4));
-        double fromOld = Math.hypot(r.x() - (200 * 8 + 4), r.y() - (50 * 8 + 4));
-        Check.isTrue(fromSpot < 200 && fromSpot < fromOld, "two days on it mills near where the sound was (" + fromSpot + " tiles)");
+        double homeFromSpot = Math.hypot(r.homeX - (200 * 8 + 4 + 180), r.homeY - (50 * 8 + 4));
+        Check.isTrue(homeFromSpot < 60, "its home moved to where the sound took it (" + homeFromSpot + " tiles off)");
+    }
+
+    /** Millers in a neighbourhood drift together: 30 spread over 60 tiles clot into a horde within a day. */
+    public static void testNeighbourhoodClotsIntoAHorde() {
+        for (int drift = 0; drift <= 1; drift++) {
+            Store s = new Store();
+            java.util.Random rng = new java.util.Random(4);
+            for (int i = 0; i < 30; i++) {
+                SimulationTest.add(s, 1600 + rng.nextInt(60), 400 + rng.nextInt(60), (float) (rng.nextDouble() * 6.28));
+            }
+            Simulation sim = new Simulation(s, SimulationTest.openMap(400, -1), settings(0).toBuilder()
+                .crowdDriftPerHour(drift == 0 ? 0 : 0.5).followChancePerHour(0).build(), 5, SimulationTest.LATE);
+            SimulationTest.run(sim, SimulationTest.LATE, 24);
+            int inHordes = sim.hordes().memberCount();
+            if (drift == 0) Check.equal(0, inHordes, "without drift (and no bumps or following) nobody clots");
+            else Check.isTrue(inHordes >= 10, "with drift a horde forms (" + inHordes + " of 30)");
+        }
     }
 }
