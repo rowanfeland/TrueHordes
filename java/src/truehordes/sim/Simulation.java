@@ -295,7 +295,7 @@ public final class Simulation {
      */
     private float weatherLossDb(SoundEvent e, float x, float y) {
         Weather w = weather;
-        if (e.kind == SoundEvent.THUNDER) return w.inStorm(x, y) ? Float.POSITIVE_INFINITY : w.muffleDb(x, y, x, y);
+        if (e.thunder()) return w.inStorm(x, y) ? Float.POSITIVE_INFINITY : w.muffleDb(x, y, x, y);
         return w.muffleDb(e.x(), e.y(), x, y);
     }
 
@@ -321,7 +321,7 @@ public final class Simulation {
             float y = w.cellY(c) + (float) ((random.getAsDouble() - 0.5) * w.step());
             if (players.nearCell(Math.floorDiv((int) x, CELL), Math.floorDiv((int) y, CELL))) continue;
             SoundEvent e = new SoundEvent(nextEventId++, x, y, SoundModel.dbFromRadius(THUNDER_RADIUS), currentHours,
-                currentHours + DISCRETE_MINUTES / 60, false, 0, SoundEvent.THUNDER, false, 0);
+                currentHours + DISCRETE_MINUTES / 60, false, 0, SoundEvent.STORM_THUNDER, false, 0);
             events.add(e);
             broadcast(e);
         }
@@ -413,7 +413,7 @@ public final class Simulation {
         }
         int n = h.size();
         // Thunder (sub-project 5b): the horde rolls once, as one, whether to turn to it.
-        int k = e.kind == SoundEvent.THUNDER ? (random.getAsDouble() < soundModel.loneChance(level) ? n : 0)
+        int k = e.thunder() ? (random.getAsDouble() < soundModel.loneChance(level) ? n : 0)
             : (int) Math.floor(soundModel.hordeShare(level, n) * n + random.getAsDouble());
         if (k <= 0) return;
         double until = e.endHours() + INVESTIGATE_HOURS;

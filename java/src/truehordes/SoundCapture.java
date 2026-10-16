@@ -100,6 +100,11 @@ public final class SoundCapture {
         zombie.iso.Helicopter heli = zombie.iso.IsoWorld.instance == null ? null : zombie.iso.IsoWorld.instance.helicopter;
         boolean atHeli = src == null && heli != null && heli.isActive() && (int) heli.x == w.x && (int) heli.y == w.y;
         int kind = kindOf(during, atHeli, gun, vehicle, appliance, w.repeating && src == null);
+        // A car alarm (sub-project 5b viewer label), loaded or kept sounding off screen by the game.
+        if (during == 0 && (src instanceof zombie.vehicles.VehicleAlarm || (src instanceof BaseVehicle bv && bv.isAlarmActive())
+                || (src instanceof zombie.vehicles.VirtualVehicle vv && vv.isAlarmActive()))) {
+            kind = SoundEvent.CAR_ALARM;
+        }
         sim.offerSound(w.x + 0.5f, w.y + 0.5f, w.radius, w.repeating, key, kind);
     }
 }

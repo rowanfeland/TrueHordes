@@ -38,6 +38,8 @@ public final class HookTargets {
     public static final String AMBIENT_SOUND = "zombie.AmbientSoundManager";
     public static final String GUN_EVENT = "doGunEvent";
     public static final String THUNDER_EVENT = "handleThunderEvent";
+    /** Vanilla's random dogs, screams, owls and wolves (sub-project 5b: the mod plays these). */
+    public static final String RANDOM_AMBIENT = "addRandomAmbient";
     public static final String RALLY = "update";
     /** Private ZombiePopulationManager members the takeover calls or reads by reflection. */
     public static final String ADD_STANDING = "addZombieStanding";
@@ -66,6 +68,7 @@ public final class HookTargets {
         {WSM, BIGGEST_SOUND},
         {AMBIENT_STREAM, GUN_EVENT},
         {AMBIENT_STREAM, THUNDER_EVENT},
+        {AMBIENT_STREAM, RANDOM_AMBIENT},
         {AMBIENT_SOUND, GUN_EVENT},
         {AMBIENT_SOUND, THUNDER_EVENT},
     };

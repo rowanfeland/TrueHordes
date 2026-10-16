@@ -117,6 +117,15 @@ public final class Core {
 
     public truehordes.sim.Simulation soundSink() { return soundSink; }
 
+    /** The map as the simulation sees it (null until the simulation runs). Lock-free; read-only queries. */
+    public truehordes.sim.MapView mapView() {
+        truehordes.sim.Simulation s = soundSink;
+        return s == null ? null : s.movement().map();
+    }
+
+    /** The mod's save file for this world (other per-world files sit beside it). */
+    public java.nio.file.Path stateFile() { return env.stateFile(); }
+
     public long tickCount() { return ticks; }
 
     /** Permanently switches the mod off for this game session. */

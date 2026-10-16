@@ -129,14 +129,24 @@ public final class Patches {
         }
     }
 
-    /** Vanilla's gunshot meta event (single player / client): its sound is labelled "meta event". */
+    /**
+     * Vanilla's gunshot meta event (single player / client): skipped while the mod runs meta events (sub-project 5b),
+     * else its sound is labelled "meta event".
+     */
     @Patch(className = HookTargets.AMBIENT_STREAM, methodName = HookTargets.GUN_EVENT)
     public static class MetaGun {
-        @Patch.OnEnter
-        public static void enter() { Hooks.soundsDuring(truehordes.sim.SoundEvent.META); }
+        @Patch.OnEnter(skipOn = true)
+        public static boolean enter() { return Hooks.metaGun(); }
 
         @Patch.OnExit
         public static void exit() { Hooks.soundsDuring(0); }
+    }
+
+    /** Vanilla's random dogs, screams, owls and wolves: the mod plays them while it runs meta events (true = skip). */
+    @Patch(className = HookTargets.AMBIENT_STREAM, methodName = HookTargets.RANDOM_AMBIENT)
+    public static class RandomAmbient {
+        @Patch.OnEnter(skipOn = true)
+        public static boolean enter() { return Hooks.randomAmbient(); }
     }
 
     /** Vanilla's thunder (single player / client): its 5,000-tile sound is labelled "thunder". */
@@ -152,8 +162,8 @@ public final class Patches {
     /** Server: the gunshot meta event. */
     @Patch(className = HookTargets.AMBIENT_SOUND, methodName = HookTargets.GUN_EVENT)
     public static class MetaGunServer {
-        @Patch.OnEnter
-        public static void enter() { Hooks.soundsDuring(truehordes.sim.SoundEvent.META); }
+        @Patch.OnEnter(skipOn = true)
+        public static boolean enter() { return Hooks.metaGun(); }
 
         @Patch.OnExit
         public static void exit() { Hooks.soundsDuring(0); }

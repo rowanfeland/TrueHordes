@@ -93,7 +93,7 @@ public final class WeatherLightsTest {
             int thunder = 0;
             for (double t = LATE; t < LATE + 4; t += 1.0 / 60) {
                 sim.step(t, Long.MAX_VALUE);
-                for (SoundEvent e : sim.sounds()) if (e.kind == SoundEvent.THUNDER && e.startHours() == t) thunder++;
+                for (SoundEvent e : sim.sounds()) if (e.kind == SoundEvent.STORM_THUNDER && e.startHours() == t) thunder++;
             }
             if (regional == 0) Check.equal(0, thunder, "vanilla weather: the game makes the thunder");
             else Check.isTrue(thunder >= 5 && thunder <= 25, "a full storm thunders about 3 times an hour (" + thunder + " in 4 h)");

@@ -183,3 +183,135 @@ option TrueHordes.LockdownDays
 	page = TrueHordes,
 	translation = TrueHordes_LockdownDays,
 }
+
+option TrueHordes.MetaEvents
+{
+	type = boolean,
+	default = true,
+	page = TrueHordes,
+	translation = TrueHordes_MetaEvents,
+}
+
+option TrueHordes.FarEventFrequency
+{
+	type = double,
+	min = 0.1,
+	max = 10,
+	default = 1.0,
+	page = TrueHordes,
+	translation = TrueHordes_FarEventFrequency,
+}
+
+option TrueHordes.NearEvents
+{
+	type = boolean,
+	default = true,
+	page = TrueHordes,
+	translation = TrueHordes_NearEvents,
+}
+
+option TrueHordes.NearGunshotFrequency
+{
+	type = double,
+	min = 0.1,
+	max = 10,
+	default = 1.0,
+	page = TrueHordes,
+	translation = TrueHordes_NearGunshotFrequency,
+}
+
+option TrueHordes.CarAlarmFrequency
+{
+	type = double,
+	min = 0.1,
+	max = 10,
+	default = 1.0,
+	page = TrueHordes,
+	translation = TrueHordes_CarAlarmFrequency,
+}
+
+option TrueHordes.CarAlarmBatteryHours
+{
+	type = double,
+	min = 0.25,
+	max = 48,
+	default = 6,
+	page = TrueHordes,
+	translation = TrueHordes_CarAlarmBatteryHours,
+}
+
+option TrueHordes.WeatherHearing
+{
+	type = boolean,
+	default = true,
+	page = TrueHordes,
+	translation = TrueHordes_WeatherHearing,
+}
+
+option TrueHordes.WeatherMuffleDb
+{
+	type = double,
+	min = 0,
+	max = 30,
+	default = 12,
+	page = TrueHordes,
+	translation = TrueHordes_WeatherMuffleDb,
+}
+
+option TrueHordes.LightLure
+{
+	type = boolean,
+	default = true,
+	page = TrueHordes,
+	translation = TrueHordes_LightLure,
+}
+
+option TrueHordes.BuildingLightLureChance
+{
+	type = double,
+	min = 0,
+	max = 1,
+	default = 0.25,
+	page = TrueHordes,
+	translation = TrueHordes_BuildingLightLureChance,
+}
+
+option TrueHordes.StreetlightLureChance
+{
+	type = double,
+	min = 0,
+	max = 1,
+	default = 0.01,
+	page = TrueHordes,
+	translation = TrueHordes_StreetlightLureChance,
+}
+
+option TrueHordes.FlashlightLureChance
+{
+	type = double,
+	min = 0,
+	max = 1,
+	default = 0.10,
+	page = TrueHordes,
+	translation = TrueHordes_FlashlightLureChance,
+}
+
+option TrueHordes.LightReach
+{
+	type = double,
+	min = 5,
+	max = 300,
+	default = 60,
+	page = TrueHordes,
+	translation = TrueHordes_LightReach,
+}
+
+option TrueHordes.StreetlightReach
+{
+	type = double,
+	min = 5,
+	max = 300,
+	default = 40,
+	page = TrueHordes,
+	translation = TrueHordes_StreetlightReach,
+}

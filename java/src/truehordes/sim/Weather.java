@@ -81,6 +81,14 @@ public final class Weather {
 
     public int step() { return step; }
 
+    /** Grid cells (0 for vanilla weather) and each one's precipitation, for the viewer. */
+    public int cellCount() { return grid == null ? 0 : grid.length; }
+
+    public float cellPrecip(int i) { return grid[i]; }
+
+    /** Vanilla weather's one precipitation for the whole map (0 with a regional grid). */
+    public float uniformPrecip() { return grid == null ? uniform : 0f; }
+
     /** Thundering storms (connected wet cells), worked out once per snapshot. Empty for vanilla weather. */
     public synchronized List<Storm> storms() {
         if (storms != null) return storms;

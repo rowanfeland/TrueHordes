@@ -19,6 +19,21 @@ public final class Schedule {
     /** After the first month: a near gunshot is a 10% chance per 31 days; a car alarm 10% per 20 days. */
     public static final double NEAR_GUN_PERIOD = 31, CAR_PERIOD = 20, LATE_CHANCE = 0.10;
 
+    /**
+     * The next look after {@code day} under a frequency setting {@code freq} (1 = as designed): gaps shrink by it and
+     * a chance per period grows by it (at most certain).
+     */
+    public static Next next(Rule rule, double day, double freq, DoubleSupplier u) {
+        double f = Math.max(0.01, freq);
+        if (rule != Rule.FAR && day >= MONTH && !(rule == Rule.CAR_ALARM && day >= YEAR)) {
+            double length = rule == Rule.NEAR_GUN ? NEAR_GUN_PERIOD : CAR_PERIOD;
+            double start = Math.floor(day / length) * length + length;
+            return new Next(start + u.getAsDouble() * length, u.getAsDouble() < Math.min(1, LATE_CHANCE * f));
+        }
+        Next n = next(rule, day, u);
+        return Double.isInfinite(n.atDays()) ? n : new Next(day + (n.atDays() - day) / f, n.fires());
+    }
+
     /** The next look after {@code day} for {@code rule}; {@code u} gives uniform rolls in [0, 1). */
     public static Next next(Rule rule, double day, DoubleSupplier u) {
         switch (rule) {

@@ -161,7 +161,7 @@ final class GameEnvImpl implements GameEnv {
     @Override
     public Map<Long, Integer> realZombiesPerCell() { return PopulationBridge.realZombiesPerCell(); }
 
-    private static double sandboxDouble(String name, double fallback) {
+    static double sandboxDouble(String name, double fallback) {
         try {
             SandboxOptions.SandboxOption option = SandboxOptions.instance.getOptionByName(name);
             return option == null ? fallback : Double.parseDouble(option.asConfigOption().getValueAsString());
@@ -170,7 +170,7 @@ final class GameEnvImpl implements GameEnv {
         }
     }
 
-    private static boolean sandboxBool(String name, boolean fallback) {
+    static boolean sandboxBool(String name, boolean fallback) {
         try {
             SandboxOptions.SandboxOption option = SandboxOptions.instance.getOptionByName(name);
             return option == null ? fallback : Boolean.parseBoolean(option.asConfigOption().getValueAsString());

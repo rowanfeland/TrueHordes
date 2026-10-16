@@ -34,6 +34,11 @@ local SOUND_KINDS = {
     [6] = { 0.60, 1.00, 0.30, "helicopter" },
     [7] = { 0.80, 0.80, 1.00, "meta event" },
     [8] = { 0.55, 0.55, 1.00, "thunder" },
+    [9] = { 1.00, 0.55, 0.55, "scream" },
+    [10] = { 0.75, 0.55, 0.30, "dog" },
+    [11] = { 1.00, 0.75, 0.10, "car alarm" },
+    [12] = { 1.00, 0.20, 0.20, "A-Life fight" },
+    [13] = { 0.45, 0.45, 0.90, "storm thunder" },
 }
 local SOUND_FADE_MS = 30000 -- an ended sound fades out over 30 real seconds
 local SOUND_RINGS = 6
@@ -141,6 +146,27 @@ function Hordes_MapPanel:drawSounds(now)
     local t = self.sounds
     local edge = t and t.edge or 0.4
     local certain = t and t.certain or 0.25
+    -- Sub-project 5b: rain cells (True Weathers' regional weather) in blue, lit lights the mod knows as dots.
+    if t and t.storms then
+        local s = t.storms
+        for i = 1, (s.n or 0) * 4, 4 do
+            local half = s[i + 2] / 2
+            local ax, ay = self:worldToScreen(s[i] - half, s[i + 1] - half)
+            local bx, by = self:worldToScreen(s[i] + half, s[i + 1] + half)
+            self:drawRect(ax, ay, bx - ax, by - ay, 0.08 + 0.22 * s[i + 3], 0.2, 0.35, 1)
+        end
+    end
+    if t and t.lights then
+        local l = t.lights
+        for i = 1, (l.n or 0) * 3, 3 do
+            local lx, ly = self:worldToScreen(l[i], l[i + 1])
+            if l[i + 2] == 1 then
+                self:drawRect(lx - 1, ly - 1, 3, 3, 0.9, 1, 0.6, 0.1)
+            else
+                self:drawRect(lx - 2, ly - 2, 4, 4, 0.9, 1, 1, 0.4)
+            end
+        end
+    end
     for id, seen in pairs(self.soundSeen) do
         local fade = 1
         if seen.endedAt then fade = math.max(0, 1 - (now - seen.endedAt) / SOUND_FADE_MS) end

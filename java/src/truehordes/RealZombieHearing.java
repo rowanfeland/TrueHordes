@@ -21,6 +21,8 @@ import zombie.network.GameServer;
  */
 final class RealZombieHearing {
     private final WeakHashMap<IsoZombie, RealHearing.Memory> memory = new WeakHashMap<>();
+    /** Vanilla's thunder radius: a source-less sound this big is thunder. */
+    static final int THUNDER_RADIUS = 5000;
     private SimSettings settings;
     private RealHearing hearing;
 
@@ -47,7 +49,8 @@ final class RealZombieHearing {
         boolean otherRoom = sq != null && sq2 != null && sq.getRoom() != sq2.getRoom();
         boolean oneOutside = otherRoom && (sq.getRoom() == null || sq2.getRoom() == null);
         float level = SoundModel.levelAt(SoundModel.dbFromRadius(radius), (float) Math.sqrt(distSq))
-            - RealHearing.roomLossDb(otherRoom, oneOutside);
+            - RealHearing.roomLossDb(otherRoom, oneOutside)
+            - Hooks.WEATHER.realLossDb(sound.x, sound.y, zx, zy, sound.radius == THUNDER_RADIUS && sound.source == null);
         if (level < SoundModel.THRESHOLD_DB) return 0;
         long id = ids.idOf(sound);
         RealHearing.Memory m = memory.computeIfAbsent(zom, z -> new RealHearing.Memory());

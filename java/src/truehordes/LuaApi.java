@@ -107,6 +107,51 @@ public final class LuaApi {
      * Debug: a real game sound at (x, y) with a radius in tiles (default 1,000), made through the game's own
      * WorldSoundManager.addSound so it reaches real zombies and the off-screen model like any other sound.
      */
+    /**
+     * True Weathers compatibility (sub-project 5b): the precipitation grid to sample, {originX, originY, step, width,
+     * height} in tiles, or nil before the map is known.
+     */
+    @LuaMethod(name = "Hordes_j_weatherGrid", global = true)
+    public static KahluaTable weatherGrid() {
+        Core c = Hooks.core();
+        if (c == null) return null;
+        try {
+            int[] s = Hooks.WEATHER.spec(c.world());
+            if (s == null) return null;
+            KahluaTable t = LuaManager.platform.newTable();
+            t.rawset("originX", (double) s[0]);
+            t.rawset("originY", (double) s[1]);
+            t.rawset("step", (double) s[2]);
+            t.rawset("width", (double) s[3]);
+            t.rawset("height", (double) s[4]);
+            return t;
+        } catch (Throwable t) {
+            Log.errorOnce("lua:weatherGrid", "weather grid failed", t);
+            return null;
+        }
+    }
+
+    /** True Weathers compatibility: precipitation (0..1) of grid cell {@code i}. */
+    @LuaMethod(name = "Hordes_j_weatherSet", global = true)
+    public static void weatherSet(Object i, Object precip) {
+        try {
+            Hooks.WEATHER.set((int) LuaArgs.toFloat(i, -1), LuaArgs.toFloat(precip, 0));
+        } catch (Throwable t) {
+            Log.errorOnce("lua:weatherSet", "weather sample failed", t);
+        }
+    }
+
+    /** Project A-Life compatibility (sub-project 5b): an off-screen squad fight at (x, y) with its casualties. */
+    @LuaMethod(name = "Hordes_j_alifeFight", global = true)
+    public static void alifeFight(Object x, Object y, Object casualties) {
+        try {
+            if (!Hooks.ownsMetaEvents()) return;
+            Hooks.EVENTS.firefight(LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0), (int) LuaArgs.toFloat(casualties, 0));
+        } catch (Throwable t) {
+            Log.errorOnce("lua:alifeFight", "A-Life fight gunfire failed", t);
+        }
+    }
+
     @LuaMethod(name = "Hordes_j_sound", global = true)
     public static String sound(Object x, Object y, Object radius) {
         Core c = Hooks.core();
@@ -145,6 +190,31 @@ public final class LuaApi {
                 lines.rawset("n", (double) (l.length / 4));
                 for (int i = 0; i < l.length; i++) lines.rawset((double) (i + 1), (double) l[i]);
                 t.rawset("lines", lines);
+                // Sub-project 5b: rain (flat x, y, size, precipitation per wet cell; "rain" = vanilla's map-wide value)
+                // and the lit lights the mod knows (flat x, y, kind: 0 building or placed, 1 streetlight).
+                truehordes.sim.Weather w = sim.weather();
+                KahluaTable storms = LuaManager.platform.newTable();
+                int sk = 1;
+                for (int i = 0; i < w.cellCount(); i++) {
+                    float p = w.cellPrecip(i);
+                    if (p < 0.05f) continue;
+                    storms.rawset((double) sk++, (double) w.cellX(i));
+                    storms.rawset((double) sk++, (double) w.cellY(i));
+                    storms.rawset((double) sk++, (double) w.step());
+                    storms.rawset((double) sk++, (double) p);
+                }
+                storms.rawset("n", (double) ((sk - 1) / 4));
+                t.rawset("storms", storms);
+                t.rawset("rain", (double) w.uniformPrecip());
+                KahluaTable lights = LuaManager.platform.newTable();
+                int lk = 1;
+                for (LightLure.Light lt : Hooks.EVENTS.lights.known()) {
+                    lights.rawset((double) lk++, (double) lt.x());
+                    lights.rawset((double) lk++, (double) lt.y());
+                    lights.rawset((double) lk++, (double) lt.kind());
+                }
+                lights.rawset("n", (double) ((lk - 1) / 3));
+                t.rawset("lights", lights);
                 t.rawset("edge", sim.settings().soundEdgeChance());
                 t.rawset("certain", sim.settings().soundCertainShare());
                 return t;

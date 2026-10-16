@@ -115,6 +115,13 @@ public final class World {
         return g == null || g.blocked(Math.floorDiv(x, 8), Math.floorDiv(y, 8));
     }
 
+    /** The map's extent in tiles {minX, minY, maxX, maxY} (exclusive max), or null before the map is built. */
+    public int[] tileBounds() {
+        Grid g = grid;
+        if (g == null) return null;
+        return new int[] {g.originX * 8, g.originY * 8, (g.originX + g.width) * 8, (g.originY + g.height) * 8};
+    }
+
     /** The chunk has map data (not void, not past the map's edge). False before the map is built. */
     public boolean chunkInMap(int chunkX, int chunkY) {
         Grid g = grid;

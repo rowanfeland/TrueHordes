@@ -26,6 +26,53 @@ public final class Hooks {
         } catch (Throwable t) {
             Log.errorOnce("hook:tick:" + t.getClass().getName(), "update failed", t);
         }
+        if (c.soundSink() == null || c.state() != Core.State.RUNNING) return;
+        try {
+            if (!eventsStarted) {
+                eventsStarted = true;
+                EVENTS.readSettings();
+                WEATHER.readSettings();
+            }
+            long now = System.currentTimeMillis();
+            WEATHER.tick(c, now);
+            EVENTS.tick(c);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:events:" + t.getClass().getName(), "meta events / weather / lights failed", t);
+        }
+    }
+
+    /** Meta events, lights (sub-project 5b) and the weather the simulation hears through. */
+    static final EventDirector EVENTS = new EventDirector();
+    static final WeatherBridge WEATHER = new WeatherBridge();
+    private static boolean eventsStarted;
+
+    /** The mod runs meta events now: vanilla's gunshot schedule and random dogs and screams are skipped. */
+    static boolean ownsMetaEvents() {
+        Core c = core;
+        return c != null && c.soundSink() != null && c.state() == Core.State.RUNNING && EVENTS.metaOn;
+    }
+
+    /** Vanilla's gunshot meta event: skipped (true) while the mod runs meta events, else labelled "meta event". */
+    public static boolean metaGun() {
+        try {
+            if (ownsMetaEvents()) return true;
+        } catch (Throwable t) {
+            Log.errorOnce("hook:metagun:" + t.getClass().getName(), "meta gunshot hook failed (vanilla kept)", t);
+        }
+        SoundCapture.during = truehordes.sim.SoundEvent.META;
+        return false;
+    }
+
+    /** Vanilla's random ambient: skipped (true) while the mod runs meta events; owls and wolves are kept. */
+    public static boolean randomAmbient() {
+        try {
+            if (!ownsMetaEvents()) return false;
+            EVENTS.wildlife();
+            return true;
+        } catch (Throwable t) {
+            Log.errorOnce("hook:ambient:" + t.getClass().getName(), "random ambient hook failed (vanilla kept)", t);
+            return false;
+        }
     }
 
     private static final SoundCapture SOUNDS = new SoundCapture();
@@ -75,6 +122,7 @@ public final class Hooks {
         if (c == null) return;
         try {
             c.save();
+            if (c.state() == Core.State.RUNNING) EVENTS.save(c.stateFile());
         } catch (Throwable t) {
             Log.errorOnce("hook:save:" + t.getClass().getName(), "save failed", t);
         }
@@ -172,6 +220,13 @@ public final class Hooks {
 
     public static void onStop() {
         PopulationBridge.clearLoaded();
+        try {
+            EVENTS.stop();
+            WEATHER.clear();
+            eventsStarted = false;
+        } catch (Throwable t) {
+            Log.errorOnce("hook:stopevents:" + t.getClass().getName(), "clearing meta events failed", t);
+        }
         Core c = core;
         if (c == null) return;
         try {
