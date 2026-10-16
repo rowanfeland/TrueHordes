@@ -88,7 +88,10 @@ public final class LouisvilleScenario {
             placed++;
         }
         SimSettings settings = SimSettings.defaults().toBuilder().followChancePerHour(follow).joinChancePerHour(join)
-            .moanResponsePerHour(moan).build();
+            .moanResponsePerHour(moan)
+            .bumpFollowChance(Double.parseDouble(System.getProperty("bump", "" + SimSettings.defaults().bumpFollowChance())))
+            .crowdDriftPerHour(Double.parseDouble(System.getProperty("drift", "" + SimSettings.defaults().crowdDriftPerHour())))
+            .build();
         System.out.println("follow " + follow + "/h, join " + join + "/h, moan " + moan + "/h");
         Simulation sim = new Simulation(s, map, settings, seed, 0);
         for (truehordes.save.LoadResult.SavedHorde h : savedHordes) {

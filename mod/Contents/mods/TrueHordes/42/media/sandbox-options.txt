@@ -139,7 +139,7 @@ option TrueHordes.BumpFollowChance
 	type = double,
 	min = 0,
 	max = 1,
-	default = 1.0,
+	default = 0.03,
 	page = TrueHordes,
 	translation = TrueHordes_BumpFollowChance,
 }

@@ -56,10 +56,12 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
      * Defaults: the user's decisions (2026-10-14) and the game's defaults (Normal sight, shamblers, 1-hour days). The
      * horde rates were tuned on the real map (LouisvilleScenario, 30,000 zombies): about half of Louisville in hordes
      * after 10 days, most after a month, two city-sized hordes after 2 to 3 months. The bump-follow chance is the full
-     * chance reached on the population peak day (vanilla default day 28); it ramps up from none on day 1.
+     * chance reached on the population peak day (vanilla default day 28); it ramps up from none on day 1. Round 8
+     * (millers stay packed in their neighbourhoods): bump 3% and crowd drift 2%/h give about 65-70% of Louisville in
+     * hordes by day 7 (LouisvilleScenario, 30,000).
      */
     public static SimSettings defaults() {
-        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 1.0, 28, 0.40, 0.25, 2, 0.05, 0.1, 7);
+        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 0.03, 28, 0.40, 0.25, 2, 0.05, 0.02, 7);
     }
 
     public Builder toBuilder() { return new Builder(this); }
