@@ -155,6 +155,33 @@ public final class LuaApi {
         }
     }
 
+    /**
+     * The loudest held horde of 50 or more the player at (x, y) can hear: a table {x, y, level, size}, or nil. Polled
+     * once a second by Hordes_Moan.lua.
+     */
+    @LuaMethod(name = "Hordes_j_hordeMoan", global = true)
+    public static KahluaTable hordeMoan(Object x, Object y) {
+        Core c = Hooks.core();
+        if (c == null) return null;
+        try {
+            synchronized (c) {
+                truehordes.sim.Simulation sim = c.simulation();
+                if (sim == null) return null;
+                float[] m = sim.loudestMoanAt(LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0), 50);
+                if (m == null) return null;
+                KahluaTable t = LuaManager.platform.newTable();
+                t.rawset("x", (double) m[0]);
+                t.rawset("y", (double) m[1]);
+                t.rawset("level", (double) m[2]);
+                t.rawset("size", (double) m[3]);
+                return t;
+            }
+        } catch (Throwable t) {
+            Log.errorOnce("lua:moan:" + t.getClass().getName(), "horde moan lookup failed", t);
+            return null;
+        }
+    }
+
     /** Debug: the 20 biggest hordes. */
     @LuaMethod(name = "Hordes_j_hordes", global = true)
     public static String hordes() {

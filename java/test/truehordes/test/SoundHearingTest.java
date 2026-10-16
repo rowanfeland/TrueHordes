@@ -6,6 +6,7 @@ import truehordes.sim.Horde;
 import truehordes.sim.SimSettings;
 import truehordes.sim.Simulation;
 import truehordes.sim.SoundEvent;
+import truehordes.sim.SoundModel;
 import truehordes.store.Store;
 import truehordes.store.ZombieRecord;
 
@@ -200,5 +201,18 @@ public final class SoundHearingTest {
         sim.step(LATE + 0.1, Long.MAX_VALUE);
         Check.equal(0, sim.sounds().size(), "the gunshot is over");
         Check.equal(1, sim.soundsView().size(), "but still in the viewer's recent list");
+    }
+
+    /** The player hears the loudest held horde of 50+ whose moaning reaches them; small or far hordes are silent. */
+    public static void testPlayerHearsTheLoudestHorde() {
+        Store s = new Store();
+        Simulation sim = sim(s, 13);
+        SimulationTest.horde(sim, 1100, 1000, 0, 30);   // close but small
+        Horde big = SimulationTest.horde(sim, 1000, 1150, 0, 2000);
+        SimulationTest.horde(sim, 3000, 3000, 0, 5000); // far away
+        float[] m = sim.loudestMoanAt(1000, 1000, 50);
+        Check.isTrue(m != null && m[0] == big.x && m[1] == big.y, "the big one 150 tiles away");
+        Check.isTrue(m[2] > SoundModel.THRESHOLD_DB, "audible (" + m[2] + " dB)");
+        Check.isTrue(sim.loudestMoanAt(5000, 5000, 50) == null, "nothing audible out here");
     }
 }

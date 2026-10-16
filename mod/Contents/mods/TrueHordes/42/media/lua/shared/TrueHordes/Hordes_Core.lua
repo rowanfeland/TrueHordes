@@ -43,7 +43,14 @@ function Hordes_sound(x, y, radius)
     return call("sound", x, y, radius)
 end
 
---- Sound viewer data (see LuaApi.sounds), or nil when the Java core is not running.
+--- The loudest held horde the player can hear (see LuaApi.hordeMoan), or nil.
+function TrueHordes.hordeMoan(x, y)
+    local j = J()
+    if not j then return nil end
+    return j.hordeMoan(x, y)
+end
+
+-- Sound viewer data (see LuaApi.sounds), or nil when the Java core is not running.
 function TrueHordes.sounds()
     local j = J()
     if not j then return nil end

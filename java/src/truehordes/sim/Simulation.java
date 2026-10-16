@@ -478,6 +478,21 @@ public final class Simulation {
 
     public double currentHours() { return currentHours; }
 
+    /**
+     * The loudest walking horde of at least {@code minSize} whose moaning reaches (px, py) on the same falloff (from its
+     * circle's edge): {x, y, level dB, size}, or null. For the player hearing big hordes just outside the loaded area.
+     */
+    public float[] loudestMoanAt(float px, float py, int minSize) {
+        float[] best = null;
+        for (Horde h : hordes.all()) {
+            if (h.dormant || h.size() < minSize) continue;
+            float level = SoundModel.levelAt(h.loudnessDb(), Math.max(1f, Hearing.dist(px, py, h.x, h.y) - h.spread()));
+            if (level < SoundModel.THRESHOLD_DB || (best != null && level <= best[2])) continue;
+            best = new float[] {h.x, h.y, level, h.size()};
+        }
+        return best;
+    }
+
     private void expireSounds(double now) {
         for (int i = events.size() - 1; i >= 0; i--) {
             SoundEvent e = events.get(i);
