@@ -30,10 +30,14 @@ public final class Takeover {
     public void taken(ZombieSnapshot z) { taken(z, 0); }
 
     /** A real zombie leaving; {@code hordeId} is the horde it was laid out from (0 none). */
-    public ZombieRecord taken(ZombieSnapshot z, long hordeId) {
+    public ZombieRecord taken(ZombieSnapshot z, long hordeId) { return taken(z, hordeId, r -> {}); }
+
+    /** As {@link #taken(ZombieSnapshot, long)}; {@code init} fills in the record's state before it may rejoin a horde. */
+    public ZombieRecord taken(ZombieSnapshot z, long hordeId, java.util.function.Consumer<ZombieRecord> init) {
         ZombieRecord r = store.add(z.x(), z.y(), z.z(), z.dir(), z.outfitId(), z.stateFlags(), z.persistentId(),
             z.targetX(), z.targetY(), z.modData(), false);
         r.hordeId = hordeId;
+        init.accept(r);
         out++;
         if (hordeId != 0) rejoin.test(r);
         return r;
@@ -41,8 +45,15 @@ public final class Takeover {
 
     /** The chunk's records to make real; they leave the store. */
     public List<ZombieRecord> arrivals(int chunkX, int chunkY, IntPredicate liveIds, FloorCheck floors) {
+        return arrivals(chunkX, chunkY, liveIds, floors, r -> true);
+    }
+
+    /** As above, only for records {@code wanted} says should be real now (the rest stay held, still walking). */
+    public List<ZombieRecord> arrivals(int chunkX, int chunkY, IntPredicate liveIds, FloorCheck floors,
+                                       java.util.function.Predicate<ZombieRecord> wanted) {
         List<ZombieRecord> spawn = new ArrayList<>();
         for (ZombieRecord r : store.inChunk(chunkX, chunkY)) {
+            if (!wanted.test(r)) continue;
             if (r.persistentId != 0 && liveIds.test(r.persistentId)) {
                 store.remove(r.id);
                 duplicates++;

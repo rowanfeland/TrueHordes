@@ -39,7 +39,42 @@ public final class Hooks {
         } catch (Throwable t) {
             Log.errorOnce("hook:events:" + t.getClass().getName(), "meta events / weather / lights failed", t);
         }
+        try {
+            if (!pilotsStarted) {
+                pilotsStarted = true;
+                PILOTS.readSettings();
+                BREAK_IN.readSettings();
+            }
+            long now = System.currentTimeMillis();
+            PILOTS.tick(c, now);
+            PopulationBridge.scanSeen(c, now);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:pilots:" + t.getClass().getName(), "steering real zombies failed", t);
+        }
     }
+
+    /** Before a zombie's thump (sub-project 6 crowd break-in). */
+    public static void thumpEnter(Object target, Object thumper, int count) {
+        try {
+            BREAK_IN.enter(target, thumper, count);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:thump:" + t.getClass().getName(), "crowd break-in failed (vanilla kept)", t);
+        }
+    }
+
+    /** After a zombie's thump. */
+    public static void thumpExit(Object target, Object thumper) {
+        try {
+            BREAK_IN.exit(target, thumper);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:thumpexit:" + t.getClass().getName(), "crowd break-in failed", t);
+        }
+    }
+
+    /** Real zombies steered by the simulation's rules (sub-project 6). */
+    static final Pilots PILOTS = new Pilots();
+    static final BreakInHook BREAK_IN = new BreakInHook();
+    private static boolean pilotsStarted;
 
     /** Meta events, lights (sub-project 5b) and the weather the simulation hears through. */
     static final EventDirector EVENTS = new EventDirector();
@@ -252,6 +287,8 @@ public final class Hooks {
             EVENTS.stop();
             WEATHER.clear();
             eventsStarted = false;
+            PILOTS.clear();
+            pilotsStarted = false;
         } catch (Throwable t) {
             Log.errorOnce("hook:stopevents:" + t.getClass().getName(), "clearing meta events failed", t);
         }

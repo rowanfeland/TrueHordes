@@ -30,6 +30,9 @@ public final class HandOver {
 
     /** A horde that has been real broke up off screen: members still real re-form it when they unload. */
     public void rememberReal(Horde h) { realHordes.put(h.id, h.heading); }
+
+    /** A horde formed among real zombies (sub-project 6): its members re-form it off screen as they leave. */
+    public void rememberReal(long id, float heading) { realHordes.put(id, heading); }
     private int laidOut, rejoined;
 
     public HandOver(Simulation sim, Store store) {
@@ -64,9 +67,7 @@ public final class HandOver {
                 float side = (col - (width - 1) / 2f) * SPACING, ahead = front - row * SPACING;
                 float x = h.x + fx * ahead + sx * side, y = h.y + fy * ahead + sy * side;
                 places[i] = new float[] {x, y};
-                if (!loaded.nearChunk(Math.floorDiv((int) Math.floor(x), 8), Math.floorDiv((int) Math.floor(y), 8))) {
-                    continue;
-                }
+                if (!loaded.realAt(x, y)) continue;
                 float[] spot = floorNear(x, y, (int) Math.floor(r.z), floors);
                 if (spot == null) continue;
                 gone.add(r);
@@ -98,8 +99,7 @@ public final class HandOver {
         float oldSpread = h.spread();
         sim.internal(() -> {
             for (ZombieRecord r : new ArrayList<>(h.members)) {
-                int cx = Math.floorDiv((int) Math.floor(r.x()), 8), cy = Math.floorDiv((int) Math.floor(r.y()), 8);
-                if (!loaded.nearChunk(cx, cy)) continue;
+                if (!loaded.realAt(r.x(), r.y())) continue;
                 if (!floors.floor((int) Math.floor(r.x()), (int) Math.floor(r.y()), (int) Math.floor(r.z))) continue;
                 gone.add(r);
                 r.followId = 0;
@@ -156,14 +156,34 @@ public final class HandOver {
         return out;
     }
 
-    /** Whether any loaded chunk lies inside the horde's circle. */
+    /** Whether the horde's circle touches a loaded chunk at all (seen-scan candidates; main thread). */
+    public static boolean touchesAnyLoaded(Horde h, PlayerNearby players) {
+        float r = h.spread();
+        int x0 = Math.floorDiv((int) Math.floor(h.x - r), 8), x1 = Math.floorDiv((int) Math.floor(h.x + r), 8);
+        int y0 = Math.floorDiv((int) Math.floor(h.y - r), 8), y1 = Math.floorDiv((int) Math.floor(h.y + r), 8);
+        for (int cx = x0; cx <= x1; cx++) {
+            for (int cy = y0; cy <= y1; cy++) if (players.nearChunk(cx, cy)) return true;
+        }
+        return false;
+    }
+
+    /** Lays out every horde touching the loaded area where a player can see its places (seen scan). */
+    public List<ZombieRecord> layOutInLoaded(Takeover.FloorCheck floors) {
+        List<Horde> touching = new ArrayList<>();
+        for (Horde h : sim.hordes().all()) if (touchesAnyLoaded(h, sim.players())) touching.add(h);
+        List<ZombieRecord> out = new ArrayList<>();
+        for (Horde h : touching) out.addAll(layOut(h, floors));
+        return out;
+    }
+
+    /** Whether any real chunk lies inside the horde's circle. */
     public static boolean touchesLoaded(Horde h, PlayerNearby players) {
         float r = h.spread();
         int x0 = Math.floorDiv((int) Math.floor(h.x - r), 8), x1 = Math.floorDiv((int) Math.floor(h.x + r), 8);
         int y0 = Math.floorDiv((int) Math.floor(h.y - r), 8), y1 = Math.floorDiv((int) Math.floor(h.y + r), 8);
         for (int cx = x0; cx <= x1; cx++) {
             for (int cy = y0; cy <= y1; cy++) {
-                if (!players.nearChunk(cx, cy)) continue;
+                if (!players.realChunk(cx, cy)) continue;
                 float nx = Math.max(cx * 8f, Math.min(h.x, cx * 8f + 8)), ny = Math.max(cy * 8f, Math.min(h.y, cy * 8f + 8));
                 float dx = h.x - nx, dy = h.y - ny;
                 if (dx * dx + dy * dy <= r * r) return true;

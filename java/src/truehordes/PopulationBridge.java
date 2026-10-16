@@ -129,7 +129,8 @@ final class PopulationBridge {
 
     /** Makes the chunk's held records real (caller holds the core's lock). */
     private static void spawnChunk(Core c, int chunkX, int chunkY) {
-        List<ZombieRecord> spawn = c.takeover().arrivals(chunkX, chunkY, PopulationBridge::live, Spawner::floorAt);
+        List<ZombieRecord> spawn = c.takeover().arrivals(chunkX, chunkY, PopulationBridge::live, Spawner::floorAt,
+            r -> realAt(r.x(), r.y(), r.z));
         for (ZombieRecord r : spawn) {
             try {
                 if (Spawner.spawn(r) == Spawner.Result.REFUSED) c.takeover().refused(r);
@@ -163,13 +164,75 @@ final class PopulationBridge {
         } catch (Throwable t) {
             Log.errorOnce("bridge:moddata", "could not save a zombie's mod data (zombie kept without it)", t);
         }
+        truehordes.real.Pilot p = Hooks.PILOTS.existing(z);
         Long horde = spawnedFromHorde.remove(z);
+        long hordeId = p != null ? p.hordeId : horde == null ? 0 : horde;
+        double now = Pilots.nowHours();
         c.takeover().taken(new ZombieSnapshot(z.getX(), z.getY(), z.getZ(), (byte) z.getForwardIsoDirection().ordinal(),
             z.getPersistentOutfitID(), ZombieStateFlags.intFromZombie(z), z.persistentId,
             withTarget ? z.getPathTargetX() : ZombieRecord.NO_TARGET, withTarget ? z.getPathTargetY() : ZombieRecord.NO_TARGET,
-            modData), horde == null ? 0 : horde);
+            modData), hordeId, r -> { if (p != null) Pilots.carry(p, r, now); });
         z.removeFromWorld();
         z.removeFromSquare();
+    }
+
+    /**
+     * A real zombie far from every player and out of sight goes back to the simulation where it stands, still walking
+     * (sub-project 6 spec goal 6). Returns true when taken.
+     */
+    static boolean sendBack(Core c, IsoZombie z, truehordes.real.Pilot p) {
+        if (c == null || z == null || z.isReanimatedPlayer() || !c.ownsPopulation()) return false;
+        try {
+            synchronized (c) {
+                ZombiePopulationManager.saveLock.lock();
+                try {
+                    take(c, z, false);
+                } finally {
+                    ZombiePopulationManager.saveLock.unlock();
+                }
+            }
+            return true;
+        } catch (Throwable t) {
+            Log.errorOnce("bridge:sendback:" + t.getClass().getName(), "sending a real zombie back failed", t);
+            return false;
+        }
+    }
+
+    /**
+     * Where a held zombie should be real right now (main thread): in a loaded chunk and within the real radius of a
+     * player, or where a local player can see it. With the radius 0, anywhere loaded.
+     */
+    static boolean realAt(float x, float y, float z) {
+        int cx = Math.floorDiv((int) Math.floor(x), 8), cy = Math.floorDiv((int) Math.floor(y), 8);
+        if (!loaded.contains(key(cx, cy))) return false;
+        truehordes.real.RealZone zone = Hooks.PILOTS.zone;
+        return !zone.on() || zone.near(x, y, 0.5f) || Pilots.seen(x, y, z);
+    }
+
+    private static long lastSeenScanMs;
+
+    /**
+     * Held zombies in the loaded area beyond the real radius that a player can now see become real (main thread, twice
+     * a second): wanderers in loaded chunks, and hordes touching the loaded area.
+     */
+    static void scanSeen(Core c, long nowMs) {
+        if (c == null || !c.ownsPopulation() || !Hooks.PILOTS.zone.on() || nowMs - lastSeenScanMs < 500) return;
+        lastSeenScanMs = nowMs;
+        List<Long> chunks = new ArrayList<>();
+        synchronized (c) {
+            for (long k : loaded) {
+                int cx = (int) (k >> 32), cy = (int) k;
+                if (Hooks.PILOTS.zone.chunkInside(cx, cy)) continue;
+                for (ZombieRecord r : c.store().inChunk(cx, cy)) {
+                    if (realAt(r.x(), r.y(), r.z)) {
+                        chunks.add(k);
+                        break;
+                    }
+                }
+            }
+            for (long k : c.layOutHordesInLoaded(Spawner::floorAt)) if (loaded.contains(k) && !chunks.contains(k)) chunks.add(k);
+            for (long k : chunks) spawnChunk(c, (int) (k >> 32), (int) k);
+        }
     }
 
     private static void markLoaded(int cx, int cy) {
@@ -194,6 +257,13 @@ final class PopulationBridge {
             @Override public boolean nearCell(int cellX, int cellY) { return loadedPerCell.containsKey(key(cellX, cellY)); }
 
             @Override public boolean nearChunk(int chunkX, int chunkY) { return loaded.contains(key(chunkX, chunkY)); }
+
+            @Override public boolean realChunk(int chunkX, int chunkY) {
+                truehordes.real.RealZone zone = Hooks.PILOTS.zone;
+                return loaded.contains(key(chunkX, chunkY)) && (!zone.on() || zone.chunkInside(chunkX, chunkY));
+            }
+
+            @Override public boolean realAt(float x, float y) { return PopulationBridge.realAt(x, y, 0); }
         };
     }
 

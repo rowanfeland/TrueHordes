@@ -41,6 +41,12 @@ public final class HookTargets {
     /** Vanilla's random dogs, screams, owls and wolves (sub-project 5b: the mod plays these). */
     public static final String RANDOM_AMBIENT = "addRandomAmbient";
     /** Lightning strikes (vanilla storms and True Weathers): a strike is also a sound inside the storm (5b). */
+    /** Crowd-scaled break-in (sub-project 6): a zombie's thump on each kind of thumpable object. */
+    public static final String DOOR = "zombie.iso.objects.IsoDoor";
+    public static final String WINDOW = "zombie.iso.objects.IsoWindow";
+    public static final String THUMPABLE = "zombie.iso.objects.IsoThumpable";
+    public static final String BARRICADE = "zombie.iso.objects.IsoBarricade";
+    public static final String THUMP = "Thump";
     public static final String THUNDERSTORM = "zombie.iso.weather.ThunderStorm";
     public static final String TRIGGER_THUNDER = "triggerThunderEvent";
     public static final String RALLY = "update";
@@ -73,6 +79,10 @@ public final class HookTargets {
         {AMBIENT_STREAM, THUNDER_EVENT},
         {AMBIENT_STREAM, RANDOM_AMBIENT},
         {THUNDERSTORM, TRIGGER_THUNDER},
+        {DOOR, THUMP},
+        {WINDOW, THUMP},
+        {THUMPABLE, THUMP},
+        {BARRICADE, THUMP},
         {AMBIENT_SOUND, GUN_EVENT},
         {AMBIENT_SOUND, THUNDER_EVENT},
     };

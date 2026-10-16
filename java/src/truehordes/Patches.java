@@ -159,6 +159,54 @@ public final class Patches {
         public static void exit() { Hooks.soundsDuring(0); }
     }
 
+    /** Crowd-scaled break-in (sub-project 6): a zombie's thump on a door. */
+    @Patch(className = HookTargets.DOOR, methodName = HookTargets.THUMP)
+    public static class DoorThump {
+        @Patch.OnEnter
+        public static void enter(@Patch.This Object self, @Patch.Argument(0) Object thumper, @Patch.Argument(1) int count) {
+            Hooks.thumpEnter(self, thumper, count);
+        }
+
+        @Patch.OnExit
+        public static void exit(@Patch.This Object self, @Patch.Argument(0) Object thumper) { Hooks.thumpExit(self, thumper); }
+    }
+
+    /** Crowd-scaled break-in: a window. */
+    @Patch(className = HookTargets.WINDOW, methodName = HookTargets.THUMP)
+    public static class WindowThump {
+        @Patch.OnEnter
+        public static void enter(@Patch.This Object self, @Patch.Argument(0) Object thumper, @Patch.Argument(1) int count) {
+            Hooks.thumpEnter(self, thumper, count);
+        }
+
+        @Patch.OnExit
+        public static void exit(@Patch.This Object self, @Patch.Argument(0) Object thumper) { Hooks.thumpExit(self, thumper); }
+    }
+
+    /** Crowd-scaled break-in: player-built walls, doors and fences. */
+    @Patch(className = HookTargets.THUMPABLE, methodName = HookTargets.THUMP)
+    public static class ThumpableThump {
+        @Patch.OnEnter
+        public static void enter(@Patch.This Object self, @Patch.Argument(0) Object thumper, @Patch.Argument(1) int count) {
+            Hooks.thumpEnter(self, thumper, count);
+        }
+
+        @Patch.OnExit
+        public static void exit(@Patch.This Object self, @Patch.Argument(0) Object thumper) { Hooks.thumpExit(self, thumper); }
+    }
+
+    /** Crowd-scaled break-in: barricades. */
+    @Patch(className = HookTargets.BARRICADE, methodName = HookTargets.THUMP)
+    public static class BarricadeThump {
+        @Patch.OnEnter
+        public static void enter(@Patch.This Object self, @Patch.Argument(0) Object thumper, @Patch.Argument(1) int count) {
+            Hooks.thumpEnter(self, thumper, count);
+        }
+
+        @Patch.OnExit
+        public static void exit(@Patch.This Object self, @Patch.Argument(0) Object thumper) { Hooks.thumpExit(self, thumper); }
+    }
+
     /** A lightning strike: a sound zombies inside the storm hear too (sub-project 5b). */
     @Patch(className = HookTargets.THUNDERSTORM, methodName = HookTargets.TRIGGER_THUNDER)
     public static class LightningStrike {

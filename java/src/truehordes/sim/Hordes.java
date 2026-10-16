@@ -101,6 +101,9 @@ public final class Hordes {
 
     public long nextId() { return nextId; }
 
+    /** An id for a horde formed among real zombies (sub-project 6): never used by another horde. */
+    public long reserveId() { return nextId++; }
+
     public void setNextId(long n) { nextId = Math.max(nextId, n); }
 
     public void clear() {

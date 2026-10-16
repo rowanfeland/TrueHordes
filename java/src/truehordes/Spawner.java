@@ -79,6 +79,7 @@ final class Spawner {
         IsoZombie z = list.get(list.size() - 1);
         ModDataCodec.load(z, r.modData);
         PopulationBridge.rememberHorde(z, r.hordeId);
+        Hooks.PILOTS.adopt(z, r);
         return Result.SPAWNED;
     }
 

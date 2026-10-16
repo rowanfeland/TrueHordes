@@ -29,6 +29,7 @@ public final class TestRunner {
         LockdownTest.class,
         EventsTest.class,
         WeatherLightsTest.class,
+        BridgeTest.class,
         EncountersTest.class,
         SimulationTest.class,
         SimSpeedTest.class,

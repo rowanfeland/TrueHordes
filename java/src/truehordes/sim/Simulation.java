@@ -328,7 +328,7 @@ public final class Simulation {
     }
 
     /** A lured zombie heads for the light as for a quiet sound: any sound 6 dB louder than this takes it away. */
-    static final float LURE_DB = 36f;
+    public static final float LURE_DB = 36f;
 
     /** Every lit light: walkers and hordes in reach that have not rolled for it roll once (once per in-game minute). */
     private void lureAll() {
@@ -622,7 +622,7 @@ public final class Simulation {
     }
 
     /** A milling zombie wanders within about this many tiles of home (round 8, user: 150). */
-    static final float HOME_RADIUS = 150f;
+    public static final float HOME_RADIUS = 150f;
 
     /** Whether lone zombie {@code id} is a traveller (stable per zombie, so nothing is saved). */
     public static boolean traveller(long id, double share) {
@@ -812,7 +812,7 @@ public final class Simulation {
         double dt = elapsedMinutes(r.simHours, now, LevelOfDetail.FAR_MINUTES);
         r.simHours = now;
         r.dueMinute = Long.MIN_VALUE;
-        if (players.nearChunk(r.chunkX(), r.chunkY())) {
+        if (players.realChunk(r.chunkX(), r.chunkY())) {
             // Still held inside the loaded area (the spawn did not take): ask the main thread to try again.
             arrivals.add(SpatialGrid.key(r.chunkX(), r.chunkY()));
             schedule(r, currentMinute + LevelOfDetail.EDGE_MINUTES);
@@ -900,7 +900,7 @@ public final class Simulation {
                     ? movement.advanceHome(r.x(), r.y(), r.heading, (float) dt, r.id, crawler, r.homeX, r.homeY,
                         HOME_RADIUS, random)
                     : movement.advance(r.x(), r.y(), r.heading, (float) dt, 1, r.id, crawler, px, py, pw, random);
-                if (players.nearChunk(chunk(st.x()), chunk(st.y()))) {
+                if (players.realChunk(chunk(st.x()), chunk(st.y()))) {
                     // Into the loaded area (round 8): the main thread makes it real there (or keeps it held at the
                     // spot if the game refuses).
                     store.moved(r, st.x(), st.y());
@@ -1028,14 +1028,14 @@ public final class Simulation {
     private boolean trail(ZombieRecord r, ZombieRecord t, double dt) {
         float gx = (float) (t.x() - Math.cos(t.heading) * TRAIL_GAP), gy = (float) (t.y() - Math.sin(t.heading) * TRAIL_GAP);
         int gcx = chunk(gx), gcy = chunk(gy);
-        if (movement.map().rank(gcx, gcy) == 0 || players.nearChunk(gcx, gcy)) return false;
+        if (movement.map().rank(gcx, gcy) == 0 || players.realChunk(gcx, gcy)) return false;
         float d = Hearing.dist(r.x(), r.y(), gx, gy);
         float reach = movement.speedTilesPerGameMinute(1, s.speedSetting(), r.id, (r.stateFlags & 2) != 0) * (float) dt;
         if (d > reach) {
             float f = reach / d;
             gx = r.x() + (gx - r.x()) * f;
             gy = r.y() + (gy - r.y()) * f;
-            if (movement.map().rank(chunk(gx), chunk(gy)) == 0 || players.nearChunk(chunk(gx), chunk(gy))) return false;
+            if (movement.map().rank(chunk(gx), chunk(gy)) == 0 || players.realChunk(chunk(gx), chunk(gy))) return false;
         }
         store.moved(r, gx, gy);
         r.heading = t.heading;

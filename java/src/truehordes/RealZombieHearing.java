@@ -58,6 +58,7 @@ final class RealZombieHearing {
         if (heard == null) {
             heard = hearing(s).rollHeard(level, ThreadLocalRandom.current().nextDouble());
             m.put(id, heard);
+            if (heard && zom != null) Hooks.PILOTS.heard(zom, sound.x, sound.y, level);
         }
         return heard ? RealHearing.score(level) : 0;
     }

@@ -124,20 +124,28 @@ final class LightLure {
             if (z == null || z.isDead() || z.getTarget() != null) continue;
             Light held = captured.get(z);
             if (held != null) {
-                if (Math.hypot(z.getX() - held.x(), z.getY() - held.y()) > 6) z.pathToSound((int) held.x(),
-                    (int) held.y(), held.z());
+                if (Math.hypot(z.getX() - held.x(), z.getY() - held.y()) > 6) Hooks.PILOTS.lure(z, held.x(),
+                    held.y(), held.z(), untilMorning());
                 continue;
             }
             for (Light l : ls) {
                 float dx = z.getX() - l.x(), dy = z.getY() - l.y(), d2 = dx * dx + dy * dy;
                 boolean st = l.kind() == STREET;
                 if (d2 > (st ? s2 : r2) || !roll(z, l.key(), st ? streetChance : buildingChance)) continue;
-                z.pathToSound((int) l.x(), (int) l.y(), l.z());
+                Hooks.PILOTS.lure(z, l.x(), l.y(), l.z(),
+                    st ? untilMorning() : GameTime.getInstance().getWorldAgeHours() + BUILDING_HOLD_HOURS);
                 if (st) captured.put(z, l);
                 break;
             }
         }
         flashlights(cell);
+    }
+
+    /** The world hour of the next dawn (streetlights hold zombies until then). */
+    static double untilMorning() {
+        GameTime g = GameTime.getInstance();
+        int hour = g.getHour();
+        return g.getWorldAgeHours() + ((DAWN - hour + 24) % 24) - g.getMinutes() / 60.0;
     }
 
     private void flashlights(IsoCell cell) {
@@ -154,7 +162,9 @@ final class LightLure {
                 float dx = z.getX() - p.getX(), dy = z.getY() - p.getY();
                 float d = (float) Math.sqrt(dx * dx + dy * dy);
                 if (d < 1 || d > dist || (dx * look.x + dy * look.y) / d < dot) continue;
-                if (roll(z, id, flashChance)) z.pathToSound((int) p.getX(), (int) p.getY(), (int) p.getZ());
+                if (roll(z, id, flashChance)) {
+                    Hooks.PILOTS.lure(z, p.getX(), p.getY(), (int) p.getZ(), GameTime.getInstance().getWorldAgeHours() + 0.5);
+                }
             }
         }
     }

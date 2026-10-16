@@ -237,6 +237,16 @@ public final class Core {
         return chunks;
     }
 
+    /** Lays out held hordes touching the loaded area wherever a player can see their places; returns their chunks. */
+    public synchronized java.util.Set<Long> layOutHordesInLoaded(truehordes.population.Takeover.FloorCheck floors) {
+        java.util.Set<Long> chunks = new java.util.HashSet<>();
+        if (sim == null || state != State.RUNNING) return chunks;
+        for (ZombieRecord r : sim.handOver().layOutInLoaded(floors)) {
+            chunks.add(((long) r.chunkX() << 32) | (r.chunkY() & 0xFFFFFFFFL));
+        }
+        return chunks;
+    }
+
     /** Writes the mod's state; called from the game's save. Returns true if a file was written. */
     public synchronized boolean save() {
         if (!submitSave()) return false;
