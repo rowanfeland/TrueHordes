@@ -106,6 +106,7 @@ merging, never from a director or a script:
 | D17 | **Zombies cross the real/simulated boundary by wandering, both ways.** A real zombie near a player can wander out of the loaded area on its own and become simulated, carrying on its way off-screen; a simulated zombie or horde can wander into the loaded area and become real. Crossing is not only caused by the player moving: the population flows in and out around the player continuously, so the edge of the loaded area is never a wall or a spawn line. | 2026-10-13 |
 | D18 | **Built for the "Urban focused" zombie distribution** (the sandbox default): hordes form in towns, then leave them or wander around them. "Uniform" is supported as an afterthought only (its mapping is read from the DLL, not tuned or tested). | 2026-10-13 |
 | D19 | **Hordes form anywhere there are enough zombies, then leave or roam by their own wandering, never by a director.** A horde forms wherever enough zombies come together (D3; the minimum size, about 10 or maybe 5, is part of Q1). The most populated places, the towns, produce the biggest hordes. Every horde follows the same joining and wandering rules: **only through its own wandering and pathfinding** it either leaves along highways, roads and trails (and may meet and join a bigger horde out there) or keeps roaming the area it is in, mostly through its own pathfinding, meeting other hordes there and merging with them. Nothing sends a horde anywhere (D5). See the stated goals in section 1 and Q8. | 2026-10-13 |
+| D20 | **Every zombie hears with energy falloff (replaces D8 and D9).** Real and held zombies alike: a chance to hear that fades with the sound's energy (100% in the inner quarter, 40% at the edge); hordes drown themselves out by size and send a share, the whole horde if half or more hear; one roll per sound; no distance cap. See section 5. | 2026-10-16 |
 
 ---
 
@@ -199,30 +200,121 @@ See section 5.
 
 ---
 
-## 5. Sound model (D7–D11)
+## 5. Sound model (D7, D10, D11; D8/D9 replaced by D20, 2026-10-16)
 
-The mod replaces "everything inside a radius reacts the same" with **loudness that fades with distance**.
+The mod replaces "everything inside a radius reacts the same" with **loudness that fades with distance**, for every
+sound in the game and **every zombie**, real ones near players and held ones off screen (Q4, decided 2026-10-16).
 
-- **Every source has a loudness** at the source: gunshots by weapon, vehicles, alarms, generators, helicopters,
-  thunder, explosions, shouting, and so on. Sources are captured from the game:
-  - world sounds through the game's sound event (`OnWorldSound` on every machine, and on the server for all player
-    sounds) or a Java hook on `WorldSoundManager.addSound`;
-  - the helicopter (it already adds a 500-radius world sound from its position, `Helicopter.java:208`);
-  - thunder, which makes no world sound (`OnThunderEvent` in single player; a Java hook on the server).
-- **Falloff like real life.** Perceived loudness drops with distance (for example by a fixed amount per doubling of
-  distance), with extra loss through buildings and terrain if wanted. A zombie hears a sound if its perceived loudness
-  is above a hearing threshold. **Reach** = the distance where it falls below that threshold. So a gunshot reaches
-  about a town, a helicopter or a storm the whole map.
-- **Who reacts and how much:**
-  - individuals react whenever they can hear it (D9);
-  - hordes send a share of themselves that grows with the perceived loudness: part of the horde near the edge of
-    reach, all of it above a threshold (D8);
-  - a horde or wanderer already following a sound switches only for a clearly louder one (rule to tune).
-- **After arriving**, the simulation manager has them settle, mill about, or wander on (D7).
-- **Mapping from the game's radius:** the game expresses sounds as a radius (Louder Gunshots multiplies it, the
-  Hearing setting scales it). The model converts radius into source loudness so modded and modified sounds work
-  without a list. The conversion and per-source overrides are tuning.
-- **Real zombies near players:** whether they keep vanilla hearing or use the same model is open (Q4).
+- **Loudness from the game's circle.** Every sound arrives with a radius in tiles (already enlarged by Louder Gunshots
+  and scaled by the Hearing setting) and becomes a source loudness `dB = 30 + 20·log10(radius)`. The circle's edge is
+  where the sound fades to the 30 dB hearing threshold, so reach in tiles is unchanged and vanilla, modded and Louder
+  Gunshots radii all work without a list.
+- **Energy fades like real sound:** `level = dB − 20·log10(distance)` (6 dB lost per doubling of distance).
+- **Lone zombies:** the chance to hear is 100% inside the inner quarter of the circle (12 dB above the threshold),
+  fading with the energy to a **floor of 40% at the edge**, 0 outside. Inner quarter and edge floor are sandbox options.
+- **Hordes drown themselves out.** A horde's share = the lone chance × the part of the horde not drowned out by its
+  own moaning: half for 1,000 zombies, more for smaller hordes, less for bigger ones (`1 − 0.25·log10(n/10)`, clamped
+  to 0.25..1); it rises to the whole horde as the sound gets louder than the moaning (full at 20 dB above the
+  threshold). Drown-out strength is tuning.
+- **Hive mind:** if half or more of a horde hears a sound, the whole horde goes. Below half, the share that heard it
+  breaks off from the horde's edge on the side facing the sound: 10 or more become a new horde heading there, fewer
+  become single zombies heading there; the rest carry on.
+- **One roll per sound.** Every discrete sound (each gunshot) is its own roll, so a firefight chips at a horde shot by
+  shot and the shrinking horde gets easier to pull (it drowns itself out less) until the hive mind sends the rest.
+  A sound the game re-sends every tick (alarm, generator) is one ongoing sound. Walkers already heading for a spot do
+  not split again for more sounds from that spot; each one refreshes their 6-hour investigate time.
+- **Switching:** a walker heading for one sound switches only for one at least 6 dB louder where it stands (tuning).
+  Horde moaning stays the lowest priority (sub-project 4).
+- **No distance cap.** The only limit is the sound's own energy: wherever it is above the threshold, zombies hear it
+  and can follow it all the way. Vanilla's `FollowSoundDistance` only affects the native off-screen zombies the mod
+  replaces.
+- **Arriving:** unchanged from sub-project 4 (mill about, investigate the spot for 6 hours, 10+ gathered = a horde).
+
+Same 850-tile gunshot (share that goes, hive mind applied):
+
+| Distance | Lone zombie | Horde of 100 | Horde of 1,000 | Horde of 10,000 |
+|---|---|---|---|---|
+| 50 | 100% | 100% | 100% | 100% (93% hear, rest follow) |
+| 100 | 100% | 100% | 100% | 100% (~85% hear) |
+| 213 | 100% | 100% | 100% | 100% (~70% hear) |
+| 425 | 70% | 100% (58% hear) | 46% | 33% |
+| 640 | 52% | 40% | 29% | 17% |
+| 800 | 43% | 33% | 22% | 12% |
+| 850+ | 0% | 0% | 0% | 0% |
+
+- **Capture (5a):** one Java patch on `WorldSoundManager.addSound` records every world sound (position, radius as
+  scaled by the Hearing setting, repeating or not, a best-guess kind for the viewer from the source: gun-holding player
+  or NPC = gunfire, vehicle, appliance, other); sounds made by zombies are skipped as vanilla skips them. Sounds go
+  through a lock-free queue to the simulation thread. A new sound is rolled at once for every held wanderer and horde
+  inside its circle (spatial grid), not at their next scheduled update. Sounds re-sent every tick (alarms, generators)
+  fold into one ongoing sound per source and spot that ends a few seconds after the game stops re-sending it; walkers
+  entering its circle roll once when they first come into range.
+- **Real zombies near players (5a):** patched where a real zombie scores sounds (`WorldSoundManager.getSoundAttract`
+  for its current sound, `getBiggestSoundZomb` for the biggest where it stands); vanilla keeps the reaction delay, the
+  scatter around the spot, pathing and dropping a thump target. Score = level at the zombie (`dB − 20·log10(distance)`,
+  vanilla's room penalties kept as about −1 dB for another room and −2.3 dB inside to outside); the lone-zombie chance
+  is rolled once per zombie per sound and remembered (weak map per zombie; repeating sounds are one sound); a heard
+  sound scores `10^(level/20)` so vanilla's own "twice as strong" switch rule (`soundAttract * 2 < attract`) is the
+  6 dB rule; a sound not heard is skipped. The capture patch tags every sound with its own id (the game pools and
+  reuses sound objects). Real zombies use the lone rule; horde identity on screen (drowning, hive mind) comes with
+  sub-project 6. Every sound is captured for the off-screen model by one patch on `WorldSoundManager.addSound`.
+- **Sound viewer (5a):** a toggle layer on the hordes map: each active or recent sound drawn as its reach, shaded by
+  the same energy curve (the shade is the chance of being heard), coloured by kind, fading over about 30 real seconds
+  after it ends; thin lines from hordes heading to a sound; a list panel of recent sounds (kind, radius, wanderers and
+  hordes that responded, zombies split off, age), click to centre the map. Data from a new `Hordes_sounds()` call.
+- **Hearing big hordes (5a):** a held horde just outside the loaded area plays distant moaning from its direction,
+  louder with size and closeness on the same energy falloff, silent when too quiet, stopping when it becomes real.
+  Uses the game's own zombie sound files; volume and starting size are tuning.
+- **Round 8, walkers and herds (2026-10-16, after the first 5a test):** 95% of lone zombies are millers (wander
+  within about 150 tiles of home, a soft pull; a sound or being left behind moves home), 5% travellers
+  (`TravellerShare`) walk the roads; millers drift towards nearby groups (fall in behind the one nearest a cluster's
+  middle, or head for a horde within 40 tiles); towns (64-tile blocks with 12+ building chunks around) hold their
+  hordes until each horde's hunger day (`LockdownDays` for 500 zombies, bigger sooner, smaller later, +-20%); held
+  zombies and hordes walk into the loaded area and become real; the map's edge turns waves back; helicopter, meta
+  events and thunder are labelled. Tuned: bump-follow peak 3%, crowd drift 2%/h: Louisville about 69% in hordes on
+  day 7. Spec: `docs/superpowers/specs/2026-10-16-sp5a-round8-walkers-and-herds-design.md`. Goals noted by the user
+  for later: a map-wide run to check towns are not empty for too long (emptying is fine if emergent), and a rare
+  emergent Louisville mega-horde circling inside the city ("Dead City").
+- **Sub-project 5 is split:** 5a sound core (model, capture of every game sound incl. Louder Gunshots and A-Life
+  gunfire, real and held zombies, the sound viewer on the hordes map, the player hearing big hordes just outside the
+  loaded area); 5b events (random meta events far away and near the player, custom events, A-Life off-screen fights if
+  A-Life offers a clean hook, thunder and weather, environment sounds, lights as a lure). Far meta events land in
+  towns and on roads (some rural-only); a lone-survivor gunshot event can land anywhere.
+- **5b far meta events (user, 2026-10-16; "be quiet or else"):** replace vanilla's gun-event schedule. Month 1: one
+  every 1-3 in-game days (gap leaning to 3 as the month ends); months 1-12 the gap stretches to about 31 days; after
+  that about monthly (Claude's call); the day is random. A-Life NPC noise and its events do not count. Kinds: vanilla's
+  set as data (the user may add sound files later): gunshots (vanilla picks 6 files: assault rifle, 3 pistols, shotgun
+  x2; a burst file becomes several shots, each a separate 5a roll), screams and dog barks (attract, quieter: Claude's
+  call radius 60 and 80), owls and wolf howls ambience only. Gunshot loudness 1:1 with the user's Louder Gunshots mod:
+  a rifle (radius 200) x its `LouderGunshots.Multiplier` when on, vanilla's when off. Same falloff as every sound. The
+  player hears direction and distance (500 tiles faint, 50-100 loud) in iso and Viewpoint. Placement: towns and roads,
+  rural-only kinds in the countryside, a lone gunshot anywhere. Feel: "oh shit, I might have to hide" as streets fill.
+- **5b near events (user, 2026-10-16; "dread from noise": get out, hide in base, or fight):** 50-100 tiles from the
+  player, own schedules, can overlap far events. Car alarm: a real parked car's alarm goes off (the player turns it off
+  or lets the battery drain); every 2-3 days in month 1, then a 10% chance every 20 days, none after month 12; kept
+  sounding while unloaded, battery drained by the elapsed time on reload (Claude's call). Near gunshot (a soon-dead
+  survivor): its own event on the far gunshots' schedule (1-3 days in month 1, then a 10% chance per 31 days).
+- **5b custom events:** undecided; the event system is built as data (kind, sound files, radius, burst, placement,
+  schedule) so custom events slot in later.
+- **5b A-Life (Project A-Life NPCs, workshop 3803984183):** its on-screen gunfire and its meta, raid and heli events
+  already call `addSound` (captured by 5a). Off-screen squad fights (`ProjectALife.OfflineCombat.apply(outcome, hours)`)
+  are silent: a compatibility layer (its own Lua file; runs only if A-Life and that function exist; wrapped in pcall;
+  logs once and does nothing if A-Life changes) wraps it and fires a burst of gunshots at the fight's spot, sized by
+  the fight (fighters and casualties), each shot its own 5a roll. Their code is not copied.
+- **5b weather (user, 2026-10-16):** a storm dampens hearing inside it, by rain or storm strength (a gunfight in a heavy
+  thunderstorm draws far fewer zombies than on a clear day). Thunder is heard by the player and by zombies; inside the
+  storm zombies do not react to it, outside it they do (lone zombies: the 5a lone roll, so some not all; a horde rolls
+  once to turn towards it, Claude's call). Storms away from the player also thunder (rate by storm strength, Claude's
+  call), so weather moves zombies. Fog does nothing. Where storms are comes from True Weathers - Gameplay
+  (`ViewpointTrueWeathersGameplay`, regional storms) through its own compatibility layer: reflection on
+  `vtwg.Api.precipAt(x, y)` / `regional()`, fail-safe like A-Life's. Without it the whole map is inside vanilla's
+  weather. Real zombies: True Weathers already muffles their hearing (rain, and ~3.5 s after nearby thunder), so ours
+  applies only when it is off (no double muffling).
+- **5b environment and lights (user, 2026-10-16):** vanilla thumping/breaking, generators, alarms and fires already make
+  world sounds (5a captures them). Lights lure only at night and only when lit after the shutoff (generator power): one
+  roll per light per lone zombie or per horde (go or wander past): flashlight beam on a zombie 10%, building and
+  player-placed lights 25%, generator streetlights 1% (stays until morning). Spec:
+  `docs/superpowers/specs/2026-10-16-sp5b-events-design.md`.
 
 ---
 
@@ -332,6 +424,21 @@ Each sub-project's design starts by re-reading this document and the relevant re
 | 4 | **Built on branch `sp4-simulation-core` (2026-10-14); in-game acceptance pending** | Held zombies wander on a background thread (2 ms slices; edge every in-game minute, near 5, far 30); hordes form from follow chains and sounds, merge by touch, follow louder hordes' moaning, shed members in tight spots, dissolve below 5; stragglers 1 in 75; rally groups off; hordes laid out as columns where they meet the loaded area; save format 3 written off the main thread for hot saves; growth now adds only the start-to-peak curve's rise. Spec and plan: `docs/superpowers/*/2026-10-14-sp4-simulation-core*`. Acceptance: `docs/TESTING.md` sub-project 4 rows. Tuned after the first in-game test (2026-10-14): followers walk right behind their leader; leaving a road needs a 15% roll, taking a trail 30%; joining a horde in sight and noticing moaning take a chance per hour (user decision A: 5% and 1%); follow 1% per hour; tuned on the real map with `LouisvilleScenario` (two city-sized hordes after 2 to 3 months). Save encode is one sized buffer. Second in-game test (2026-10-15): fast-forward put the simulation hours behind (fixed: each update simulates at most an hour, the thread catches up with 1 ms pauses, `Hordes_stats` shows the lag); zombies keep heading to a sound's spot for 6 h after it ends. User design: idle building zombies wait per chunk as dormant **building hordes** until a sound or a louder horde's moaning sets them loose (10+ come out as a horde); 1 in 10 are **building stragglers** that stay inside (option `BuildingStragglerOneIn`); save format 4. Third in-game test (2026-10-15): wandering redone as **travel** (straight down roads and trails, follow bends, side roads at real junctions, dead ends turn back, occasional straight cross-country legs to the next road, turn only when blocked), no random pauses, touching a horde joins at once, bumping into a walker 50% falls in behind (option `BumpFollowChance`). Fourth in-game test (2026-10-15, user design "waves don't turn around"): a road two or more chunks wide (highway, main road) is one road: its lanes are never side roads, walkers on it never wander off across country and take a road leaving it only 2% of the time; town junctions stay 30%; bends are followed but never back the way the walker came; where a road ends the walker carries straight on across country; decisions are made once per chunk entered, not re-rolled every update; a diagonal that clips a blocked corner steps round it. Bump-follow ramps up with the days: none on day 1 (pure chaos), 1-2% on day 2, 25% by day 7, 50% by day 14, the full `BumpFollowChance` (now default 100%) on the population peak day. User option "both": sight-follow, joining a horde in sight and noticing moaning ride the same ramp, and a bump is one roll when two zombies first touch (not one per update). Offline Louisville (30,000): days 1-2 no hordes, day 3 33% in hordes, day 7 89%, day 30 98% (biggest 12,117). Known: held zombies and hordes still turn back 2 chunks from the loaded area (walking in is sub-project 6). |
 | 5–9 | Not started | |
 
+Fixes after the round-8 in-game test (2026-10-16, branch `sp5a-sound-core`): no hordes formed in game (drifters each
+followed a different leader; now they join the biggest group in reach, chains count within 40 tiles, drift 3%/h; replay
+of the real save: 64% of town zombies in hordes on day 7); hordes walk at the game's zombie speed (no idling, no size
+slowdown); hordes sweep up lone zombies along the path they walked; the player hears held hordes (+18 dB); zombies
+arriving on a floorless tile step to the nearest floor and retry spawning; a horde stays the same horde while real
+(members re-form it when they unload, one-hour gathering window). Gap: the horde tag on real zombies is lost on
+save/reload (store it on the zombie in sub-project 6).
+
+Deferred to sub-project 6 (user, 2026-10-16):
+- millers favour roads; let them wander anywhere (yards, fields, roads);
+- hordes now and then cut through a yard, house or field while roaming, like the off-road chance, until they reach
+  another road or trail;
+- check why the Muldraugh highway horde never turns into town (2% turn-off per junction; rolls unchecked);
+- seeing held zombies at Viewpoint's max draw distance (and hearing them), beyond the loaded area.
+
 Deferred minor issues from sub-project 1's final review (fix when the code they touch is next changed):
 - the scheduler's pending time is not reset between worlds (matters once systems run on an interval);
 - a save file with duplicate entity IDs makes start-up retry every frame instead of falling back;
@@ -351,7 +458,7 @@ Deferred minor issues from sub-project 1's final review (fix when the code they 
 | Q1 | **Decided 2026-10-14 (see the sub-project 4 spec, section 2).** A horde forms from 10+ zombies moving together (converging on a sound, or follow chains: a wanderer that sees another zombie walking past has a small chance to fall in behind it); never from zombies just standing close. It dissolves at 4 or fewer (5 is the minimum). Wanderers join by vanilla sight (radius and cone). Hordes merge only by touching; seeing does nothing. Horde moaning (louder with size) is always the lowest-priority sound, masks quieter moaning, is never heard by its own members; smaller hordes hear and follow bigger ones, trail them as a convoy and merge when the leader pauses or slows. Splits only by sound (sub-project 5) and break-aways; no splitting at forks. Vanilla rally groups are switched off. | Decided |
 | Q2 | Stimuli other than sound, and their weights: thunder or lightning, base lights after the power goes off, players seen, other hordes | Sub-project 5 |
 | Q3 | Sound numbers: loudness per source, falloff rate, hearing threshold, horde share curve, "switch to a louder sound" rule | Sub-project 5 (tuning) |
-| Q4 | Do real zombies near players keep vanilla hearing, or use the mod's sound model? | Sub-project 5/6 |
+| Q4 | **Decided 2026-10-16:** real zombies near players use the mod's sound model too (D20). | Decided |
 | Q5 | Population start: how many zombies, where, and whether any arrive from the map edges over time | Sub-project 3 |
 | Q6 | Is "real only if the player could see it" wanted near players, or distance only? | Sub-project 6 |
 | Q7 | Crowd-scaled structure damage (D15): final numbers, the curve between 1, 10 and 1,000 zombies, and how it works for real zombies (vanilla thumping changed in Java) versus off-screen wear | Sub-projects 6, 7 |

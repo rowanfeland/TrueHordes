@@ -83,3 +83,18 @@ hordes after 10 in-game days, most after a month, and two city-sized hordes roam
 | 12 | Louisville at high game speed: watch `Hordes_map()` over Louisville for 1 to 3 in-game months, `Hordes_hordes()` | hordes form over the first weeks; by 2 to 3 months one or two hordes of 10,000+ roam the city and sometimes leave it |
 | 11 (optional) | Wait a few in-game weeks | `held` (status) grows only with the sandbox's start-to-peak curve; a town that hordes walked out of stays emptier |
 
+
+## Sub-project 5a acceptance: sound core (single player, debug)
+
+| # | Do | Expect |
+|---|---|---|
+| 1 | Load the save, `Hordes_status()`; check the console for `[TrueHordes]` errors | no "real-zombie hearing failed" or "sound capture failed" errors (they would mean a patch fell back to vanilla) |
+| 2 | `Hordes_map()`, fire one shot | a shaded orange circle (gunfire) appears at you, darkest in the middle, fading to the edge; the list (right) shows `gunfire r<radius>` with wanderers/hordes counts; it fades ~30 s after |
+| 3 | Fire with Louder Gunshots at 5, then set it to 1 (or disable) and fire again | the circle's radius (list `r`) is 5x bigger with the mod; off-screen dots respond from that far |
+| 4 | Drive a car, start a generator or set off an alarm | blue (vehicle), teal (appliance) or yellow (alarm) circles; an alarm stays one entry while it rings |
+| 5 | Let an A-Life NPC fire a gun near you (A-Life enabled) | a gunfire circle at the NPC; zombies head there |
+| 6 | Click a row in the sound list | the map jumps to that sound |
+| 7 | `Hordes_sound()` (radius 1,000) with real zombies around you 200-900 tiles out, and held ones beyond | real zombies near the edge ignore it about half the time; close ones all come; held dots respond the same way; lines run from responding hordes to the spot |
+| 8 | Near a big held horde (find one with `Hordes_hordes()`), fire repeatedly from 600-800 tiles | each shot splits part of it off (new purple circles heading to you, list `split` counts); after many shots the rest follows (hive mind) |
+| 9 | Stand just outside a big held horde's reach, then walk towards it (or let it come) | distant zombie groans from its direction, more and louder as it gets closer or bigger; silence when none is near |
+| 10 | Sandbox: `SoundEdgeChance` 0 and `SoundCertainShare` 0.5 in a new game | fewer zombies at the edges of sounds respond, everyone inside half the radius does |
