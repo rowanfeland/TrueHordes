@@ -36,6 +36,9 @@ public final class Respawner {
 
     public int edgePool() { return edgePool; }
 
+    /** Restores the edge arrivals still owed (saved beside the mod save). */
+    public void setEdgePool(int n) { edgePool = Math.max(0, n); }
+
     /** How many edge arrivals come together as one horde on world day {@code days}: 50, about 200 at a month, 2,000 at most. */
     public static int edgeBatch(double days) { return (int) Math.min(2000, 50 + 5 * Math.max(0, days)); }
 

@@ -88,6 +88,17 @@ public final class BridgeTest {
         Check.near(900, f[0], 0.01, "nearest first");
     }
 
+    /** A real horde near a player moans like a held one: a held wanderer in earshot heads its way. */
+    public static void testHeldZombiesHearRealHordes() {
+        truehordes.store.Store s = new truehordes.store.Store();
+        truehordes.sim.Simulation sim = new truehordes.sim.Simulation(s, SimulationTest.openMap(200, -1),
+            SimulationTest.quiet().toBuilder().moanResponsePerHour(1).travellerShare(1).build(), 12, 24 * 60);
+        truehordes.store.ZombieRecord r = SimulationTest.add(s, 800, 800, (float) (-Math.PI / 2)); // walking north, the horde to the east
+        sim.setRealHordes(new float[] {4242, 860, 800, 400}); // 400 moan about 75 tiles out
+        for (double t = 24 * 60; t < 24 * 60 + 3; t += 1.0 / 60) sim.step(t, Long.MAX_VALUE);
+        Check.isTrue(r.x() > 820, "it turned towards the real horde's moaning (x " + r.x() + ")");
+    }
+
     public static void testColumnSlotsBehindTheLeader() {
         float[] lead = Pilot.slot(0, 9, 100, 100, 0);
         Check.near(100, lead[0], 1e-4, "slot 0 is the leader's spot");

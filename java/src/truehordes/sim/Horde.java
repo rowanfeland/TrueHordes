@@ -51,13 +51,19 @@ public final class Horde {
 
     public int size() { return members.size(); }
 
+    /** A real horde near a player, stood in only so held zombies hear its moaning (sub-project 6): its size. */
+    public int phantom;
+
+    /** Zombies moaning in it (members, or a real horde's real count). */
+    public int moaners() { return members.size() + phantom; }
+
     /** Radius in tiles the horde covers: grows with the square root of its size (10: ~3.6, 10,000: 52). */
-    public float spread() { return spreadOf(members.size()); }
+    public float spread() { return spreadOf(moaners()); }
 
     public static float spreadOf(int n) { return (float) (2 + Math.sqrt(n) * 0.5); }
 
     /** Moaning loudness at the horde in dB: 40 + 10 log10(size) (10: 50 dB, 1,000: 70 dB, 10,000: 80 dB). */
-    public float loudnessDb() { return (float) (40 + 10 * Math.log10(Math.max(1, members.size()))); }
+    public float loudnessDb() { return (float) (40 + 10 * Math.log10(Math.max(1, moaners()))); }
 
     /** Every member crawls (ZombieStateFlag.Crawling): a horde keeps its walkers' pace, so only these are slow. */
     public boolean allCrawlers() {

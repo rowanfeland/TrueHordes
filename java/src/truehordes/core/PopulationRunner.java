@@ -134,6 +134,10 @@ final class PopulationRunner {
     /** Map-edge respawns arrive as hordes (sub-project 6); null = one by one. */
     void setEdgeHordes(truehordes.population.Respawner.EdgeHordes h) { respawner.setEdgeHordes(h); }
 
+    int edgePool() { return respawner.edgePool(); }
+
+    void setEdgePool(int n) { respawner.setEdgePool(n); }
+
     void setHordeCounter(java.util.function.Supplier<Map<Long, Integer>> c) { inHordes = c == null ? java.util.Map::of : c; }
 
     private void hourly(double hours) {

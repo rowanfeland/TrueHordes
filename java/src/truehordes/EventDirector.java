@@ -387,6 +387,8 @@ final class EventDirector {
             }
             pr.setProperty("alarms", sb.toString());
             pr.setProperty("lights", lights.saveString());
+            truehordes.core.Core c = Hooks.core();
+            if (c != null) pr.setProperty("edgePool", Integer.toString(c.edgePool()));
             java.io.StringWriter w = new java.io.StringWriter();
             pr.store(w, "True Hordes events (sub-project 5b)");
             Files.writeString(file(stateFile), w.toString(), StandardCharsets.UTF_8);
@@ -419,6 +421,8 @@ final class EventDirector {
                 alarms.add(a);
             }
             lights.loadString(pr.getProperty("lights", ""));
+            truehordes.core.Core c = Hooks.core();
+            if (c != null) c.setEdgePool(Integer.parseInt(pr.getProperty("edgePool", "0")));
         } catch (Throwable t) {
             Log.errorOnce("events:load", "could not read the meta-event state; starting fresh", t);
         }

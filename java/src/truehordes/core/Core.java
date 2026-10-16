@@ -238,6 +238,11 @@ public final class Core {
         return chunks;
     }
 
+    /** Map-edge arrivals owed but not yet placed as a horde (saved beside the mod save). */
+    public synchronized int edgePool() { return population.edgePool(); }
+
+    public synchronized void setEdgePool(int n) { population.setEdgePool(n); }
+
     /** Lays out held hordes touching the loaded area wherever a player can see their places; returns their chunks. */
     public synchronized java.util.Set<Long> layOutHordesInLoaded(truehordes.population.Takeover.FloorCheck floors) {
         java.util.Set<Long> chunks = new java.util.HashSet<>();

@@ -396,6 +396,17 @@ final class Pilots {
             s.followChancePerHour() * ramp, s.crowdDriftPerHour() * ramp, s.hordeFormSize(), s.hordeMinSize());
         try {
             groups = Crowd.update(ps, dt, now, rules, id -> heldPart(c, id), h -> newHorde(c, h), rnd::nextDouble);
+            // Held zombies hear real hordes' moaning too.
+            float[] packed = new float[groups.size() * 4];
+            int i = 0;
+            for (Crowd.Group g : groups.values()) {
+                packed[i++] = g.id;
+                packed[i++] = g.cx;
+                packed[i++] = g.cy;
+                packed[i++] = g.members.size();
+            }
+            Simulation sim = c.simulation();
+            if (sim != null) sim.setRealHordes(packed);
         } catch (Throwable t) {
             Log.errorOnce("pilots:crowd:" + t.getClass().getName(), "real horde forming failed", t);
         }

@@ -854,7 +854,7 @@ public final class Simulation {
             float px = 0, py = 0, pw = 0;
             // Heading for a sound it heard: moaning (always the lowest priority) does not turn it.
             Hearing.Pull p = r.hasTarget() && r.investigateUntilHours > now ? null : pull(r.x(), r.y(), 0, 0f);
-            if (r.followId < 0 && hordes.get(-r.followId) == null) r.followId = 0; // the horde it heard is gone
+            if (r.followId < 0 && !hordeExists(-r.followId)) r.followId = 0; // the horde it heard is gone
             if (p != null && p.event() == null && p.horde() != null && r.followId != -p.horde().id) {
                 // Moaning is noticed gradually: a chance per hour to turn towards it; until then it is ignored.
                 if (r.straggler || random.getAsDouble() >= 1 - Math.pow(1 - encounters.ramped(s.moanResponsePerHour(), currentHours), dt / 60.0)) {
@@ -972,7 +972,7 @@ public final class Simulation {
         if (walk) {
             Hearing.Pull p = !Float.isNaN(h.targetX) && h.investigateUntilHours > now ? null
                 : pull(h.x, h.y, h.id, Hearing.maskingDb(h));
-            if (h.followHordeId != 0 && hordes.get(h.followHordeId) == null) h.followHordeId = 0;
+            if (h.followHordeId != 0 && !hordeExists(h.followHordeId)) h.followHordeId = 0;
             if (p != null && p.event() == null && p.horde() != null && h.followHordeId != p.horde().id) {
                 // Like single zombies, a horde notices a louder horde's moaning gradually.
                 if (random.getAsDouble() >= 1 - Math.pow(1 - encounters.ramped(s.moanResponsePerHour(), currentHours), dt / 60.0)) p = null;
@@ -1079,7 +1079,18 @@ public final class Simulation {
     /** Which hordes can be heard from each 256-tile cell (a horde's moaning reaches a few cells at most). */
     private void rebuildMoanIndex() {
         moanIndex.clear();
-        for (Horde h : hordes.all()) {
+        List<Horde> all = new ArrayList<>(hordes.all());
+        float[] rh = realHordes;
+        phantomIds.clear();
+        for (int i = 0; i + 3 < rh.length; i += 4) {
+            long id = (long) rh[i];
+            if (hordes.get(id) != null) continue; // part of it is held: that part moans already
+            Horde ph = new Horde(id, rh[i + 1], rh[i + 2], 0, List.of());
+            ph.phantom = (int) rh[i + 3];
+            phantomIds.add(id);
+            all.add(ph);
+        }
+        for (Horde h : all) {
             if (h.dormant) continue; // building hordes wait silently
             float r = Hearing.moanRange(h);
             int x0 = Math.floorDiv((int) (h.x - r), CELL), x1 = Math.floorDiv((int) (h.x + r), CELL);
@@ -1092,6 +1103,15 @@ public final class Simulation {
         }
         moanIndexMinute = currentMinute;
     }
+
+    /** Real hordes near players {id, x, y, size, ...}, published by the main thread so held zombies hear their moaning. */
+    private volatile float[] realHordes = new float[0];
+    private final java.util.Set<Long> phantomIds = new java.util.HashSet<>();
+
+    public void setRealHordes(float[] packed) { realHordes = packed == null ? new float[0] : packed; }
+
+    /** A horde id that is held here or real near a player (followed by moaning). */
+    private boolean hordeExists(long id) { return hordes.get(id) != null || phantomIds.contains(id); }
 
     private static long cellKey(float x, float y) {
         return SpatialGrid.key(Math.floorDiv((int) Math.floor(x), CELL), Math.floorDiv((int) Math.floor(y), CELL));
