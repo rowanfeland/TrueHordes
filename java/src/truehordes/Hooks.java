@@ -41,6 +41,32 @@ public final class Hooks {
         }
     }
 
+    private static final RealZombieHearing REAL = new RealZombieHearing();
+
+    /** Real zombie, current sound: our score, or vanilla's when the mod is not running or on any error. */
+    public static float soundAttract(Object sound, Object zombie, float vanilla) {
+        Core c = core;
+        if (c == null || c.soundSink() == null || !(zombie instanceof IsoZombie z)) return vanilla;
+        try {
+            return REAL.attract((zombie.WorldSoundManager.WorldSound) sound, z, c.soundSink().settings(), SOUNDS);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:attract:" + t.getClass().getName(), "real-zombie hearing failed (vanilla kept)", t);
+            return vanilla;
+        }
+    }
+
+    /** Real zombie, biggest sound where it stands: our pick written into vanilla's result (left as is on error). */
+    public static void biggestSound(int x, int y, int zl, boolean ignoreBySameType, Object zombie, Object result) {
+        Core c = core;
+        if (c == null || c.soundSink() == null || !(result instanceof zombie.WorldSoundManager.ResultBiggestSound out)) return;
+        try {
+            REAL.biggest(x, y, zl, ignoreBySameType, zombie instanceof IsoZombie z ? z : null, out,
+                c.soundSink().settings(), SOUNDS);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:biggest:" + t.getClass().getName(), "real-zombie hearing failed (vanilla kept)", t);
+        }
+    }
+
     public static void onSave() {
         Core c = core;
         if (c == null) return;

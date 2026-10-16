@@ -107,4 +107,25 @@ public final class Patches {
         @Patch.OnExit
         public static void exit(@Patch.Return(readOnly = true) Object sound) { Hooks.onWorldSound(sound); }
     }
+
+    /** A real zombie's current sound strength: energy falloff with one remembered roll (vanilla's on any error). */
+    @Patch(className = HookTargets.WSM, methodName = HookTargets.SOUND_ATTRACT)
+    public static class SoundAttract {
+        @Patch.OnExit
+        public static void exit(@Patch.Argument(0) Object sound, @Patch.Argument(1) Object zombie,
+                                @Patch.Return(readOnly = false) float attract) {
+            attract = Hooks.soundAttract(sound, zombie, attract);
+        }
+    }
+
+    /** The biggest sound a real zombie hears where it stands: rewritten into vanilla's result object. */
+    @Patch(className = HookTargets.WSM, methodName = HookTargets.BIGGEST_SOUND)
+    public static class BiggestSound {
+        @Patch.OnExit
+        public static void exit(@Patch.Argument(0) int x, @Patch.Argument(1) int y, @Patch.Argument(2) int z,
+                                @Patch.Argument(3) boolean ignoreBySameType, @Patch.Argument(4) Object zombie,
+                                @Patch.Return(readOnly = true) Object result) {
+            Hooks.biggestSound(x, y, z, ignoreBySameType, zombie, result);
+        }
+    }
 }

@@ -25,6 +25,31 @@ import zombie.vehicles.BaseVehicle;
 public final class SoundCapture {
     private Object last;
     private long lastTick = -1;
+    /** Ids of live sound objects (the game pools them), for real zombies' remembered rolls; swept now and then. */
+    private final java.util.IdentityHashMap<Object, Long> ids = new java.util.IdentityHashMap<>();
+    private long nextId = 1;
+    private long lastSweepTick;
+
+    /** The sound's id: one per sound object while it lives; a repeating sound has one id per source and spot. */
+    long idOf(WorldSoundManager.WorldSound w) {
+        Long id = ids.get(w);
+        return id != null ? id : System.identityHashCode(w); // added before the patch was in: still stable
+    }
+
+    private long assign(WorldSoundManager.WorldSound w, long key) {
+        long id = w.repeating ? (key | (1L << 62)) : nextId++;
+        ids.put(w, id);
+        return id;
+    }
+
+    /** Drops ids of sounds the game has released (every 300 ticks). */
+    void sweep(long tick) {
+        if (tick - lastSweepTick < 300 || ids.isEmpty()) return;
+        lastSweepTick = tick;
+        java.util.Set<Object> live = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        live.addAll(WorldSoundManager.instance.soundList);
+        ids.keySet().removeIf(o -> !live.contains(o));
+    }
 
     /** True the first time this sound object is seen on tick {@code tick}. */
     public boolean firstTime(Object sound, long tick) {
@@ -45,9 +70,13 @@ public final class SoundCapture {
 
     /** Takes one sound the game just added (main thread). */
     void capture(WorldSoundManager.WorldSound w, long tick, Simulation sim) {
-        if (w == null || sim == null || !firstTime(w, tick)) return;
-        if (w.sourceIsZombie || !w.stressZombies || w.radius <= 0) return;
+        if (w == null || !firstTime(w, tick)) return;
         Object src = w.source;
+        // Re-sends of a repeating sound fold by source; with no source object, by its spot.
+        long key = src != null ? System.identityHashCode(src) : (((long) w.x) << 32) ^ (w.y & 0xFFFFFFFFL) ^ 0x5EEDL;
+        assign(w, key);
+        sweep(tick);
+        if (sim == null || w.sourceIsZombie || !w.stressZombies || w.radius <= 0) return;
         boolean gun = false;
         if (src instanceof IsoGameCharacter c) {
             InventoryItem item = c.getPrimaryHandItem();
@@ -58,8 +87,6 @@ public final class SoundCapture {
             || src instanceof IsoClothingWasher || src instanceof IsoClothingDryer || src instanceof IsoCombinationWasherDryer
             || src instanceof IsoJukebox || src instanceof IsoStove;
         int kind = kindOf(gun, vehicle, appliance, w.repeating && src == null);
-        // Re-sends of a repeating sound fold by source; with no source object, by its spot.
-        long key = src != null ? System.identityHashCode(src) : (((long) w.x) << 32) ^ (w.y & 0xFFFFFFFFL) ^ 0x5EEDL;
         sim.offerSound(w.x + 0.5f, w.y + 0.5f, w.radius, w.repeating, key, kind);
     }
 }

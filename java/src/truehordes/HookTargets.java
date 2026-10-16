@@ -30,6 +30,9 @@ public final class HookTargets {
     /** Every world sound zombies can hear goes through WorldSoundManager.addSound (all overloads; sub-project 5a). */
     public static final String WSM = "zombie.WorldSoundManager";
     public static final String ADD_SOUND = "addSound";
+    /** Where a real zombie scores its current sound and the biggest sound where it stands (sub-project 5a). */
+    public static final String SOUND_ATTRACT = "getSoundAttract";
+    public static final String BIGGEST_SOUND = "getBiggestSoundZomb";
     public static final String RALLY = "update";
     /** Private ZombiePopulationManager members the takeover calls or reads by reflection. */
     public static final String ADD_STANDING = "addZombieStanding";
@@ -54,6 +57,8 @@ public final class HookTargets {
         {VZM, ROOM_SPOTTED},
         {GROUP_MANAGER, RALLY},
         {WSM, ADD_SOUND},
+        {WSM, SOUND_ATTRACT},
+        {WSM, BIGGEST_SOUND},
     };
 
     /** Live map updates. Optional: if missing, the world map still builds from the files. */

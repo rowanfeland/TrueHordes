@@ -24,6 +24,7 @@ public final class TestRunner {
         SoundModelTest.class,
         SoundHearingTest.class,
         SoundCaptureTest.class,
+        RealHearingTest.class,
         EncountersTest.class,
         SimulationTest.class,
         SimSpeedTest.class,
