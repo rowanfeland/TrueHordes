@@ -57,6 +57,17 @@ public final class TakeoverTest {
         Check.equal(1, t.arrivals(0, 0, id -> false, FLOOR).size(), "arrives once the tile is clear");
     }
 
+    /** In-game test 2026-10-16 (zombies piled at the loaded area's border): it steps to the nearest floor in its chunk. */
+    public static void testNoFloorStepsToNearestFloorInChunk() {
+        Store store = new Store();
+        Takeover t = new Takeover(store);
+        t.taken(zombie(3.5f, 3.5f, 0));
+        List<ZombieRecord> in = t.arrivals(0, 0, id -> false, (x, y, z) -> x == 5 && y == 6);
+        Check.equal(1, in.size(), "spawned on the floor nearby");
+        Check.near(5.5f, in.get(0).x(), 0.01f, "x");
+        Check.near(6.5f, in.get(0).y(), 0.01f, "y");
+    }
+
     public static void testRefusedAndFailed() {
         Store store = new Store();
         Takeover t = new Takeover(store);

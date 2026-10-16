@@ -682,6 +682,8 @@ public final class Simulation {
         r.simHours = now;
         r.dueMinute = Long.MIN_VALUE;
         if (players.nearChunk(r.chunkX(), r.chunkY())) {
+            // Still held inside the loaded area (the spawn did not take): ask the main thread to try again.
+            arrivals.add(SpatialGrid.key(r.chunkX(), r.chunkY()));
             schedule(r, currentMinute + LevelOfDetail.EDGE_MINUTES);
             return;
         }

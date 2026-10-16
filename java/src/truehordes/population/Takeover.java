@@ -46,7 +46,8 @@ public final class Takeover {
             if (r.persistentId != 0 && liveIds.test(r.persistentId)) {
                 store.remove(r.id);
                 duplicates++;
-            } else if (!floors.floor((int) Math.floor(r.x()), (int) Math.floor(r.y()), (int) Math.floor(r.z))) {
+            } else if (!floors.floor((int) Math.floor(r.x()), (int) Math.floor(r.y()), (int) Math.floor(r.z))
+                    && !toNearestFloor(r, chunkX, chunkY, floors)) {
                 keptNoFloor++;
             } else {
                 store.remove(r.id);
@@ -55,6 +56,28 @@ public final class Takeover {
             }
         }
         return spawn;
+    }
+
+    /**
+     * Moves a record standing where there is no floor to the nearest floor tile of its chunk (in-game test 2026-10-16:
+     * walkers that came in on a wall or water tile stayed held at the loaded area's border). False if the chunk has none.
+     */
+    private boolean toNearestFloor(ZombieRecord r, int chunkX, int chunkY, FloorCheck floors) {
+        int z = (int) Math.floor(r.z), bx = -1, by = -1;
+        float best = Float.MAX_VALUE;
+        for (int x = chunkX * 8; x < chunkX * 8 + 8; x++) {
+            for (int y = chunkY * 8; y < chunkY * 8 + 8; y++) {
+                float dx = x + 0.5f - r.x(), dy = y + 0.5f - r.y(), d = dx * dx + dy * dy;
+                if (d < best && floors.floor(x, y, z)) {
+                    best = d;
+                    bx = x;
+                    by = y;
+                }
+            }
+        }
+        if (bx < 0) return false;
+        store.moved(r, bx + 0.5f, by + 0.5f);
+        return true;
     }
 
     /** The game's spawn-point rule deleted it, as vanilla does. */
