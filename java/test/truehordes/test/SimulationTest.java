@@ -288,16 +288,26 @@ public final class SimulationTest {
         Check.near(100 * 8 + 4, r.x(), 1e-6, "a zombie inside the loaded area is left to the game");
     }
 
-    public static void testWalkersNeverEnterTheLoadedArea() {
+    /**
+     * Round 8 (in-game test 2026-10-16: a sound near the player drew zombies to the loaded area's edge, where they turned
+     * back): a held walker walks into the loaded area and asks the main thread to make it real there.
+     */
+    public static void testWalkersWalkIntoTheLoadedArea() {
         Store s = new Store();
         ZombieRecord r = add(s, 96 * 8 + 4, 100 * 8 + 4, 0);
         Simulation sim = new Simulation(s, roadMap(200, 200, 100), quiet().toBuilder().offRoadChance(0).build(), 2, 0);
         sim.setPlayers(loadedAround(100, 100, 2));
-        for (double t = 0; t < 6; t += 1.0 / 60) {
+        boolean asked = false;
+        for (double t = 0; t < 6 && !asked; t += 1.0 / 60) {
             sim.step(t, Long.MAX_VALUE);
-            Check.isTrue(!sim.players().nearChunk(Math.floorDiv((int) r.x(), 8), Math.floorDiv((int) r.y(), 8)),
-                "held zombies stay outside the loaded area");
+            long want = truehordes.sim.SpatialGrid.keyOf(r.chunkX(), r.chunkY());
+            for (long k : sim.takeArrivals()) if (k == want) asked = true;
         }
+        Check.isTrue(sim.players().nearChunk(r.chunkX(), r.chunkY()), "it walked into the loaded area (" + r.x() + ")");
+        Check.isTrue(asked, "and asked to be made real in the chunk it entered");
+        float x = r.x();
+        run(sim, 7, 1);
+        Check.near(x, r.x(), 1e-6, "held inside the loaded area it waits for the game to take it");
     }
 
     public static void testTestSoundGathersAHorde() {

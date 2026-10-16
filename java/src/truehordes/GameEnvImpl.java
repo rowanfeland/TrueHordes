@@ -148,6 +148,9 @@ final class GameEnvImpl implements GameEnv {
     public void spawnLoadedChunks() { PopulationBridge.spawnLoadedChunks(Hooks.core()); }
 
     @Override
+    public void spawnChunks(long[] chunkKeys) { PopulationBridge.spawnChunks(Hooks.core(), chunkKeys); }
+
+    @Override
     public long[] loadedChunks() { return PopulationBridge.loadedChunks(); }
 
     @Override

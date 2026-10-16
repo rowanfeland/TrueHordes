@@ -45,6 +45,9 @@ public interface GameEnv {
     /** Bring held zombies into every chunk loaded right now. */
     void spawnLoadedChunks();
 
+    /** Makes the held zombies in these loaded chunks real (keys: x in the high 32 bits, y in the low). */
+    default void spawnChunks(long[] chunkKeys) { spawnLoadedChunks(); }
+
     /** Chunks loaded right now (chunkX << 32 | chunkY). */
     long[] loadedChunks();
 

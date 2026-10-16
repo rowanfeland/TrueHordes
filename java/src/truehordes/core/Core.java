@@ -135,6 +135,10 @@ public final class Core {
         population.tick(env.worldAgeHours());
         simNowHours = env.worldAgeHours();
         if (sim != null && sim.takeLayoutDue()) env.spawnLoadedChunks();
+        if (sim != null) {
+            long[] walkedIn = sim.takeArrivals();
+            if (walkedIn.length > 0) env.spawnChunks(walkedIn);
+        }
         if (sim != null && Log.isDebug("core") && (Double.isNaN(lastConservationHours)
                 || simNowHours - lastConservationHours >= 1.0)) {
             lastConservationHours = simNowHours;

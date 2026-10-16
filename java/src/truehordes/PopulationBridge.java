@@ -107,6 +107,11 @@ final class PopulationBridge {
     }
 
     /** Arrivals for every chunk loaded right now (after the core starts or the seeding finishes). */
+    /** Held zombies walked into these chunks: make them real where the chunk is (still) loaded. */
+    static void spawnChunks(Core c, long[] keys) {
+        for (long k : keys) if (loaded.contains(k)) arrive(c, (int) (k >> 32), (int) k);
+    }
+
     static void spawnLoadedChunks(Core c) {
         for (long k : new ArrayList<>(loaded)) arrive(c, (int) (k >> 32), (int) k);
     }

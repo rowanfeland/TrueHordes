@@ -27,6 +27,9 @@ public final class SpatialGrid implements truehordes.store.Store.Listener {
 
     static long key(int cx, int cy) { return ((long) cx << 32) | (cy & 0xFFFFFFFFL); }
 
+    /** The chunk key the main thread uses (x in the high 32 bits, y in the low). */
+    public static long keyOf(int cx, int cy) { return key(cx, cy); }
+
     static int chunk(float tile) { return Math.floorDiv((int) Math.floor(tile), 8); }
 
     static final int BLOCK = 64;

@@ -60,6 +60,8 @@ public final class Simulation {
     /** World sounds captured on the game's main thread, handled at the start of the next step (lock-free). */
     private final java.util.concurrent.ConcurrentLinkedQueue<Offer> inbox = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private final SoundModel soundModel;
+    /** Loaded chunks held walkers walked into (keys as SpatialGrid.key), taken by the main thread. */
+    private final java.util.Set<Long> arrivals = new java.util.HashSet<>();
     /** Recently ended sounds, newest last, for the viewer (at most RECENT_SOUNDS). */
     private final java.util.ArrayDeque<SoundEvent> recentSounds = new java.util.ArrayDeque<>();
     static final int RECENT_SOUNDS = 64;
@@ -478,6 +480,15 @@ public final class Simulation {
 
     public double currentHours() { return currentHours; }
 
+    /** Chunks held walkers walked into since the last call (the main thread makes them real there). */
+    public long[] takeArrivals() {
+        long[] out = new long[arrivals.size()];
+        int i = 0;
+        for (long k : arrivals) out[i++] = k;
+        arrivals.clear();
+        return out;
+    }
+
     /**
      * The loudest walking horde of at least {@code minSize} whose moaning reaches (px, py) on the same falloff (from its
      * circle's edge): {x, y, level dB, size}, or null. For the player hearing big hordes just outside the loaded area.
@@ -708,7 +719,11 @@ public final class Simulation {
                 Movement.Step st = movement.advance(r.x(), r.y(), r.heading, (float) dt, 1, r.id, crawler, px, py, pw,
                     random);
                 if (players.nearChunk(chunk(st.x()), chunk(st.y()))) {
-                    r.heading = turnedBack(st.heading());
+                    // Into the loaded area (round 8): the main thread makes it real there (or keeps it held at the
+                    // spot if the game refuses).
+                    store.moved(r, st.x(), st.y());
+                    r.heading = st.heading();
+                    arrivals.add(SpatialGrid.key(chunk(st.x()), chunk(st.y())));
                 } else {
                     store.moved(r, st.x(), st.y());
                     r.heading = st.heading();
@@ -783,14 +798,12 @@ public final class Simulation {
                 float ox = h.x, oy = h.y, oldSpread = h.spread();
                 Movement.Step st = movement.advance(h.x, h.y, h.heading, (float) dt, h.size(), h.id, h.allCrawlers(),
                     px, py, pw, random);
-                if (players.nearChunk(chunk(st.x()), chunk(st.y()))) {
-                    h.heading = turnedBack(st.heading());
-                } else {
-                    h.x = st.x();
-                    h.y = st.y();
-                    h.heading = st.heading();
-                    tight = st.tightChunks();
-                }
+                // Hordes walk into the loaded area too (round 8): the partial layout makes real every member whose
+                // place is in a loaded chunk, a little more each update.
+                h.x = st.x();
+                h.y = st.y();
+                h.heading = st.heading();
+                tight = st.tightChunks();
                 grid.moveHorde(h, ox, oy, oldSpread);
                 h.pauseMinutes = st.boxedIn() ? 10f : 0f;
             }
@@ -837,7 +850,6 @@ public final class Simulation {
         return true;
     }
 
-    private static float turnedBack(float heading) { return Movement.normalise(heading + (float) Math.PI); }
 
     // ---- hearing ----
 
