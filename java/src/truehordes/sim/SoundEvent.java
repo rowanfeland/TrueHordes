@@ -8,7 +8,8 @@ package truehordes.sim;
  * simulation thread only; the counters feed the sound viewer.
  */
 public final class SoundEvent {
-    public static final int OTHER = 0, GUNFIRE = 1, VEHICLE = 2, APPLIANCE = 3, ALARM = 4, DEBUG = 5;
+    public static final int OTHER = 0, GUNFIRE = 1, VEHICLE = 2, APPLIANCE = 3, ALARM = 4, DEBUG = 5, HELICOPTER = 6,
+        META = 7, THUNDER = 8;
 
     private final long id;
     private final float x, y, loudnessDb;

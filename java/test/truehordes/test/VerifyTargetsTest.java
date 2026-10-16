@@ -41,7 +41,7 @@ public final class VerifyTargetsTest {
         List<String> all = new java.util.ArrayList<>();
         for (String[] t : HookTargets.ALL) all.add(t[0] + "." + t[1]);
         Check.isTrue(all.contains("zombie.ai.ZombieGroupManager.update"), "rally target is required");
-        Check.equal(14, HookTargets.ALL.length, "hook count (sub-project 5a added addSound, getSoundAttract, getBiggestSoundZomb)");
+        Check.equal(18, HookTargets.ALL.length, "hook count (sub-project 5a: addSound, getSoundAttract, getBiggestSoundZomb, meta events and thunder)");
         try (ZipFile jar = new ZipFile(System.getProperty("truehordes.gameJar"))) {
             Check.isTrue(ClassFileMethods.methodNames(jar, "zombie.ai.ZombieGroupManager").contains("update"),
                 "ZombieGroupManager.update exists in the game");

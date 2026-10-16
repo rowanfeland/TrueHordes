@@ -31,6 +31,9 @@ local SOUND_KINDS = {
     [3] = { 0.20, 0.90, 0.70, "appliance" },
     [4] = { 1.00, 0.90, 0.20, "alarm" },
     [5] = { 1.00, 0.30, 1.00, "test" },
+    [6] = { 0.60, 1.00, 0.30, "helicopter" },
+    [7] = { 0.80, 0.80, 1.00, "meta event" },
+    [8] = { 0.55, 0.55, 1.00, "thunder" },
 }
 local SOUND_FADE_MS = 30000 -- an ended sound fades out over 30 real seconds
 local SOUND_RINGS = 6

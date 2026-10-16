@@ -121,6 +121,17 @@ public final class TravelTest {
     /** Distance between two points in tiles. */
     static double dist(float ax, float ay, float bx, float by) { return Math.hypot(ax - bx, ay - by); }
 
+    /** Like walk, but returns the furthest south (largest y) the walker got. */
+    static float walkMaxY(Movement mv, float x, float y, float h, int updates, float minutes, Random rng) {
+        float maxY = y;
+        for (int i = 0; i < updates; i++) {
+            Movement.Step st = mv.advance(x, y, h, minutes, 1, 1, false, 0, 0, 0, rng::nextDouble);
+            x = st.x(); y = st.y(); h = st.heading();
+            maxY = Math.max(maxY, y);
+        }
+        return maxY;
+    }
+
     static float[] walk(Movement mv, float x, float y, float h, int updates, float minutes, Random rng) {
         for (int i = 0; i < updates; i++) {
             Movement.Step s = mv.advance(x, y, h, minutes, 1, 1, false, 0, 0, 0, rng::nextDouble);
@@ -164,8 +175,8 @@ public final class TravelTest {
         int took = 0, n = 1000;
         for (int seed = 0; seed < n; seed++) {
             Random rng = new Random(seed * 0x9E3779B97F4A7C15L);
-            float[] e = walk(mv, MovementTest.tile(2), MovementTest.tile(1 + seed % 2), EAST, 500, 1, rng);
-            if (e[1] > MovementTest.tile(3)) took++;
+            // The side road runs off the test map's edge, where a walker turns back: count who went down it.
+            if (walkMaxY(mv, MovementTest.tile(2), MovementTest.tile(1 + seed % 2), EAST, 500, 1, rng) > MovementTest.tile(3)) took++;
         }
         Check.isTrue(took >= 5 && took <= 45, "about 2% turned off the highway (" + took + "/" + n + ")");
     }
@@ -183,8 +194,7 @@ public final class TravelTest {
         int took = 0, n = 400;
         for (int seed = 0; seed < n; seed++) {
             Random rng = new Random(seed * 0x9E3779B97F4A7C15L);
-            float[] e = walk(mv, MovementTest.tile(2), MovementTest.tile(1), EAST, 300, 1, rng);
-            if (e[1] > MovementTest.tile(2)) took++;
+            if (walkMaxY(mv, MovementTest.tile(2), MovementTest.tile(1), EAST, 300, 1, rng) > MovementTest.tile(2)) took++;
         }
         Check.isTrue(took > 80 && took < 160, "about 30% took the side street (" + took + "/" + n + ")");
     }

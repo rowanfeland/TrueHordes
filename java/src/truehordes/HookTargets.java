@@ -33,6 +33,11 @@ public final class HookTargets {
     /** Where a real zombie scores its current sound and the biggest sound where it stands (sub-project 5a). */
     public static final String SOUND_ATTRACT = "getSoundAttract";
     public static final String BIGGEST_SOUND = "getBiggestSoundZomb";
+    /** Vanilla's meta events and thunder (single player / client, and server): their sounds get labelled. */
+    public static final String AMBIENT_STREAM = "zombie.AmbientStreamManager";
+    public static final String AMBIENT_SOUND = "zombie.AmbientSoundManager";
+    public static final String GUN_EVENT = "doGunEvent";
+    public static final String THUNDER_EVENT = "handleThunderEvent";
     public static final String RALLY = "update";
     /** Private ZombiePopulationManager members the takeover calls or reads by reflection. */
     public static final String ADD_STANDING = "addZombieStanding";
@@ -59,6 +64,10 @@ public final class HookTargets {
         {WSM, ADD_SOUND},
         {WSM, SOUND_ATTRACT},
         {WSM, BIGGEST_SOUND},
+        {AMBIENT_STREAM, GUN_EVENT},
+        {AMBIENT_STREAM, THUNDER_EVENT},
+        {AMBIENT_SOUND, GUN_EVENT},
+        {AMBIENT_SOUND, THUNDER_EVENT},
     };
 
     /** Live map updates. Optional: if missing, the world map still builds from the files. */

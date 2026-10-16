@@ -134,6 +134,8 @@ public final class MovementTest {
             Check.isTrue(m.inMap(Math.floorDiv((int) x, 8), Math.floorDiv((int) y, 8)), "never leaves the map");
         }
         Check.isTrue(still < 10, "keeps walking at the map's edge (" + still + " updates standing)");
+        // Round 8: the map's edge is the one place a wave turns back (it no longer drifts along the rim).
+        Check.isTrue(x < tile(6), "it turned back down the road (" + x + ")");
     }
 
     public static void testOffRoadChanceRespected() {

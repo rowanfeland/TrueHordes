@@ -43,6 +43,9 @@ public final class Hooks {
 
     private static final RealZombieHearing REAL = new RealZombieHearing();
 
+    /** Labels sounds made while vanilla's meta-event or thunder code runs (0 = none). */
+    public static void soundsDuring(int kind) { SoundCapture.during = kind; }
+
     /** Real zombie, current sound: our score, or vanilla's when the mod is not running or on any error. */
     public static float soundAttract(Object sound, Object zombie, float vanilla) {
         Core c = core;

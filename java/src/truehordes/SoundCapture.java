@@ -59,6 +59,17 @@ public final class SoundCapture {
         return true;
     }
 
+    /** Set while vanilla's meta-event or thunder code runs (main thread), so its sounds are labelled. */
+    static int during;
+
+    /** The viewer's kind: a meta event or thunder by where it was made, then the helicopter, then the source. */
+    public static int kindOf(int during, boolean atHelicopter, boolean gunInHand, boolean vehicle, boolean appliance,
+                             boolean repeatingNoSource) {
+        if (during != 0) return during;
+        if (atHelicopter) return SoundEvent.HELICOPTER;
+        return kindOf(gunInHand, vehicle, appliance, repeatingNoSource);
+    }
+
     /** The viewer's kind for a sound, from what made it. */
     public static int kindOf(boolean gunInHand, boolean vehicle, boolean appliance, boolean repeatingNoSource) {
         if (gunInHand) return SoundEvent.GUNFIRE;
@@ -86,7 +97,9 @@ public final class SoundCapture {
         boolean appliance = src instanceof IsoGenerator || src instanceof IsoRadio || src instanceof IsoTelevision
             || src instanceof IsoClothingWasher || src instanceof IsoClothingDryer || src instanceof IsoCombinationWasherDryer
             || src instanceof IsoJukebox || src instanceof IsoStove;
-        int kind = kindOf(gun, vehicle, appliance, w.repeating && src == null);
+        zombie.iso.Helicopter heli = zombie.iso.IsoWorld.instance == null ? null : zombie.iso.IsoWorld.instance.helicopter;
+        boolean atHeli = src == null && heli != null && heli.isActive() && (int) heli.x == w.x && (int) heli.y == w.y;
+        int kind = kindOf(during, atHeli, gun, vehicle, appliance, w.repeating && src == null);
         sim.offerSound(w.x + 0.5f, w.y + 0.5f, w.radius, w.repeating, key, kind);
     }
 }

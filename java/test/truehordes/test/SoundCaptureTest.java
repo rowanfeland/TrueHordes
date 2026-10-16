@@ -23,5 +23,11 @@ public final class SoundCaptureTest {
         Check.equal(SoundEvent.APPLIANCE, SoundCapture.kindOf(false, false, true, false), "an appliance");
         Check.equal(SoundEvent.ALARM, SoundCapture.kindOf(false, false, false, true), "a repeating sound with no source");
         Check.equal(SoundEvent.OTHER, SoundCapture.kindOf(false, false, false, false), "anything else");
+        Check.equal(SoundEvent.META, SoundCapture.kindOf(SoundEvent.META, false, false, false, false, false),
+            "made inside vanilla's meta event");
+        Check.equal(SoundEvent.THUNDER, SoundCapture.kindOf(SoundEvent.THUNDER, false, false, false, false, false),
+            "made inside vanilla's thunder");
+        Check.equal(SoundEvent.HELICOPTER, SoundCapture.kindOf(0, true, false, false, false, false),
+            "at the helicopter");
     }
 }

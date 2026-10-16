@@ -131,6 +131,11 @@ public final class Movement {
 
     /** Blocked: the smallest turn (45, 90, 135 degrees, either side at random first) that can be walked; else back. */
     private float smallestTurn(int cx, int cy, int f, DoubleSupplier rng) {
+        // The map's edge ahead: the one place a wave turns back, so walkers do not crowd along the rim (round 8).
+        if (!map.inMap(cx + DX[f], cy + DY[f]) || !map.inMap(cx + 2 * DX[f], cy + 2 * DY[f])) {
+            int back = Math.floorMod(f + 4, 8);
+            if (open(cx, cy, back)) return dirAngle(back);
+        }
         int first = rng.getAsDouble() < 0.5 ? 1 : -1;
         for (int k = 1; k <= 3; k++) {
             if (open(cx, cy, Math.floorMod(f + first * k, 8))) return dirAngle(Math.floorMod(f + first * k, 8));

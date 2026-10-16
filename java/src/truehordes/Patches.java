@@ -128,4 +128,44 @@ public final class Patches {
             Hooks.biggestSound(x, y, z, ignoreBySameType, zombie, result);
         }
     }
+
+    /** Vanilla's gunshot meta event (single player / client): its sound is labelled "meta event". */
+    @Patch(className = HookTargets.AMBIENT_STREAM, methodName = HookTargets.GUN_EVENT)
+    public static class MetaGun {
+        @Patch.OnEnter
+        public static void enter() { Hooks.soundsDuring(truehordes.sim.SoundEvent.META); }
+
+        @Patch.OnExit
+        public static void exit() { Hooks.soundsDuring(0); }
+    }
+
+    /** Vanilla's thunder (single player / client): its 5,000-tile sound is labelled "thunder". */
+    @Patch(className = HookTargets.AMBIENT_STREAM, methodName = HookTargets.THUNDER_EVENT)
+    public static class Thunder {
+        @Patch.OnEnter
+        public static void enter() { Hooks.soundsDuring(truehordes.sim.SoundEvent.THUNDER); }
+
+        @Patch.OnExit
+        public static void exit() { Hooks.soundsDuring(0); }
+    }
+
+    /** Server: the gunshot meta event. */
+    @Patch(className = HookTargets.AMBIENT_SOUND, methodName = HookTargets.GUN_EVENT)
+    public static class MetaGunServer {
+        @Patch.OnEnter
+        public static void enter() { Hooks.soundsDuring(truehordes.sim.SoundEvent.META); }
+
+        @Patch.OnExit
+        public static void exit() { Hooks.soundsDuring(0); }
+    }
+
+    /** Server: thunder. */
+    @Patch(className = HookTargets.AMBIENT_SOUND, methodName = HookTargets.THUNDER_EVENT)
+    public static class ThunderServer {
+        @Patch.OnEnter
+        public static void enter() { Hooks.soundsDuring(truehordes.sim.SoundEvent.THUNDER); }
+
+        @Patch.OnExit
+        public static void exit() { Hooks.soundsDuring(0); }
+    }
 }
