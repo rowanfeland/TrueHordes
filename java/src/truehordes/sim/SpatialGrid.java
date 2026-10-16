@@ -14,6 +14,13 @@ import truehordes.store.ZombieRecord;
 public final class SpatialGrid implements truehordes.store.Store.Listener {
     private final Map<Long, List<ZombieRecord>> wanderers = new HashMap<>();
     private final Map<Long, List<Horde>> hordes = new HashMap<>();
+    /**
+     * Wanderers per 64-tile block, and how many per 512-tile region: a huge circle (a loud gunshot) visits only the
+     * populated regions and blocks and reads their zombies directly.
+     */
+    private final Map<Long, List<ZombieRecord>> blocks = new HashMap<>();
+    private final Map<Long, int[]> regions = new HashMap<>();
+    static final int REGION_BLOCKS = 8;
     private int wandererCount;
     private int hordeEntries;
     private int stamp;
@@ -35,6 +42,23 @@ public final class SpatialGrid implements truehordes.store.Store.Listener {
     public void putWanderer(ZombieRecord r) {
         wanderers.computeIfAbsent(key(r.chunkX(), r.chunkY()), k -> new ArrayList<>()).add(r);
         wandererCount++;
+        addToBlock(r, r.chunkX(), r.chunkY());
+    }
+
+    private static int blockOfChunk(int c) { return Math.floorDiv(c, BLOCK / 8); }
+
+    private void addToBlock(ZombieRecord r, int cx, int cy) {
+        int bx = blockOfChunk(cx), by = blockOfChunk(cy);
+        blocks.computeIfAbsent(key(bx, by), k -> new ArrayList<>()).add(r);
+        regions.computeIfAbsent(key(Math.floorDiv(bx, REGION_BLOCKS), Math.floorDiv(by, REGION_BLOCKS)), k -> new int[1])[0]++;
+    }
+
+    private void removeFromBlock(ZombieRecord r, int cx, int cy) {
+        int bx = blockOfChunk(cx), by = blockOfChunk(cy);
+        if (!removeFrom(blocks, key(bx, by), r)) return;
+        long rk = key(Math.floorDiv(bx, REGION_BLOCKS), Math.floorDiv(by, REGION_BLOCKS));
+        int[] n = regions.get(rk);
+        if (n != null && --n[0] <= 0) regions.remove(rk);
     }
 
     /** The record already moved (Store.moved); (oldX, oldY) is where it was. */
@@ -43,11 +67,18 @@ public final class SpatialGrid implements truehordes.store.Store.Listener {
         if (ocx == r.chunkX() && ocy == r.chunkY()) return;
         if (removeFrom(wanderers, key(ocx, ocy), r)) {
             wanderers.computeIfAbsent(key(r.chunkX(), r.chunkY()), k -> new ArrayList<>()).add(r);
+            if (blockOfChunk(ocx) != blockOfChunk(r.chunkX()) || blockOfChunk(ocy) != blockOfChunk(r.chunkY())) {
+                removeFromBlock(r, ocx, ocy);
+                addToBlock(r, r.chunkX(), r.chunkY());
+            }
         }
     }
 
     public void removeWanderer(ZombieRecord r) {
-        if (removeFrom(wanderers, key(r.chunkX(), r.chunkY()), r)) wandererCount--;
+        if (removeFrom(wanderers, key(r.chunkX(), r.chunkY()), r)) {
+            wandererCount--;
+            removeFromBlock(r, r.chunkX(), r.chunkY());
+        }
     }
 
     public void putHorde(Horde h) { forCircle(h.x, h.y, h.spread(), k -> addHorde(k, h)); }
@@ -103,8 +134,25 @@ public final class SpatialGrid implements truehordes.store.Store.Listener {
     public void wanderersIn(float minX, float minY, float maxX, float maxY, Consumer<ZombieRecord> out) {
         int x0 = chunk(minX), x1 = chunk(maxX), y0 = chunk(minY), y1 = chunk(maxY);
         long area = (long) (x1 - x0 + 1) * (y1 - y0 + 1);
-        if (area > wanderers.size()) {
-            for (List<ZombieRecord> ws : wanderers.values()) addIn(ws, minX, minY, maxX, maxY, out);
+        int bx0 = blockOfChunk(x0), bx1 = blockOfChunk(x1), by0 = blockOfChunk(y0), by1 = blockOfChunk(y1);
+        long blockArea = (long) (bx1 - bx0 + 1) * (by1 - by0 + 1);
+        if (blockArea > blocks.size()) {
+            // Wider than the populated map (a zoomed-out debug map): every populated block.
+            for (List<ZombieRecord> ws : blocks.values()) addIn(ws, minX, minY, maxX, maxY, out);
+        } else if (area > 4096) {
+            // A big rectangle (a loud gunshot): only the populated 512-tile regions, then their blocks' zombies.
+            // (Walking every occupied chunk instead scanned the whole population once zombies crowded onto roads.)
+            for (int rx = Math.floorDiv(bx0, REGION_BLOCKS); rx <= Math.floorDiv(bx1, REGION_BLOCKS); rx++) {
+                for (int ry = Math.floorDiv(by0, REGION_BLOCKS); ry <= Math.floorDiv(by1, REGION_BLOCKS); ry++) {
+                    if (!regions.containsKey(key(rx, ry))) continue;
+                    for (int bx = Math.max(bx0, rx * REGION_BLOCKS); bx <= Math.min(bx1, rx * REGION_BLOCKS + REGION_BLOCKS - 1); bx++) {
+                        for (int by = Math.max(by0, ry * REGION_BLOCKS); by <= Math.min(by1, ry * REGION_BLOCKS + REGION_BLOCKS - 1); by++) {
+                            List<ZombieRecord> ws = blocks.get(key(bx, by));
+                            if (ws != null) addIn(ws, minX, minY, maxX, maxY, out);
+                        }
+                    }
+                }
+            }
         } else {
             for (int cx = x0; cx <= x1; cx++) {
                 for (int cy = y0; cy <= y1; cy++) {
@@ -151,6 +199,8 @@ public final class SpatialGrid implements truehordes.store.Store.Listener {
     public void clear() {
         wanderers.clear();
         hordes.clear();
+        blocks.clear();
+        regions.clear();
         wandererCount = 0;
         hordeEntries = 0;
     }

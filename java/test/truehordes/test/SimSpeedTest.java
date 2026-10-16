@@ -35,7 +35,15 @@ public final class SimSpeedTest {
         return t;
     }
 
-    public static void testOneMillionHeldZombiesStayWithinBudget() {
+    public static void testOneMillionHeldZombiesStayWithinBudget() { measure(false); }
+
+    /**
+     * Sub-project 5a spec section 7: a firefight (10 shots per real second, Louder Gunshots-sized 3,000-tile radius)
+     * on top of the 1.05M population stays inside the same limits.
+     */
+    public static void testFirefightStaysWithinBudget() { measure(true); }
+
+    static void measure(boolean firefight) {
         Store s = new Store();
         Random rng = new Random(1);
         // Clustered like towns: 2,000 towns of 500 zombies, 10% of them idle in buildings.
@@ -63,7 +71,15 @@ public final class SimSpeedTest {
         for (; t < 1; t += 1.0 / 60) while (sim.step(t, slice) > 0) { /* drain what is due */ }
         long gc0 = gcMillis();
         List<Long> slices = new ArrayList<>();
+        float fx = 1000 + 35000, fy = 1000 + 35000;
         for (; t < 3; t += 1.0 / 60) {
+            // 10 shots per real second = 25 per in-game minute at 1-hour days.
+            if (firefight) {
+                for (int i = 0; i < 25; i++) {
+                    sim.offerSound(fx + rng.nextInt(20), fy + rng.nextInt(20), 3000, false, 1,
+                        truehordes.sim.SoundEvent.GUNFIRE);
+                }
+            }
             while (true) {
                 long g0 = gcMillis(), t0 = System.nanoTime();
                 int n = sim.step(t, slice);
@@ -80,7 +96,7 @@ public final class SimSpeedTest {
         slices.sort(null);
         long p99 = slices.get((int) (slices.size() * 0.99));
         System.out.println(String.format(Locale.ROOT,
-            "  SimSpeedTest: 1.05M held, %.2f s CPU per in-game hour (%.1f%% of one core at 1-hour days), slices net of GC: 99%% under %.2f ms, worst %.2f ms, GC %d ms; %s",
+            "  SimSpeedTest" + (firefight ? " (firefight)" : "") + ": 1.05M held, %.2f s CPU per in-game hour (%.1f%% of one core at 1-hour days), slices net of GC: 99%% under %.2f ms, worst %.2f ms, GC %d ms; %s",
             perHour, perHour / 150 * 100, p99 / 1e6, worst / 1e6, gcMillis() - gc0, sim.stats()));
         // 1.05M held is about 8x a default map; travel and bumping cost about 18 s alone, more with the suite running.
         Check.isTrue(perHour < 25, "under 25 s CPU per in-game hour (150 real s at 1-hour days)");

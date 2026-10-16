@@ -25,6 +25,9 @@ public final class Horde {
     /** Where it heard a sound and keeps heading after the sound ends, until investigateUntilHours (not saved). */
     public float targetX = Float.NaN, targetY = Float.NaN;
     public double investigateUntilHours;
+    /** The last sound it rolled for and the loudness of the one it is heading for (not saved; sub-project 5a). */
+    public long rolledSoundId;
+    public float targetDb;
     public final List<ZombieRecord> members;
     /** Scheduling (not saved): the in-game minute of its next update and the hour of its last. */
     long dueMinute = Long.MIN_VALUE;

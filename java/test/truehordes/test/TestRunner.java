@@ -22,6 +22,7 @@ public final class TestRunner {
         SpatialGridTest.class,
         HearingTest.class,
         SoundModelTest.class,
+        SoundHearingTest.class,
         EncountersTest.class,
         SimulationTest.class,
         SimSpeedTest.class,

@@ -44,6 +44,10 @@ public final class ZombieRecord {
     public long followId;
     /** The walker it last rolled a bump against (not saved): a bump is one roll per contact, not one per update. */
     public long bumpedId;
+    /** The last sound it rolled for (not saved): one roll per sound (sub-project 5a). */
+    public long rolledSoundId;
+    /** Source loudness of the sound it is heading for (not saved), for the 6 dB switch rule. */
+    public float targetDb;
     /** The horde this zombie last belonged to (0 none); lets it rejoin after a spell as a real zombie. */
     public long hordeId;
     /** World hour until which a left-behind or straggling zombie stays put. */

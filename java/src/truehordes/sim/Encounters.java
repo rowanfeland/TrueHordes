@@ -54,7 +54,7 @@ public final class Encounters {
     private final SimSettings s;
     private final Random rng;
     private final java.util.function.DoubleSupplier random;
-    private final Map<Long, List<ZombieRecord>> responders = new HashMap<>();
+    private final Map<Long, java.util.Set<ZombieRecord>> responders = new HashMap<>();
     private final List<ZombieRecord> seenWanderers = new ArrayList<>();
     private final List<Horde> seenHordes = new ArrayList<>();
     private final java.util.function.Consumer<ZombieRecord> addSeenWanderer = seenWanderers::add;
@@ -270,8 +270,7 @@ public final class Encounters {
 
     /** A wanderer heard {@code e} and is heading for it. */
     public void responded(SoundEvent e, ZombieRecord r) {
-        List<ZombieRecord> l = responders.computeIfAbsent(e.id(), k -> new ArrayList<>());
-        if (!l.contains(r)) l.add(r);
+        responders.computeIfAbsent(e.id(), k -> new java.util.LinkedHashSet<>()).add(r);
     }
 
     /**
@@ -298,7 +297,7 @@ public final class Encounters {
 
     /** {@code e} faded: the non-straggler responders gathered at it become a horde if there are enough. */
     public void soundEnded(SoundEvent e) {
-        List<ZombieRecord> l = responders.remove(e.id());
+        java.util.Set<ZombieRecord> l = responders.remove(e.id());
         if (l == null) return;
         List<ZombieRecord> gathered = new ArrayList<>();
         double sx = 0, sy = 0;

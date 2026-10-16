@@ -57,6 +57,11 @@ public final class Simulation {
     private boolean layoutDue;
     private final TreeMap<Long, LongStack> buckets = new TreeMap<>();
     private final List<SoundEvent> events = new ArrayList<>();
+    /** World sounds captured on the game's main thread, handled at the start of the next step (lock-free). */
+    private final java.util.concurrent.ConcurrentLinkedQueue<Offer> inbox = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private final SoundModel soundModel;
+    /** Sound spots (target tile key) last checked for gathering, and the minute (cleared with the sounds). */
+    private final Map<Long, Long> gatherChecked = new HashMap<>();
     private final Map<Long, List<Horde>> moanIndex = new HashMap<>();
     /** Idle building zombies not yet grouped into a building horde (grouped at the next step). */
     private final List<ZombieRecord> pendingIdle = new ArrayList<>();
@@ -78,6 +83,7 @@ public final class Simulation {
         this.random = rng::nextDouble;
         this.movement = new Movement(map, s);
         this.encounters = new Encounters(store, hordes, grid, s, rng);
+        this.soundModel = new SoundModel(s);
         this.handOver = new HandOver(this, store);
         this.currentHours = nowHours;
         this.currentMinute = minuteOf(nowHours);
@@ -152,21 +158,205 @@ public final class Simulation {
 
     // ---- sounds ----
 
-    /** A sound at (x, y) heard for {@code durationHours}; wakes idle zombies in range and gets walkers moving. */
+    /** A world sound offered from any thread: x, y, radius in tiles (as the game hears it), re-sent every tick or not. */
+    record Offer(float x, float y, float radius, boolean repeating, long sourceKey, int kind) {}
+
+    /** Minutes an ongoing (re-sent) sound stays active after the game last re-sent it. */
+    static final double REPEAT_HOLD_MINUTES = 2;
+    /** A discrete sound (a gunshot) is over in a moment; kept this long for the viewer and for gathering. */
+    static final double DISCRETE_MINUTES = 1;
+    /** Walkers heading for a spot this close to a new sound do not roll again (their time is refreshed). */
+    static final float SAME_SPOT = 20f;
+
+    /**
+     * A world sound captured on any thread (the game's main thread, without the core lock): handled at the start of
+     * the next step. {@code sourceKey} identifies the game's source so that re-sends of a repeating sound fold into
+     * one ongoing sound (0 = none).
+     */
+    public void offerSound(float x, float y, float radius, boolean repeating, long sourceKey, int kind) {
+        if (radius > 0) inbox.add(new Offer(x, y, radius, repeating, sourceKey, kind));
+    }
+
+    /** A sound at (x, y) heard for {@code durationHours} (the debug sound): rolled at once for everyone in reach. */
     public SoundEvent addSound(float x, float y, float loudnessDb, double durationHours) {
         SoundEvent e = new SoundEvent(nextEventId++, x, y, loudnessDb, currentHours, currentHours + durationHours,
-            false, 0);
+            false, 0, SoundEvent.DEBUG, false, 0);
         events.add(e);
-        float range = Hearing.range(loudnessDb);
-        grid.near(x, y, range, r -> {
-            r.idle = false;
-            r.lingerUntilHours = 0;
-            schedule(r, currentMinute);
-        }, h -> scheduleHorde(h, currentMinute));
-        List<Horde> asleep = new ArrayList<>();
-        grid.nearHordes(x, y, range, h -> { if (h.dormant) asleep.add(h); });
-        for (Horde h : asleep) wake(h, x, y, e.endHours() + INVESTIGATE_HOURS, 0);
+        broadcast(e);
         return e;
+    }
+
+    /** Handles queued sounds while the slice lasts (at least one per step); the rest wait for the next step. */
+    private void drainSounds(long t0, long budgetNanos) {
+        Offer o;
+        boolean first = true;
+        while ((first || System.nanoTime() - t0 < budgetNanos) && (o = inbox.poll()) != null) {
+            first = false;
+            if (o.repeating()) {
+                SoundEvent same = ongoing(o);
+                if (same != null) {
+                    same.extendTo(currentHours + REPEAT_HOLD_MINUTES / 60);
+                    continue;
+                }
+            }
+            double minutes = o.repeating() ? REPEAT_HOLD_MINUTES : DISCRETE_MINUTES;
+            SoundEvent e = new SoundEvent(nextEventId++, o.x(), o.y(), SoundModel.dbFromRadius(o.radius()), currentHours,
+                currentHours + minutes / 60, false, 0, o.kind(), o.repeating(), o.sourceKey());
+            events.add(e);
+            broadcast(e);
+        }
+        // Ongoing sounds: walkers that walked into reach since roll once (checked once per in-game minute).
+        for (int i = 0; i < events.size(); i++) {
+            SoundEvent e = events.get(i);
+            if (e.repeating && e.lastBroadcastMinute != currentMinute) broadcast(e);
+        }
+    }
+
+    private SoundEvent ongoing(Offer o) {
+        for (int i = 0; i < events.size(); i++) {
+            SoundEvent e = events.get(i);
+            if (e.repeating && e.sourceKey == o.sourceKey() && Hearing.dist(e.x(), e.y(), o.x(), o.y()) <= 2) return e;
+        }
+        return null;
+    }
+
+    /**
+     * Rolls a sound for every held wanderer and horde in its reach that has not rolled for it yet (sub-project 5a spec
+     * section 4): at once, not at their next update, so far zombies on slow updates hear a single gunshot too. A big
+     * circle walks only the occupied chunks.
+     */
+    private void broadcast(SoundEvent e) {
+        e.lastBroadcastMinute = currentMinute;
+        float range = e.radius(), ex = e.x(), ey = e.y();
+        List<ZombieRecord> ws = new ArrayList<>();
+        grid.wanderersIn(ex - range, ey - range, ex + range, ey + range, r -> {
+            if (r.rolledSoundId != e.id() && Hearing.dist(r.x(), r.y(), ex, ey) <= range) ws.add(r);
+        });
+        List<Horde> hs = new ArrayList<>();
+        grid.nearHordes(ex, ey, range, h -> { if (h.rolledSoundId != e.id()) hs.add(h); });
+        for (ZombieRecord r : ws) {
+            r.rolledSoundId = e.id();
+            if (store.get(r.id) == r) wandererHears(r, e);
+        }
+        for (Horde h : hs) {
+            h.rolledSoundId = e.id();
+            if (hordes.get(h.id) == h) hordeHears(h, e);
+        }
+    }
+
+    private void wandererHears(ZombieRecord r, SoundEvent e) {
+        float level = SoundModel.levelAt(e.loudnessDb(), Hearing.dist(r.x(), r.y(), e.x(), e.y()));
+        if (level < SoundModel.THRESHOLD_DB) return;
+        if (r.hasTarget() && r.investigateUntilHours > currentHours) {
+            float tx = r.targetX + 0.5f, ty = r.targetY + 0.5f;
+            if (Hearing.dist(tx, ty, e.x(), e.y()) <= SAME_SPOT) {
+                r.investigateUntilHours = Math.max(r.investigateUntilHours, e.endHours() + INVESTIGATE_HOURS);
+                return;
+            }
+            float current = SoundModel.levelAt(r.targetDb, Hearing.dist(r.x(), r.y(), tx, ty));
+            if (level < current + SoundModel.SWITCH_DB) return;
+        }
+        if (random.getAsDouble() >= soundModel.loneChance(level)) return;
+        sendTo(r, e, e.endHours() + INVESTIGATE_HOURS);
+        e.wanderers++;
+    }
+
+    private void sendTo(ZombieRecord r, SoundEvent e, double until) {
+        r.idle = false;
+        r.lingerUntilHours = 0;
+        r.pauseMinutes = 0;
+        r.targetX = (int) Math.floor(e.x());
+        r.targetY = (int) Math.floor(e.y());
+        r.targetDb = e.loudnessDb();
+        r.investigateUntilHours = until;
+        r.heading = (float) Math.atan2(e.y() - r.y(), e.x() - r.x());
+        encounters.responded(e, r);
+        schedule(r, currentMinute);
+    }
+
+    /**
+     * A horde in reach of a sound: the share that hears it (its own moaning drowns the rest) goes for it; half or more
+     * and the whole horde goes (hive mind). A dormant building horde is woken the same way.
+     */
+    private void hordeHears(Horde h, SoundEvent e) {
+        float d = Math.max(1f, Hearing.dist(h.x, h.y, e.x(), e.y()) - h.spread());
+        float level = SoundModel.levelAt(e.loudnessDb(), d);
+        if (level < SoundModel.THRESHOLD_DB) return;
+        if (!h.dormant && !Float.isNaN(h.targetX) && h.investigateUntilHours > currentHours) {
+            if (Hearing.dist(h.targetX, h.targetY, e.x(), e.y()) <= SAME_SPOT) {
+                h.investigateUntilHours = Math.max(h.investigateUntilHours, e.endHours() + INVESTIGATE_HOURS);
+                return;
+            }
+            float current = SoundModel.levelAt(h.targetDb, Math.max(1f, Hearing.dist(h.x, h.y, h.targetX, h.targetY)
+                - h.spread()));
+            if (level < current + SoundModel.SWITCH_DB) return;
+        }
+        int n = h.size();
+        int k = (int) Math.floor(soundModel.hordeShare(level, n) * n + random.getAsDouble());
+        if (k <= 0) return;
+        double until = e.endHours() + INVESTIGATE_HOURS;
+        e.hordes++;
+        if (k >= n) {
+            if (h.dormant) {
+                wake(h, e.x(), e.y(), until, 0);
+            } else {
+                h.targetX = e.x();
+                h.targetY = e.y();
+                h.investigateUntilHours = until;
+                h.followHordeId = 0;
+                h.pauseMinutes = 0;
+                h.heading = (float) Math.atan2(e.y() - h.y, e.x() - h.x);
+                scheduleHorde(h, currentMinute);
+            }
+            h.targetDb = e.loudnessDb();
+            return;
+        }
+        breakOff(h, k, e, until);
+    }
+
+    /**
+     * {@code k} members of {@code h} heard the sound and leave from its edge facing it: 10 or more as a new horde,
+     * fewer as wanderers, all heading for the sound. The rest carry on.
+     */
+    private void breakOff(Horde h, int k, SoundEvent e, double until) {
+        float old = h.spread();
+        float ang = (float) Math.atan2(e.y() - h.y, e.x() - h.x);
+        // Clear of the horde it left (touching would merge them straight back).
+        float away = old + Horde.spreadOf(k) + Encounters.BUMP_RADIUS + 1;
+        float ex = h.x + (float) Math.cos(ang) * away, ey = h.y + (float) Math.sin(ang) * away;
+        if (movement.map().rank(chunk(ex), chunk(ey)) == 0) {
+            ex = h.x;
+            ey = h.y;
+        }
+        List<ZombieRecord> out = new ArrayList<>(k);
+        for (int i = 0; i < k; i++) out.add(h.members.get(h.members.size() - 1 - i));
+        java.util.Set<ZombieRecord> gone = java.util.Collections.newSetFromMap(new java.util.IdentityHashMap<>());
+        gone.addAll(out);
+        final float fx = ex, fy = ey;
+        internal(() -> {
+            hordes.removeMembers(h, gone);
+            grid.moveHorde(h, h.x, h.y, old);
+            if (k >= s.hordeFormSize()) {
+                Horde nh = hordes.create(fx, fy, ang, out);
+                nh.targetX = e.x();
+                nh.targetY = e.y();
+                nh.targetDb = e.loudnessDb();
+                nh.investigateUntilHours = until;
+                nh.rolledSoundId = e.id();
+                grid.putHorde(nh);
+                scheduleHorde(nh, currentMinute);
+            } else {
+                for (ZombieRecord r : out) {
+                    r.hordeId = 0;
+                    r.followId = 0;
+                    r.rolledSoundId = e.id();
+                    store.restore(r);
+                    store.moved(r, fx + (float) (random.getAsDouble() - 0.5) * 3, fy + (float) (random.getAsDouble() - 0.5) * 3);
+                    sendTo(r, e, until);
+                }
+            }
+        });
+        e.splitOff += k;
     }
 
     // ---- building hordes ----
@@ -326,6 +516,8 @@ public final class Simulation {
         currentHours = nowHours;
         currentMinute = minuteOf(nowHours);
         expireSounds(nowHours);
+        drainSounds(t0, budgetNanos);
+        if (gatherChecked.size() > 4096) gatherChecked.clear();
         if (!pendingIdle.isEmpty()) groupBuildings();
         if (currentMinute - moanIndexMinute >= HORDE_INDEX_MINUTES) rebuildMoanIndex();
         int updated = 0, pops = 0;
@@ -404,7 +596,8 @@ public final class Simulation {
         }
         if (walk) {
             float px = 0, py = 0, pw = 0;
-            Hearing.Pull p = pull(r.x(), r.y(), 0, 0f);
+            // Heading for a sound it heard: moaning (always the lowest priority) does not turn it.
+            Hearing.Pull p = r.hasTarget() && r.investigateUntilHours > now ? null : pull(r.x(), r.y(), 0, 0f);
             if (r.followId < 0 && hordes.get(-r.followId) == null) r.followId = 0; // the horde it heard is gone
             if (p != null && p.event() == null && p.horde() != null && r.followId != -p.horde().id) {
                 // Moaning is noticed gradually: a chance per hour to turn towards it; until then it is ignored.
@@ -439,7 +632,14 @@ public final class Simulation {
                     r.pauseMinutes = 2 + 3 * rng.nextFloat();
                     walk = false;
                     final float gx = px, gy = py;
-                    internal(() -> encounters.gatherAt(gx, gy, r.targetX, r.targetY));
+                    // Once per spot per in-game minute: a firefight draws thousands, and each arrival scanning all the
+                    // others at the spot every update grew with the square of the crowd.
+                    long spot = SpatialGrid.key(r.targetX, r.targetY);
+                    Long last = gatherChecked.get(spot);
+                    if (last == null || last != currentMinute) {
+                        gatherChecked.put(spot, currentMinute);
+                        internal(() -> encounters.gatherAt(gx, gy, r.targetX, r.targetY));
+                    }
                     if (store.get(r.id) != r) return; // it became part of a horde
                 }
             } else if (r.followId > 0) {
@@ -500,7 +700,8 @@ public final class Simulation {
         }
         int tight = 0;
         if (walk) {
-            Hearing.Pull p = pull(h.x, h.y, h.id, Hearing.maskingDb(h));
+            Hearing.Pull p = !Float.isNaN(h.targetX) && h.investigateUntilHours > now ? null
+                : pull(h.x, h.y, h.id, Hearing.maskingDb(h));
             if (h.followHordeId != 0 && hordes.get(h.followHordeId) == null) h.followHordeId = 0;
             if (p != null && p.event() == null && p.horde() != null && h.followHordeId != p.horde().id) {
                 // Like single zombies, a horde notices a louder horde's moaning gradually.
@@ -593,8 +794,9 @@ public final class Simulation {
 
     private Hearing.Pull pull(float x, float y, long ownHordeId, float ownDb) {
         List<Horde> near = moanIndex.getOrDefault(cellKey(x, y), Collections.emptyList());
-        if (events.isEmpty() && near.isEmpty()) return null;
-        return Hearing.choose(x, y, ownHordeId, ownDb, events, near);
+        if (near.isEmpty()) return null;
+        // Sounds are rolled once when they happen (broadcast) and followed as targets; only moaning pulls here.
+        return Hearing.choose(x, y, ownHordeId, ownDb, java.util.Collections.emptyList(), near);
     }
 
     /** Which hordes can be heard from each 256-tile cell (a horde's moaning reaches a few cells at most). */
