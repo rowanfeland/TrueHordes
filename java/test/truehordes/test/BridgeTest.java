@@ -58,6 +58,36 @@ public final class BridgeTest {
         Check.equal("", sim.checkConservation("test"), "conservation");
     }
 
+    public static void testRingHordesWaitUntilASound() {
+        truehordes.store.Store s = new truehordes.store.Store();
+        truehordes.sim.Simulation sim = new truehordes.sim.Simulation(s, SimulationTest.openMap(200, -1),
+            SimulationTest.quiet(), 10, 24 * 10);
+        int placed = truehordes.sim.TestHordes.ring(sim, s, 6, 50, 120, 800, 800, new Random(5));
+        Check.equal(6, placed, "six hordes placed");
+        Check.equal(300, sim.hordes().memberCount(), "of 50 each");
+        for (truehordes.sim.Horde h : sim.hordes().all()) {
+            Check.isTrue(h.dormant, "dormant");
+            Check.near(120, (float) Math.hypot(h.x - 800, h.y - 800), 12, "on the circle");
+        }
+        Check.equal("", sim.checkConservation("test"), "conservation (a population change, counted)");
+    }
+
+    public static void testFarSightSkipsTheLoadedAreaNearestFirst() {
+        truehordes.store.Store s = new truehordes.store.Store();
+        truehordes.sim.Simulation sim = new truehordes.sim.Simulation(s, SimulationTest.openMap(200, -1),
+            SimulationTest.quiet(), 11, 0);
+        sim.setPlayers(new truehordes.population.PlayerNearby() {
+            @Override public boolean nearCell(int cx, int cy) { return true; }
+            @Override public boolean nearChunk(int cx, int cy) { return Math.abs(cx - 100) <= 9 && Math.abs(cy - 100) <= 9; }
+        });
+        SimulationTest.add(s, 810, 810, 0);       // inside the loaded area: not drawn
+        SimulationTest.add(s, 950, 804, 0);       // 150 out
+        SimulationTest.add(s, 900, 804, 0);       // 100 out
+        float[] f = truehordes.sim.FarSight.figures(sim, 804, 804, 200, 10);
+        Check.equal(2 * truehordes.sim.FarSight.STRIDE, f.length, "two figures beyond the loaded area");
+        Check.near(900, f[0], 0.01, "nearest first");
+    }
+
     public static void testColumnSlotsBehindTheLeader() {
         float[] lead = Pilot.slot(0, 9, 100, 100, 0);
         Check.near(100, lead[0], 1e-4, "slot 0 is the leader's spot");

@@ -315,3 +315,57 @@ option TrueHordes.StreetlightReach
 	page = TrueHordes,
 	translation = TrueHordes_StreetlightReach,
 }
+
+option TrueHordes.RealRadius
+{
+	type = double,
+	min = 0,
+	max = 300,
+	default = 50,
+	page = TrueHordes,
+	translation = TrueHordes_RealRadius,
+}
+
+option TrueHordes.PilotOrdersPerTick
+{
+	type = integer,
+	min = 1,
+	max = 500,
+	default = 25,
+	page = TrueHordes,
+	translation = TrueHordes_PilotOrdersPerTick,
+}
+
+option TrueHordes.CrowdBreakIn
+{
+	type = boolean,
+	default = true,
+	page = TrueHordes,
+	translation = TrueHordes_CrowdBreakIn,
+}
+
+option TrueHordes.FarSight
+{
+	type = boolean,
+	default = true,
+	page = TrueHordes,
+	translation = TrueHordes_FarSight,
+}
+
+option TrueHordes.FarSightTiles
+{
+	type = integer,
+	min = 50,
+	max = 600,
+	default = 200,
+	page = TrueHordes,
+	translation = TrueHordes_FarSightTiles,
+}
+
+option TrueHordes.EdgeHordes
+{
+	type = boolean,
+	default = true,
+	page = TrueHordes,
+	translation = TrueHordes_EdgeHordes,
+}

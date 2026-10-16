@@ -65,5 +65,17 @@
     "Sandbox_TrueHordes_LightReach": "Light reach (tiles)",
     "Sandbox_TrueHordes_LightReach_tooltip": "How far away zombies notice a lit building, floodlight or lamp.",
     "Sandbox_TrueHordes_StreetlightReach": "Streetlight reach (tiles)",
-    "Sandbox_TrueHordes_StreetlightReach_tooltip": "How far away zombies notice a lit streetlight."
+    "Sandbox_TrueHordes_StreetlightReach_tooltip": "How far away zombies notice a lit streetlight.",
+    "Sandbox_TrueHordes_RealRadius": "Real zombie radius (tiles)",
+    "Sandbox_TrueHordes_RealRadius_tooltip": "Zombies are real game objects within this many tiles of a player, or where a player can see them. Further out in the loaded area they keep walking in the mod's simulation, which costs far less. 0 makes the whole loaded area real.",
+    "Sandbox_TrueHordes_PilotOrdersPerTick": "Real zombie orders per tick",
+    "Sandbox_TrueHordes_PilotOrdersPerTick_tooltip": "Most path orders given to real zombies each tick. Lower is cheaper; higher keeps big crowds moving more smoothly.",
+    "Sandbox_TrueHordes_CrowdBreakIn": "Crowd break-in",
+    "Sandbox_TrueHordes_CrowdBreakIn_tooltip": "Doors, windows, barricades and player-built walls break faster the more zombies are at them: a lone zombie takes hours, a huge horde minutes.",
+    "Sandbox_TrueHordes_FarSight": "See hordes coming",
+    "Sandbox_TrueHordes_FarSight_tooltip": "Zombies beyond the loaded area are drawn as dark outlines where they walk, so hordes can be seen coming before they arrive.",
+    "Sandbox_TrueHordes_FarSightTiles": "See hordes coming: reach (tiles)",
+    "Sandbox_TrueHordes_FarSightTiles_tooltip": "How far from you the outlines are drawn.",
+    "Sandbox_TrueHordes_EdgeHordes": "Respawns arrive as hordes",
+    "Sandbox_TrueHordes_EdgeHordes_tooltip": "Zombies respawning at the map's edge arrive together as a horde from the next county, bigger the older the world is."
 }

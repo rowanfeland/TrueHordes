@@ -33,6 +33,28 @@ function Hordes_save() return call("save") end
 function Hordes_world() return call("world") end
 function Hordes_hordes() return call("hordes") end
 
+-- Test: a horde of n (default 300) walking down the nearest highway towards you from about 250 tiles away, or from x, y.
+function Hordes_roadHorde(n, x, y)
+    local p = getPlayer and getPlayer()
+    if not p then return call("roadHorde", n, 0, 0, x, y) end
+    return call("roadHorde", n, p:getX(), p:getY(), x, y)
+end
+
+-- Test: count (default 6) dormant hordes of size (default 100) on a circle of radius (default 120) round you.
+-- They stay idle until a sound (a gunshot) or a louder horde's moaning sets them loose.
+function Hordes_ringHordes(count, size, radius)
+    local p = getPlayer and getPlayer()
+    if not p then return call("ringHordes", count, size, radius, 0, 0) end
+    return call("ringHordes", count, size, radius, p:getX(), p:getY())
+end
+
+--- Far-sight figures round (x, y) (see LuaApi.farSight), or nil.
+function TrueHordes.farSight(x, y, reach, max)
+    local j = J()
+    if not j or not j.farSight then return nil end
+    return j.farSight(x, y, reach, max)
+end
+
 -- Debug: a real game sound (default: where the player stands, radius 1,000 tiles). Real and held zombies may hear it.
 function Hordes_sound(x, y, radius)
     if x == nil or y == nil then

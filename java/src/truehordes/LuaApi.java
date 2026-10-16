@@ -32,7 +32,7 @@ public final class LuaApi {
         if (c == null) return NOT_INSTALLED;
         synchronized (c) {
             truehordes.sim.Simulation sim = c.simulation();
-            return c.stats().format() + (sim == null ? "" : "\n" + sim.stats());
+            return c.stats().format() + (sim == null ? "" : "\n" + sim.stats()) + "\n" + Hooks.PILOTS.stats();
         }
     }
 
@@ -294,6 +294,87 @@ public final class LuaApi {
     }
 
     /** Debug-map data for a rectangle, or nil when the core is not running. */
+    /**
+     * Seeing hordes coming (sub-project 6): held zombies beyond the loaded area within {@code reach} tiles of (x, y),
+     * nearest first, at most {@code max}: {@code n}, {@code rspm} (real seconds per in-game minute), then x, y, heading,
+     * speed (tiles per in-game minute) per figure. Nil when the simulation is not running here.
+     */
+    @LuaMethod(name = "Hordes_j_farSight", global = true)
+    public static KahluaTable farSight(Object x, Object y, Object reach, Object max) {
+        Core c = Hooks.core();
+        if (c == null || c.state() != Core.State.RUNNING) return null;
+        try {
+            float[] f;
+            double rspm;
+            synchronized (c) {
+                truehordes.sim.Simulation sim = c.simulation();
+                if (sim == null) return null;
+                f = truehordes.sim.FarSight.figures(sim, LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0),
+                    LuaArgs.toFloat(reach, 200), LuaArgs.toInt(max, 600));
+                rspm = sim.settings().realSecondsPerGameMinute();
+            }
+            KahluaTable t = LuaManager.platform.newTable();
+            t.rawset("n", (double) (f.length / truehordes.sim.FarSight.STRIDE));
+            t.rawset("rspm", rspm);
+            for (int i = 0; i < f.length; i++) t.rawset((double) (i + 1), (double) f[i]);
+            return t;
+        } catch (Throwable t) {
+            Log.errorOnce("lua:farSight:" + t.getClass().getName(), "far sight failed", t);
+            return null;
+        }
+    }
+
+    /** Test command: a horde of {@code n} on the nearest highway about 250 tiles from (px, py), or at (x, y). */
+    @LuaMethod(name = "Hordes_j_roadHorde", global = true)
+    public static String roadHorde(Object n, Object px, Object py, Object x, Object y) {
+        Core c = Hooks.core();
+        if (c == null || c.state() != Core.State.RUNNING) return NOT_INSTALLED;
+        try {
+            synchronized (c) {
+                truehordes.sim.Simulation sim = c.simulation();
+                if (sim == null) return "the simulation is not running";
+                int size = Math.max(sim.settings().hordeFormSize(), LuaArgs.toInt(n, 300));
+                float ppx = LuaArgs.toFloat(px, 0), ppy = LuaArgs.toFloat(py, 0);
+                float[] spot;
+                if (x != null && y != null) {
+                    float sx = LuaArgs.toFloat(x, 0), sy = LuaArgs.toFloat(y, 0);
+                    spot = new float[] {sx, sy, (float) Math.atan2(ppy - sy, ppx - sx)};
+                } else {
+                    spot = truehordes.sim.TestHordes.roadSpot(sim.movement().map(), ppx, ppy, 250);
+                }
+                if (spot == null) return "no highway found 150-350 tiles from you; give x, y";
+                truehordes.sim.Horde h = truehordes.sim.TestHordes.walking(sim, c.store(), size, spot[0], spot[1], spot[2],
+                    new java.util.Random());
+                return String.format(java.util.Locale.ROOT, "horde %d of %d at %.0f,%.0f heading %.0f degrees", h.id, size,
+                    spot[0], spot[1], Math.toDegrees(spot[2]));
+            }
+        } catch (Throwable t) {
+            Log.errorOnce("lua:roadHorde:" + t.getClass().getName(), "road horde failed", t);
+            return "failed: " + t;
+        }
+    }
+
+    /** Test command: {@code count} dormant hordes of {@code size} on a circle of {@code radius} round (px, py). */
+    @LuaMethod(name = "Hordes_j_ringHordes", global = true)
+    public static String ringHordes(Object count, Object size, Object radius, Object px, Object py) {
+        Core c = Hooks.core();
+        if (c == null || c.state() != Core.State.RUNNING) return NOT_INSTALLED;
+        try {
+            synchronized (c) {
+                truehordes.sim.Simulation sim = c.simulation();
+                if (sim == null) return "the simulation is not running";
+                int k = Math.max(1, LuaArgs.toInt(count, 6)), s = Math.max(2, LuaArgs.toInt(size, 100));
+                float r = LuaArgs.toFloat(radius, 120);
+                int placed = truehordes.sim.TestHordes.ring(sim, c.store(), k, s, r, LuaArgs.toFloat(px, 0),
+                    LuaArgs.toFloat(py, 0), new java.util.Random());
+                return placed + " dormant hordes of " + s + " placed " + (int) r + " tiles round you (a gunshot sets them loose)";
+            }
+        } catch (Throwable t) {
+            Log.errorOnce("lua:ringHordes:" + t.getClass().getName(), "ring hordes failed", t);
+            return "failed: " + t;
+        }
+    }
+
     @LuaMethod(name = "Hordes_j_snapshot", global = true)
     public static KahluaTable snapshot(Object minX, Object minY, Object maxX, Object maxY, Object maxPoints) {
         Core c = Hooks.core();

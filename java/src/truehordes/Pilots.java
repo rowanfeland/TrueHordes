@@ -60,6 +60,8 @@ final class Pilots {
     /** Zombies looked at per tick (each comes round again every few ticks). */
     static final int PER_TICK = 200;
     static final long BUDGET_NANOS = 2_000_000L;
+    /** How long a far real zombie must be out of every player's sight before it goes back to the simulation. */
+    static final long UNSEEN_MS = 5000;
 
     void readSettings() {
         radius = (float) Math.max(0, GameEnvImpl.sandboxDouble("TrueHordes.RealRadius", 50));
@@ -145,8 +147,14 @@ final class Pilots {
                 continue;
             }
             if (zone.on() && !zone.near(p.x, p.y, RealZone.DEMAT_MARGIN) && !seen(p.x, p.y, z.getZ())) {
-                back.add(z);
-                continue;
+                // Out of sight a few seconds (a player glancing round does not make zombies blink in and out).
+                if (p.unseenSinceMs == 0) p.unseenSinceMs = nowMs;
+                if (nowMs - p.unseenSinceMs >= UNSEEN_MS) {
+                    back.add(z);
+                    continue;
+                }
+            } else {
+                p.unseenSinceMs = 0;
             }
             if (budget > 0 && due(p, z, nowMs, now, s)) {
                 order(p, z, nowMs, now, s);
@@ -155,8 +163,11 @@ final class Pilots {
             if ((k & 15) == 15 && System.nanoTime() - t0 > BUDGET_NANOS) break;
         }
         for (IsoZombie z : back) {
-            Pilot p = pilots.remove(z);
-            if (p != null && PopulationBridge.sendBack(c, z, p)) sentBack++;
+            Pilot p = pilots.get(z);
+            if (p != null && PopulationBridge.sendBack(c, z, p)) {
+                pilots.remove(z);
+                sentBack++;
+            }
         }
     }
 
