@@ -277,6 +277,27 @@ public final class Encounters {
         formed++;
     }
 
+    /**
+     * A horde that walked from (ox, oy) to where it is now rolls up the lone zombies it passed on the way, not only
+     * those where it was set down (in-game test 2026-10-16: the wave should pick up what lies in its path). Building
+     * zombies (idle) stay inside.
+     */
+    public void sweep(Horde h, float ox, float oy) {
+        float len = Hearing.dist(ox, oy, h.x, h.y);
+        if (h.dormant || len < 1) return;
+        float reach = h.spread() + BUMP_RADIUS;
+        int steps = (int) Math.ceil(len / Math.max(2f, reach));
+        seenWanderers.clear();
+        for (int i = 0; i < steps; i++) {
+            float f = (float) i / steps;
+            grid.nearWanderers(ox + (h.x - ox) * f, oy + (h.y - oy) * f, reach, addSeenWanderer);
+        }
+        for (int i = 0; i < seenWanderers.size(); i++) {
+            ZombieRecord w = seenWanderers.get(i);
+            if (!w.idle && store.get(w.id) == w) join(h, w);
+        }
+    }
+
     private void join(Horde h, ZombieRecord r) {
         float old = h.spread();
         store.remove(r.id);

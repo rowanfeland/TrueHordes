@@ -267,4 +267,26 @@ public final class TravelTest {
         Check.isTrue(dist(s.x(), s.y(), x, y) > 3, "it moved on (" + s.x() + "," + s.y() + ")");
         Check.isTrue(m.rank(Math.floorDiv((int) s.x(), 8), Math.floorDiv((int) s.y(), 8)) > 0, "not into the water");
     }
+
+    /**
+     * In-game test 2026-10-16: a horde only picked up zombies where each update set it down, not the ones it walked
+     * past between updates. Standing zombies along its road are swept up as it rolls over them.
+     */
+    public static void testHordeSweepsUpZombiesAlongItsPath() {
+        truehordes.store.Store s = new truehordes.store.Store();
+        java.util.List<truehordes.store.ZombieRecord> standing = new java.util.ArrayList<>();
+        for (int x = 1640; x <= 1720; x += 20) {
+            truehordes.store.ZombieRecord r = SimulationTest.add(s, x, 404, 0);
+            r.lingerUntilHours = 1000; // standing still: it never walks into the horde itself
+            standing.add(r);
+        }
+        truehordes.sim.Simulation sim = new truehordes.sim.Simulation(s, SimulationTest.roadMap(400, 100, 50),
+            SimulationTest.quiet().toBuilder().breakAwayChance(0).build(), 3, 0);
+        truehordes.sim.Horde h = SimulationTest.horde(sim, 1604, 404, 0, 30);
+        SimulationTest.run(sim, 0, 6);
+        int swept = 0;
+        for (truehordes.store.ZombieRecord r : standing) if (s.get(r.id) == null) swept++;
+        Check.isTrue(h.x > 1730, "the horde walked past them (" + h.x + ")");
+        Check.equal(standing.size(), swept, "every zombie it rolled over joined");
+    }
 }

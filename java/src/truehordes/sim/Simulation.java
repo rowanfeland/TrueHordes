@@ -868,6 +868,7 @@ public final class Simulation {
                 tight = st.tightChunks();
                 grid.moveHorde(h, ox, oy, oldSpread);
                 h.pauseMinutes = st.boxedIn() ? 10f : 0f;
+                internal(() -> encounters.sweep(h, ox, oy));
             }
         }
         final int tightSpots = tight;
