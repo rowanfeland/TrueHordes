@@ -43,7 +43,14 @@ function Hordes_sound(x, y, radius)
     return call("sound", x, y, radius)
 end
 
---- Debug-map data for a rectangle (see LuaApi.snapshot), or nil when the Java core is not running.
+--- Sound viewer data (see LuaApi.sounds), or nil when the Java core is not running.
+function TrueHordes.sounds()
+    local j = J()
+    if not j then return nil end
+    return j.sounds()
+end
+
+-- Debug-map data for a rectangle (see LuaApi.snapshot), or nil when the Java core is not running.
 function TrueHordes.snapshot(minX, minY, maxX, maxY, maxPoints)
     local j = J()
     if not j then return nil end

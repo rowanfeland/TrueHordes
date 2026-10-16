@@ -60,6 +60,9 @@ public final class Simulation {
     /** World sounds captured on the game's main thread, handled at the start of the next step (lock-free). */
     private final java.util.concurrent.ConcurrentLinkedQueue<Offer> inbox = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private final SoundModel soundModel;
+    /** Recently ended sounds, newest last, for the viewer (at most RECENT_SOUNDS). */
+    private final java.util.ArrayDeque<SoundEvent> recentSounds = new java.util.ArrayDeque<>();
+    static final int RECENT_SOUNDS = 64;
     /** Sound spots (target tile key) last checked for gathering, and the minute (cleared with the sounds). */
     private final Map<Long, Long> gatherChecked = new HashMap<>();
     private final Map<Long, List<Horde>> moanIndex = new HashMap<>();
@@ -449,11 +452,39 @@ public final class Simulation {
 
     public List<SoundEvent> sounds() { return Collections.unmodifiableList(events); }
 
+    /** Recently ended sounds then active ones (oldest first), for the sound viewer. */
+    public List<SoundEvent> soundsView() {
+        List<SoundEvent> v = new ArrayList<>(recentSounds);
+        v.addAll(events);
+        return v;
+    }
+
+    /** Lines (horde x, y, target x, y) from every horde heading for a sound, for the sound viewer. */
+    public float[] responseLines() {
+        List<Horde> going = new ArrayList<>();
+        for (Horde h : hordes.all()) {
+            if (!h.dormant && !Float.isNaN(h.targetX) && h.investigateUntilHours > currentHours) going.add(h);
+        }
+        float[] out = new float[going.size() * 4];
+        for (int i = 0; i < going.size(); i++) {
+            Horde h = going.get(i);
+            out[i * 4] = h.x;
+            out[i * 4 + 1] = h.y;
+            out[i * 4 + 2] = h.targetX;
+            out[i * 4 + 3] = h.targetY;
+        }
+        return out;
+    }
+
+    public double currentHours() { return currentHours; }
+
     private void expireSounds(double now) {
         for (int i = events.size() - 1; i >= 0; i--) {
             SoundEvent e = events.get(i);
             if (e.endHours() <= now) {
                 events.remove(i);
+                recentSounds.addLast(e);
+                if (recentSounds.size() > RECENT_SOUNDS) recentSounds.removeFirst();
                 internal(() -> encounters.soundEnded(e));
             }
         }

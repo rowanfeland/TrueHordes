@@ -23,6 +23,20 @@ local TERRAIN_COLOURS = {
     [9] = { 0.50, 0.35, 0.20 }, -- trail
 }
 
+-- Sound kinds (Java truehordes.sim.SoundEvent) to colours and names for the sound viewer.
+local SOUND_KINDS = {
+    [0] = { 0.85, 0.85, 0.85, "other" },
+    [1] = { 1.00, 0.40, 0.10, "gunfire" },
+    [2] = { 0.30, 0.60, 1.00, "vehicle" },
+    [3] = { 0.20, 0.90, 0.70, "appliance" },
+    [4] = { 1.00, 0.90, 0.20, "alarm" },
+    [5] = { 1.00, 0.30, 1.00, "test" },
+}
+local SOUND_FADE_MS = 30000 -- an ended sound fades out over 30 real seconds
+local SOUND_RINGS = 6
+local SOUND_LIST_ROWS = 20
+local SOUND_LIST_W = 230
+
 Hordes_MapPanel = ISPanel:derive("Hordes_MapPanel")
 
 function Hordes_MapPanel:new(x, y, width, height)
@@ -40,6 +54,10 @@ function Hordes_MapPanel:new(x, y, width, height)
     o.terrain = nil
     o.tiles = nil
     o.lastTerrain = 0
+    o.showSounds = true
+    o.sounds = nil -- latest TrueHordes.sounds() result
+    o.soundSeen = {} -- id -> { row data, endedAt (real ms) } kept until it has faded out
+    o.listRows = {} -- screen rows of the list panel: { y, x, y of the sound }
     return o
 end
 
@@ -62,6 +80,118 @@ function Hordes_MapPanel:createChildren()
     self.terrainButton = ISButton:new(self.width - 90, 2, 86, 18, "Terrain: on", self, Hordes_MapPanel.onToggleTerrain)
     self.terrainButton:initialise()
     self:addChild(self.terrainButton)
+    self.soundButton = ISButton:new(self.width - 180, 2, 86, 18, "Sounds: on", self, Hordes_MapPanel.onToggleSounds)
+    self.soundButton:initialise()
+    self:addChild(self.soundButton)
+end
+
+function Hordes_MapPanel:onToggleSounds()
+    self.showSounds = not self.showSounds
+    self.soundButton:setTitle(self.showSounds and "Sounds: on" or "Sounds: off")
+end
+
+-- Keeps every sound seen until 30 real seconds after it ended (or vanished from the list), for the fade-out.
+function Hordes_MapPanel:fetchSounds(now)
+    local t = TrueHordes.sounds()
+    self.sounds = t
+    local present = {}
+    if t then
+        for i = 1, (t.n or 0) * 10, 10 do
+            local id = t[i]
+            present[id] = true
+            local seen = self.soundSeen[id]
+            if not seen then
+                seen = {}
+                self.soundSeen[id] = seen
+            end
+            seen.x, seen.y, seen.r, seen.kind = t[i + 1], t[i + 2], t[i + 3], t[i + 4]
+            seen.age, seen.w, seen.h, seen.split = t[i + 5], t[i + 7], t[i + 8], t[i + 9]
+            if t[i + 6] == 1 and not seen.endedAt then seen.endedAt = now end
+        end
+    end
+    for id, seen in pairs(self.soundSeen) do
+        if not present[id] and not seen.endedAt then seen.endedAt = now end
+        if seen.endedAt and now - seen.endedAt > SOUND_FADE_MS then self.soundSeen[id] = nil end
+    end
+end
+
+-- Chance a lone zombie at distance d hears a sound of radius r (the same energy curve as the Java model).
+local function hearChance(d, r, edge, certain)
+    if d >= r then return 0 end
+    local m = 20 * math.log(r / math.max(1, d)) / math.log(10)
+    local full = 20 * math.log(1 / certain) / math.log(10)
+    return edge + (1 - edge) * math.min(1, m / full)
+end
+
+-- A filled disc as horizontal strips (at most about 60 per disc, so big circles stay cheap).
+function Hordes_MapPanel:fillDisc(cx, cy, rp, a, r, g, b)
+    if rp < 1 then return end
+    local step = math.max(2, math.ceil(rp / 30))
+    for dy = -rp, rp, step do
+        local half = math.sqrt(math.max(0, rp * rp - dy * dy))
+        self:drawRect(cx - half, cy + dy, half * 2, step, a, r, g, b)
+    end
+end
+
+-- Each sound: stacked discs so the shade is the chance of being heard there; lines from hordes heading to sounds.
+function Hordes_MapPanel:drawSounds(now)
+    local t = self.sounds
+    local edge = t and t.edge or 0.4
+    local certain = t and t.certain or 0.25
+    for id, seen in pairs(self.soundSeen) do
+        local fade = 1
+        if seen.endedAt then fade = math.max(0, 1 - (now - seen.endedAt) / SOUND_FADE_MS) end
+        local c = SOUND_KINDS[seen.kind] or SOUND_KINDS[0]
+        local sx, sy = self:worldToScreen(seen.x, seen.y)
+        for k = SOUND_RINGS, 1, -1 do
+            local ringR = seen.r * k / SOUND_RINGS
+            local outer = hearChance(seen.r * (k - 0.5) / SOUND_RINGS, seen.r, edge, certain)
+            -- Each smaller disc adds the extra chance gained moving in, so the stack's total is the chance there.
+            local a = (k == SOUND_RINGS and outer or math.max(0, outer - (hearChance(seen.r * (k + 0.5) / SOUND_RINGS,
+                seen.r, edge, certain)))) * 0.35 * fade
+            if a > 0.005 then self:fillDisc(sx, sy, ringR * self.zoom, a, c[1], c[2], c[3]) end
+        end
+        self:drawRect(sx - 2, sy - 2, 5, 5, fade, c[1], c[2], c[3])
+    end
+    if t and t.lines then
+        local l = t.lines
+        for i = 1, (l.n or 0) * 4, 4 do
+            local ax, ay = self:worldToScreen(l[i], l[i + 1])
+            local bx, by = self:worldToScreen(l[i + 2], l[i + 3])
+            local len = math.sqrt((bx - ax) ^ 2 + (by - ay) ^ 2)
+            local steps = math.min(200, math.floor(len / 6))
+            for j = 0, steps do
+                local f = steps > 0 and j / steps or 0
+                self:drawRect(ax + (bx - ax) * f, ay + (by - ay) * f, 2, 2, 0.8, 1, 1, 1)
+            end
+        end
+    end
+end
+
+-- The list panel: newest sounds first; click a row to centre the map on it.
+function Hordes_MapPanel:drawSoundList(now)
+    local list = {}
+    for id, seen in pairs(self.soundSeen) do
+        seen.id = id
+        table.insert(list, seen)
+    end
+    table.sort(list, function(a, b) return a.id > b.id end)
+    local x0 = self.width - SOUND_LIST_W - 4
+    local rows = math.min(SOUND_LIST_ROWS, #list)
+    self.listRows = {}
+    if rows == 0 then return end
+    local rowH = 15
+    self:drawRect(x0, 24, SOUND_LIST_W, rows * rowH + 4, 0.75, 0, 0, 0)
+    for i = 1, rows do
+        local seen = list[i]
+        local c = SOUND_KINDS[seen.kind] or SOUND_KINDS[0]
+        local y = 26 + (i - 1) * rowH
+        local ago = seen.endedAt and string.format("%ds ago", math.floor((now - seen.endedAt) / 1000)) or "now"
+        local text = string.format("%-9s r%-5d %dw %dh %ds | %s", c[4], math.floor(seen.r), seen.w or 0, seen.h or 0,
+            seen.split or 0, ago)
+        self:drawText(text, x0 + 4, y, c[1], c[2], c[3], 1, UIFont.Small)
+        table.insert(self.listRows, { y = y, h = rowH, x = seen.x, wy = seen.y })
+    end
 end
 
 function Hordes_MapPanel:onToggleTerrain()
@@ -157,6 +287,11 @@ function Hordes_MapPanel:prerender()
     end
     if not self.centerX then return end
     self:fetch()
+    local now = getTimestampMs()
+    if self.showSounds and now - (self.lastSounds or 0) >= FETCH_MS then
+        self.lastSounds = now
+        self:fetchSounds(now)
+    end
     if self.showTerrain then
         self:fetchTerrain()
         self:drawTerrain()
@@ -185,6 +320,7 @@ function Hordes_MapPanel:prerender()
         end
         self:drawHordes(s.hordes)
     end
+    if self.showSounds then self:drawSounds(now) end
     if player then
         local px, py = self:worldToScreen(player:getX(), player:getY())
         self:drawRect(px - 3, py - 3, 7, 7, 1, 0.2, 1.0, 0.2)
@@ -199,6 +335,7 @@ function Hordes_MapPanel:prerender()
     end
     self:drawText(string.format("zoom %.2f px/tile | %s%s", self.zoom, status, self.follow and " | following" or ""),
         4, 4, 1, 1, 1, 1, UIFont.Small)
+    if self.showSounds then self:drawSoundList(now) end
 end
 
 function Hordes_MapPanel:onMouseWheel(del)
@@ -210,6 +347,17 @@ function Hordes_MapPanel:onMouseWheel(del)
 end
 
 function Hordes_MapPanel:onMouseDown(x, y)
+    if self.showSounds and x >= self.width - SOUND_LIST_W - 4 then
+        for _, row in ipairs(self.listRows or {}) do
+            if y >= row.y and y < row.y + row.h then
+                self.follow = false
+                self.centerX, self.centerY = row.x, row.wy
+                self.snapshot = nil
+                self.terrain = nil
+                return true
+            end
+        end
+    end
     self.dragging = true
     self.follow = false
     return true

@@ -117,6 +117,44 @@ public final class LuaApi {
         return String.format(java.util.Locale.ROOT, "sound at %d,%d, radius %d tiles (as the game makes it)", sx, sy, r);
     }
 
+    /**
+     * The sound viewer's data: {@code n} sounds of 10 numbers each (id, x, y, radius, kind, age in in-game minutes,
+     * ended 0/1, wanderers, hordes, zombies split off), {@code lines} (n, then horde x, y, target x, y each), and the
+     * curve settings {@code edge} and {@code certain} for shading. Nil when not running.
+     */
+    @LuaMethod(name = "Hordes_j_sounds", global = true)
+    public static KahluaTable sounds() {
+        Core c = Hooks.core();
+        if (c == null) return null;
+        try {
+            synchronized (c) {
+                truehordes.sim.Simulation sim = c.simulation();
+                if (sim == null) return null;
+                java.util.List<truehordes.sim.SoundEvent> v = sim.soundsView();
+                double now = sim.currentHours();
+                KahluaTable t = LuaManager.platform.newTable();
+                t.rawset("n", (double) v.size());
+                int k = 1;
+                for (truehordes.sim.SoundEvent e : v) {
+                    double[] row = {e.id(), e.x(), e.y(), e.radius(), e.kind, (now - e.startHours()) * 60,
+                        e.endHours() <= now ? 1 : 0, e.wanderers, e.hordes, e.splitOff};
+                    for (double d : row) t.rawset((double) k++, d);
+                }
+                float[] l = sim.responseLines();
+                KahluaTable lines = LuaManager.platform.newTable();
+                lines.rawset("n", (double) (l.length / 4));
+                for (int i = 0; i < l.length; i++) lines.rawset((double) (i + 1), (double) l[i]);
+                t.rawset("lines", lines);
+                t.rawset("edge", sim.settings().soundEdgeChance());
+                t.rawset("certain", sim.settings().soundCertainShare());
+                return t;
+            }
+        } catch (Throwable t) {
+            Log.errorOnce("lua:sounds:" + t.getClass().getName(), "sound list failed", t);
+            return null;
+        }
+    }
+
     /** Debug: the 20 biggest hordes. */
     @LuaMethod(name = "Hordes_j_hordes", global = true)
     public static String hordes() {

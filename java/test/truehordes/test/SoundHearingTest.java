@@ -181,4 +181,24 @@ public final class SoundHearingTest {
             else Check.equal(0, heard, "Poor never hears it 600 tiles out");
         }
     }
+
+    /** The viewer sees active sounds and recently ended ones with their counts, and lines from responding hordes. */
+    public static void testViewerData() {
+        Store s = new Store();
+        for (int i = 0; i < 20; i++) SimulationTest.add(s, 1100, 1000 + i, 0);
+        Simulation sim = sim(s, 12);
+        Horde h = SimulationTest.horde(sim, 1000, 1300, 0, 50);
+        sim.offerSound(1000, 1000, 1000, false, 1, SoundEvent.GUNFIRE);
+        sim.step(LATE + 0.001, Long.MAX_VALUE);
+        List<SoundEvent> v = sim.soundsView();
+        Check.equal(1, v.size(), "one sound");
+        Check.equal(20, v.get(0).wanderers, "20 wanderers went");
+        Check.equal(1, v.get(0).hordes, "one horde went");
+        float[] lines = sim.responseLines();
+        Check.equal(4, lines.length, "one line");
+        Check.isTrue(lines[0] == h.x && lines[2] == 1000, "from the horde to the sound");
+        sim.step(LATE + 0.1, Long.MAX_VALUE);
+        Check.equal(0, sim.sounds().size(), "the gunshot is over");
+        Check.equal(1, sim.soundsView().size(), "but still in the viewer's recent list");
+    }
 }
