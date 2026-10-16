@@ -78,6 +78,8 @@ public final class EventsTest {
         Check.equal(600, Gunfire.radius(Double.NaN), "no Louder Gunshots: vanilla 600");
         Check.equal(1000, Gunfire.radius(5.0), "Louder Gunshots x5: 1000");
         Check.equal(200, Gunfire.radius(1.0), "x1: a rifle's 200");
+        Check.equal(200, Gunfire.rifleRadius(Double.NaN), "an A-Life fight without Louder Gunshots: a rifle's 200");
+        Check.equal(1000, Gunfire.rifleRadius(5.0), "with Louder Gunshots x5: 1000");
     }
 
     /** A-Life fight: 6 shots + 4 per casualty, capped at 60, spread over about a minute, ascending. */

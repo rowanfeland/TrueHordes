@@ -20,6 +20,12 @@ public final class Gunfire {
         return (int) Math.round(RIFLE_RADIUS * louderMultiplier);
     }
 
+    /** A rifle's radius (200), times Louder Gunshots' multiplier when that mod is active (A-Life fights). */
+    public static int rifleRadius(double louderMultiplier) {
+        boolean louder = !Double.isNaN(louderMultiplier) && louderMultiplier > 0;
+        return (int) Math.round(RIFLE_RADIUS * (louder ? louderMultiplier : 1));
+    }
+
     public static int fightShots(int casualties) {
         return Math.min(FIGHT_MAX, FIGHT_BASE + FIGHT_PER_CASUALTY * Math.max(0, casualties));
     }

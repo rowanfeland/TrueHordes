@@ -164,7 +164,7 @@ final class EventDirector {
 
     /** An A-Life off-screen fight at (x, y): a scattered burst of rifle shots over about a minute. */
     void firefight(float x, float y, int casualties) {
-        int radius = Gunfire.radius(louderMultiplier());
+        int radius = Gunfire.rifleRadius(louderMultiplier());
         int n = Gunfire.fightShots(casualties);
         double[] t = Gunfire.times(n, Gunfire.FIGHT_SECONDS, u);
         long now = System.currentTimeMillis();
