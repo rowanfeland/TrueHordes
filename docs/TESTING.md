@@ -121,3 +121,15 @@ Turn on `Hordes_debug("core", true)` first: every event the mod fires is logged 
 | 12 | At night after the shutoff, shine a flashlight at zombies that have not seen you | about 1 in 10 of those the beam touches comes to you |
 | 13 | During the day | no light luring (no new zombies drawn by lights) |
 | 14 | Save and quit during a sounding car alarm and with lights lit, reload | the alarm keeps going (battery drained for the time passed); the light dots are still on the map |
+
+## Sub-project 6 acceptance: materialisation bridge (deferred to the sub-project 7 server test, user)
+
+| # | Steps | Expected |
+|---|---|---|
+| 1 | Stand still in a town for an in-game hour | real zombies keep wandering (yards, roads); some walk off out of sight; only building zombies and stragglers stand still |
+| 2 | Fire a gun | real zombies that hear it go to the spot, mill, then wander on; some leave the loaded area |
+| 3 | `Hordes_roadHorde(300)` near Muldraugh | outlines far up the highway; the horde walks in, becomes real without popping, walks past and out, one horde on the debug map |
+| 4 | `Hordes_ringHordes(6, 100, 120)`, then a gunshot | all six converge on you |
+| 5 | Debug map (`Hordes_map`) in town | real zombies green (bright in a real horde), real hordes ringed cyan; no invisible zombies or cars |
+| 6 | Save and reload with a real horde on screen | still one horde (debug map, `Hordes_stats` real hordes) |
+| 7 | 20+ zombies at a door | it breaks in well under an hour; a lone zombie takes about a day |
