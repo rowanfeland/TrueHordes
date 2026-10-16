@@ -48,15 +48,19 @@ public final class Seeder {
 
     /** A standing, undressed zombie at a random walkable tile of the chunk; false if none was found. */
     static boolean placeInChunk(int cx, int cy, TilePicker tiles, Random rnd, Store store) {
+        return placeInChunkRecord(cx, cy, tiles, rnd, store) != null;
+    }
+
+    /** As placeInChunk; returns the record added, or null. */
+    static ZombieRecord placeInChunkRecord(int cx, int cy, TilePicker tiles, Random rnd, Store store) {
         for (int t = 0; t < TILE_TRIES; t++) {
             int x = cx * 8 + rnd.nextInt(8), y = cy * 8 + rnd.nextInt(8);
             if (tiles.outdoorWalkable(x, y)) {
-                store.add(x + 0.5f, y + 0.5f, 0f, (byte) rnd.nextInt(8), 0, 0, 0, ZombieRecord.NO_TARGET,
+                return store.add(x + 0.5f, y + 0.5f, 0f, (byte) rnd.nextInt(8), 0, 0, 0, ZombieRecord.NO_TARGET,
                     ZombieRecord.NO_TARGET, null, false);
-                return true;
             }
         }
-        return false;
+        return null;
     }
 
     /** Every room's zombies (vanilla's room formula), on the room's floor tiles and level. Returns records added. */

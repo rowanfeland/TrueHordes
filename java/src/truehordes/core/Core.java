@@ -219,6 +219,7 @@ public final class Core {
         }
         takeover.setRejoin(sim.handOver()::rejoin);
         population.setHordeCounter(sim::hordeMembersPerCell);
+        if (env.edgeHordes()) population.setEdgeHordes(sim::edgeHorde);
         simThread = new SimThread(this, sim, () -> simNowHours, world::ready, SIM_SLICE_NANOS, SIM_SLEEP_MILLIS);
         simThread.start();
         Log.info("simulation started: " + store.size() + " wanderers, " + sim.hordes().size() + " hordes");

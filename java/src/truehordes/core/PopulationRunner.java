@@ -131,6 +131,9 @@ final class PopulationRunner {
     /** Zombies held in hordes per cell (sub-project 4), so respawn sees them; set by the core. */
     private java.util.function.Supplier<Map<Long, Integer>> inHordes = java.util.Map::of;
 
+    /** Map-edge respawns arrive as hordes (sub-project 6); null = one by one. */
+    void setEdgeHordes(truehordes.population.Respawner.EdgeHordes h) { respawner.setEdgeHordes(h); }
+
     void setHordeCounter(java.util.function.Supplier<Map<Long, Integer>> c) { inHordes = c == null ? java.util.Map::of : c; }
 
     private void hourly(double hours) {

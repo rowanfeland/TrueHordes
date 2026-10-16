@@ -715,6 +715,27 @@ public final class Simulation {
         return h;
     }
 
+    /**
+     * Map-edge respawns placed together (sub-project 6): they leave the store as one horde heading inland. Not a
+     * population change (they were just added as wanderers).
+     */
+    public void edgeHorde(List<ZombieRecord> members, float heading) {
+        List<ZombieRecord> live = new ArrayList<>();
+        for (ZombieRecord r : members) if (store.get(r.id) == r) live.add(r);
+        if (live.size() < s.hordeFormSize()) return;
+        double sx = 0, sy = 0;
+        for (ZombieRecord r : live) {
+            sx += r.x();
+            sy += r.y();
+        }
+        float cx = (float) (sx / live.size()), cy = (float) (sy / live.size());
+        internal(() -> {
+            for (ZombieRecord r : live) store.remove(r.id);
+            Horde h = hordes.create(cx, cy, heading, live);
+            grid.putHorde(h);
+        });
+    }
+
     /** Re-forms a wholly real horde from its first member to unload (not a population change: it was held as a wanderer). */
     Horde reformHorde(long id, float x, float y, float heading, ZombieRecord first) {
         Horde h = hordes.restore(id, x, y, heading, new ArrayList<>(List.of(first)));

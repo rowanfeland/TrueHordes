@@ -51,10 +51,17 @@ public final class Movement {
         if (pullWeight > 0) return choose(x, y, heading, pullX, pullY, pullWeight, rng, false);
         if (homeRadius > 0) {
             // Milling (round 8): past the home radius each decision bends homewards with a growing chance; a soft
-            // pull through the same scored fan, never a wall.
-            float d = (float) Math.hypot(x - homeX, y - homeY);
-            if (d > homeRadius && rng.getAsDouble() < Math.min(1.0, (d - homeRadius) / homeRadius)) {
-                return choose(x, y, heading, homeX, homeY, HOME_PULL, rng, false);
+            // pull through the same scored fan, never a wall. Millers wander anywhere (sub-project 6, user): yards,
+            // fields and roads alike, no road preference.
+            anywhere = true;
+            try {
+                float d = (float) Math.hypot(x - homeX, y - homeY);
+                if (d > homeRadius && rng.getAsDouble() < Math.min(1.0, (d - homeRadius) / homeRadius)) {
+                    return choose(x, y, heading, homeX, homeY, HOME_PULL, rng, false);
+                }
+                return keepInside(chunk(x), chunk(y), choose(x, y, heading, 0, 0, 0, rng, false), rng);
+            } finally {
+                anywhere = false;
             }
         }
         return keepInside(chunk(x), chunk(y), travel(x, y, heading, rng), rng);
@@ -88,6 +95,11 @@ public final class Movement {
         return h;
     }
 
+    /** Choosing for a miller: no terrain preference and no rolls to leave a road (one thread). */
+    private boolean anywhere;
+    /** Walkers in the advance in progress (1 = a lone zombie, more = a horde). */
+    private int walkers = 1;
+
     /** A miller's home for the advance in progress (0 radius = none; one simulation thread). */
     private float homeX, homeY, homeRadius;
 
@@ -115,6 +127,15 @@ public final class Movement {
      * 2026-10-15: hordes should stay on the highway like an unstoppable wave).
      */
     static final double HIGHWAY_TURN = 0.02;
+    /**
+     * The same, where the road leaving the highway leads into a town (buildings within TOWN_LOOK chunks along it):
+     * sub-project 6 found the Muldraugh highway horde passed the town's few junctions at 2% each and almost never went
+     * in (offline probe: about 1 in 40 over ten hours). Claude's call; tuning.
+     */
+    static final double HIGHWAY_TOWN_TURN = 0.10;
+    static final int TOWN_LOOK = 6;
+    /** Chance at a town junction that a horde cuts straight across a yard or field instead (times OffRoadChance). */
+    static final double HORDE_CUT = 1.0;
     /** Widest road scanned across when looking for a side road (in chunks). */
     private static final int MAX_LANES = 4;
     /**
@@ -217,10 +238,15 @@ public final class Movement {
             int ways = 0;
             for (int d = 0; d < 8; d += 2) if (way(cx, cy, d)) ways++;
             if (ways < 3) return dirAngle(f);
-            double turn = highway ? HIGHWAY_TURN : JUNCTION_TURN;
+            // A horde at a town junction now and then cuts across a yard or field instead (sub-project 6, user).
+            if (!highway && walkers > 1 && fence == null && rng.getAsDouble() < s.offRoadChance() * HORDE_CUT) {
+                float off = offWay(cx, cy, f, rng);
+                if (!Float.isNaN(off)) return off;
+            }
             int side = rng.getAsDouble() < 0.5 ? 2 : -2;
             for (int j = 0; j < 2; j++) {
                 int d = Math.floorMod(f + (j == 0 ? side : -side), 8);
+                double turn = !highway ? JUNCTION_TURN : towardsTown(cx, cy, d) ? HIGHWAY_TOWN_TURN : HIGHWAY_TURN;
                 if (!branch(cx, cy, f, d) || rng.getAsDouble() >= turn) continue;
                 if (here == 1 && map.rank(cx + DX[d], cy + DY[d]) == 2 && rng.getAsDouble() >= s.trailChance()) continue;
                 return dirAngle(d);
@@ -250,6 +276,17 @@ public final class Movement {
     }
 
     private static boolean isWay(int rank) { return rank == 1 || rank == 2; }
+
+    /** Buildings lie within TOWN_LOOK chunks of (cx, cy) in direction d (the side road leads into a town). */
+    private boolean towardsTown(int cx, int cy, int d) {
+        for (int k = 2; k <= TOWN_LOOK; k++) {
+            int x = cx + DX[d] * k, y = cy + DY[d] * k;
+            for (int o = -1; o <= 1; o++) {
+                if (map.building(x + DY[d] * o, y + DX[d] * o)) return true;
+            }
+        }
+        return false;
+    }
 
     /** The road continues beyond chunk (x, y) in direction d (straight on or 45 degrees either side). */
     private boolean carriesOn(int x, int y, int d) {
@@ -337,8 +374,8 @@ public final class Movement {
                     if (k == 1) drop = true;
                     break;
                 }
-                if (k == 1) leaveChance[i] = leaving(here, r);
-                terrain += 5 - r;
+                if (k == 1) leaveChance[i] = anywhere ? 1 : leaving(here, r);
+                terrain += anywhere ? 0 : 5 - r;
                 seen++;
             }
             if (drop || seen == 0) continue;
@@ -376,6 +413,7 @@ public final class Movement {
      */
     public Step advance(float x, float y, float heading, float minutes, int members, long walkerId, boolean crawler,
                         float pullX, float pullY, float pullWeight, DoubleSupplier rng) {
+        walkers = members;
         float remaining = speedTilesPerGameMinute(members, s.speedSetting(), walkerId, crawler) * minutes;
         // Travelling walkers decide when they enter a chunk, not again on every update inside it (in-game test
         // 2026-10-15: re-rolling junctions each update turned walkers round at every junction they stood in).

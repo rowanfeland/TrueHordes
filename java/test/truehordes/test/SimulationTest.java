@@ -231,8 +231,9 @@ public final class SimulationTest {
             if (map.rank(cx, cy) == 1) onRoad++;
         }
         double share = onRoad / (double) Math.max(1, inTown);
-        // In-game test 2026-10-15: zombies should keep to roads and walk down them (most of the town's zombies).
-        Check.isTrue(share > 0.75, "roads hold most of the town's zombies (" + share + ")");
+        // In-game test 2026-10-15: zombies kept to roads (most of the town's zombies). Sub-project 6 (user): millers
+        // wander anywhere, yards and fields too, so roads now hold about their share; travellers still walk them.
+        Check.isTrue(share > 0.2 && share < 0.75, "millers spread over yards and roads alike (" + share + ")");
         // With the user's 15% off-road / 30% trail rolls town zombies mostly keep to the streets (about 80%), but the
         // roads are not a trap any more (91% within a day before).
         int offRoad = 0;

@@ -36,6 +36,9 @@ public interface GameEnv {
     /** The off-screen simulation's settings (sandbox, Sight, Speed, day length). */
     truehordes.sim.SimSettings simSettings();
 
+    /** Map-edge respawns arrive as hordes (sub-project 6 option EdgeHordes). */
+    default boolean edgeHordes() { return true; }
+
     /** No True Hordes save and the game never saved a native population for this world: a new game. */
     boolean newWorld();
 

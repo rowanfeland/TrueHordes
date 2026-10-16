@@ -39,6 +39,25 @@ public final class BridgeTest {
         Check.near(1000, per * 10 * BreakIn.THUMPS_PER_SECOND * seconds, 1e-6, "10 zombies deal the health in 5 h");
     }
 
+    public static void testEdgeBatchGrowsWithTheWorld() {
+        Check.equal(50, truehordes.population.Respawner.edgeBatch(0), "day 0: 50");
+        Check.equal(200, truehordes.population.Respawner.edgeBatch(30), "a month: 200");
+        Check.equal(2000, truehordes.population.Respawner.edgeBatch(1000), "never more than 2,000");
+    }
+
+    public static void testEdgeArrivalsBecomeOneHorde() {
+        truehordes.store.Store s = new truehordes.store.Store();
+        truehordes.sim.Simulation sim = new truehordes.sim.Simulation(s, SimulationTest.openMap(200, -1),
+            SimulationTest.quiet(), 9, 0);
+        List<truehordes.store.ZombieRecord> rs = new ArrayList<>();
+        for (int i = 0; i < 60; i++) rs.add(SimulationTest.add(s, 20 + (i % 8), 20 + i / 8, 0));
+        sim.edgeHorde(rs, 0.7f);
+        Check.equal(1, sim.hordes().size(), "one horde");
+        Check.equal(60, sim.hordes().memberCount(), "all 60 in it");
+        Check.equal(0, s.size(), "none left as wanderers");
+        Check.equal("", sim.checkConservation("test"), "conservation");
+    }
+
     public static void testColumnSlotsBehindTheLeader() {
         float[] lead = Pilot.slot(0, 9, 100, 100, 0);
         Check.near(100, lead[0], 1e-4, "slot 0 is the leader's spot");

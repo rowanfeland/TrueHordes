@@ -47,6 +47,9 @@ final class GameEnvImpl implements GameEnv {
     public boolean debugLogging() { return sandboxBool("TrueHordes.DebugLogging", false); }
 
     @Override
+    public boolean edgeHordes() { return sandboxBool("TrueHordes.EdgeHordes", true); }
+
+    @Override
     public WorldSource worldSource() {
         IsoMetaGrid grid = IsoWorld.instance == null ? null : IsoWorld.instance.getMetaGrid();
         if (grid == null || grid.maxX < grid.minX) return null;
