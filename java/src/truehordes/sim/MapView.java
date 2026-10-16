@@ -10,4 +10,7 @@ public interface MapView {
 
     /** A passable chunk squeezed between buildings (an alley or a gap): hordes shed members here. */
     boolean tight(int chunkX, int chunkY);
+
+    /** A building chunk (towns are where these are dense; round 8). */
+    default boolean building(int chunkX, int chunkY) { return false; }
 }

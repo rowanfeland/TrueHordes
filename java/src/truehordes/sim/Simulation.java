@@ -480,6 +480,33 @@ public final class Simulation {
 
     public double currentHours() { return currentHours; }
 
+    /**
+     * The day a horde of {@code n} runs out of food and leaves its town (round 8, user): {@code lockdownDays} for 500
+     * zombies, sooner for bigger hordes, later for smaller ones, with a fixed +-20% per horde.
+     */
+    public static double hungerDay(int n, double lockdownDays, long hordeId) {
+        double jitter = 0.8 + 0.4 * ((Movement.mix(hordeId ^ 0x6F0DL) & 0xFFFFL) / 65535.0);
+        return lockdownDays * Math.pow(500.0 / Math.max(1, n), 0.15) * jitter;
+    }
+
+    /** Building chunks within a block's 3x3 neighbourhood of 64-tile blocks that make it town. */
+    static final int TOWN_BUILDINGS = 12;
+    private final Map<Long, Boolean> townBlocks = new HashMap<>();
+    private final java.util.function.BiPredicate<Integer, Integer> townFence = (cx, cy) -> town(cx, cy);
+
+    /** Chunk (cx, cy) is in a town: enough buildings around its 64-tile block (computed once per block). */
+    public boolean town(int cx, int cy) {
+        int bx = Math.floorDiv(cx, 8), by = Math.floorDiv(cy, 8);
+        return townBlocks.computeIfAbsent(SpatialGrid.key(bx, by), k -> {
+            int n = 0;
+            MapView m = movement.map();
+            for (int x = (bx - 1) * 8; x < (bx + 2) * 8; x++) {
+                for (int y = (by - 1) * 8; y < (by + 2) * 8; y++) if (m.building(x, y)) n++;
+            }
+            return n >= TOWN_BUILDINGS;
+        });
+    }
+
     /** A milling zombie wanders within about this many tiles of home (round 8, user: 150). */
     static final float HOME_RADIUS = 150f;
 
@@ -814,8 +841,16 @@ public final class Simulation {
             }
             if (walk) {
                 float ox = h.x, oy = h.y, oldSpread = h.spread();
-                Movement.Step st = movement.advance(h.x, h.y, h.heading, (float) dt, h.size(), h.id, h.allCrawlers(),
-                    px, py, pw, random);
+                // Round 8: until it runs out of food a horde in town roams only its town.
+                boolean locked = now / 24 < hungerDay(h.size(), s.lockdownDays(), h.id) && town(chunk(h.x), chunk(h.y));
+                movement.setFence(locked ? townFence : null);
+                Movement.Step st;
+                try {
+                    st = movement.advance(h.x, h.y, h.heading, (float) dt, h.size(), h.id, h.allCrawlers(),
+                        px, py, pw, random);
+                } finally {
+                    movement.setFence(null);
+                }
                 // Hordes walk into the loaded area too (round 8): the partial layout makes real every member whose
                 // place is in a loaded chunk, a little more each update.
                 h.x = st.x();

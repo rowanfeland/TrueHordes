@@ -173,3 +173,13 @@ option TrueHordes.TravellerShare
 	page = TrueHordes,
 	translation = TrueHordes_TravellerShare,
 }
+
+option TrueHordes.LockdownDays
+{
+	type = double,
+	min = 0,
+	max = 120,
+	default = 7,
+	page = TrueHordes,
+	translation = TrueHordes_LockdownDays,
+}

@@ -10,7 +10,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
                           double joinChancePerHour, int buildingStragglerOneIn,
                           double bumpFollowChance, int peakDay, double soundEdgeChance,
                           double soundCertainShare, int hearingSetting, double travellerShare,
-                          double crowdDriftPerHour) {
+                          double crowdDriftPerHour, double lockdownDays) {
 
     /** Share of the time an off-screen zombie spends walking rather than standing (vanilla zombies idle a lot). */
     public static final double DUTY = 0.5;
@@ -41,6 +41,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         checkChance(soundEdgeChance, "soundEdgeChance");
         checkChance(travellerShare, "travellerShare");
         checkChance(crowdDriftPerHour, "crowdDriftPerHour");
+        if (!(lockdownDays >= 0)) throw new IllegalArgumentException("lockdownDays must be >= 0");
         if (!(soundCertainShare > 0 && soundCertainShare <= 1)) {
             throw new IllegalArgumentException("soundCertainShare must be in (0, 1]");
         }
@@ -58,7 +59,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
      * chance reached on the population peak day (vanilla default day 28); it ramps up from none on day 1.
      */
     public static SimSettings defaults() {
-        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 1.0, 28, 0.40, 0.25, 2, 0.05, 0.1);
+        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 1.0, 28, 0.40, 0.25, 2, 0.05, 0.1, 7);
     }
 
     public Builder toBuilder() { return new Builder(this); }
@@ -68,7 +69,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
             peakDay, hearingSetting;
         private double followChancePerHour, offRoadChance, breakAwayChance, realSecondsPerGameMinute, trailChance,
             moanResponsePerHour, joinChancePerHour, bumpFollowChance, soundEdgeChance, soundCertainShare,
-            travellerShare, crowdDriftPerHour;
+            travellerShare, crowdDriftPerHour, lockdownDays;
 
         private Builder(SimSettings s) {
             stragglerOneIn = s.stragglerOneIn;
@@ -91,6 +92,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
             hearingSetting = s.hearingSetting;
             travellerShare = s.travellerShare;
             crowdDriftPerHour = s.crowdDriftPerHour;
+            lockdownDays = s.lockdownDays;
         }
 
         public Builder stragglerOneIn(int v) { stragglerOneIn = v; return this; }
@@ -113,12 +115,13 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         public Builder hearingSetting(int v) { hearingSetting = v; return this; }
         public Builder travellerShare(double v) { travellerShare = v; return this; }
         public Builder crowdDriftPerHour(double v) { crowdDriftPerHour = v; return this; }
+        public Builder lockdownDays(double v) { lockdownDays = v; return this; }
 
         public SimSettings build() {
             return new SimSettings(stragglerOneIn, hordeFormSize, hordeMinSize, followChancePerHour, offRoadChance,
                 breakAwayChance, sightSetting, speedSetting, realSecondsPerGameMinute, trailChance, moanResponsePerHour,
                 joinChancePerHour, buildingStragglerOneIn, bumpFollowChance, peakDay, soundEdgeChance,
-                soundCertainShare, hearingSetting, travellerShare, crowdDriftPerHour);
+                soundCertainShare, hearingSetting, travellerShare, crowdDriftPerHour, lockdownDays);
         }
     }
 }

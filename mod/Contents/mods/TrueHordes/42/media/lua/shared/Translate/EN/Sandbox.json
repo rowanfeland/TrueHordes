@@ -35,5 +35,7 @@
     "Sandbox_TrueHordes_SoundCertainShare": "Share of a sound's reach where every zombie hears it",
     "Sandbox_TrueHordes_SoundCertainShare_tooltip": "Inside this share of a sound's circle (0.25 = the inner quarter) every lone zombie hears it; beyond, the chance fades with the sound's energy down to the edge chance.",
     "Sandbox_TrueHordes_TravellerShare": "Share of lone zombies that travel",
-    "Sandbox_TrueHordes_TravellerShare_tooltip": "Most lone zombies mill about their neighbourhood (about 150 tiles); this share are travellers that walk the roads between towns and ignore the lockdown. Hordes make the real crossings."
+    "Sandbox_TrueHordes_TravellerShare_tooltip": "Most lone zombies mill about their neighbourhood (about 150 tiles); this share are travellers that walk the roads between towns and ignore the lockdown. Hordes make the real crossings.",
+    "Sandbox_TrueHordes_LockdownDays": "Day a 500-zombie town horde runs out of food",
+    "Sandbox_TrueHordes_LockdownDays_tooltip": "Town hordes roam only their town until they run out of food, then leave along the roads. A horde of 500 leaves around this day; bigger hordes sooner, smaller ones later (each varies by 20%). 0 = no lockdown."
 }

@@ -32,6 +32,9 @@ public final class WorldMapView implements MapView {
     public boolean inMap(int cx, int cy) { return world.chunkInMap(cx, cy); }
 
     @Override
+    public boolean building(int cx, int cy) { return world.chunkTerrain(cx, cy) == Terrain.BUILDING; }
+
+    @Override
     public boolean tight(int cx, int cy) {
         if (rank(cx, cy) == 0) return false;
         int b = 0;

@@ -57,11 +57,37 @@ public final class Movement {
                 return choose(x, y, heading, homeX, homeY, HOME_PULL, rng, false);
             }
         }
-        return travel(x, y, heading, rng);
+        return keepInside(chunk(x), chunk(y), travel(x, y, heading, rng), rng);
     }
 
     /** How strongly home steers a miller that has wandered past its radius (a Movement pull weight). */
     static final float HOME_PULL = 4f;
+    /** Chunks a locked-down town horde may not step out to (null = none; one simulation thread). */
+    private java.util.function.BiPredicate<Integer, Integer> fence;
+
+    /** Set (or clear with null) the town a horde must stay in for the next advance. */
+    public void setFence(java.util.function.BiPredicate<Integer, Integer> inside) { fence = inside; }
+
+    /** Direction d from chunk (cx, cy) leaves the fenced town. */
+    private boolean fenced(int cx, int cy, int d) {
+        return fence != null && fence.test(cx, cy) && !fence.test(cx + DX[d], cy + DY[d]);
+    }
+
+    /** A travelling heading that would leave the town: the smallest turn that stays inside (either side first). */
+    private float keepInside(int cx, int cy, float h, DoubleSupplier rng) {
+        if (fence == null || Float.isNaN(h)) return h;
+        int f = dirIndex(h);
+        if (!fenced(cx, cy, f)) return h;
+        int first = rng.getAsDouble() < 0.5 ? 1 : -1;
+        for (int k = 1; k <= 4; k++) {
+            for (int j = 0; j < 2; j++) {
+                int d = Math.floorMod(f + (j == 0 ? first : -first) * k, 8);
+                if (!fenced(cx, cy, d) && open(cx, cy, d)) return dirAngle(d);
+            }
+        }
+        return h;
+    }
+
     /** A miller's home for the advance in progress (0 radius = none; one simulation thread). */
     private float homeX, homeY, homeRadius;
 
