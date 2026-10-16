@@ -33,7 +33,7 @@ local function onTick()
         local ey = py + dy / d * ahead + ZombRand(-6, 7)
         local emitter = world:getFreeEmitter(ex, ey, 0)
         if emitter then
-            local id = emitter:playSoundImpl(VOICES[ZombRand(#VOICES) + 1], nil)
+            local id = emitter:playSound(VOICES[ZombRand(#VOICES) + 1])
             if id and id ~= 0 then emitter:setVolume(id, volume) end
         end
     end
