@@ -73,6 +73,13 @@ public final class Simulation {
     /** The dormant building horde of each chunk (a chunk is about one house). */
     private final Map<Long, Horde> dormantByChunk = new HashMap<>();
     private PlayerNearby players = NOBODY;
+    /** Rain and storms (sub-project 5b), handed over by the main thread. */
+    private volatile Weather weather = Weather.CLEAR;
+    /** Lit lights that lure at night (sub-project 5b), handed over by the main thread. */
+    private volatile List<Lure> lures = List.of();
+    /** Per light, the wanderers (id) and hordes (-id) that already rolled for it. */
+    private final Map<Long, java.util.Set<Long>> lureRolled = new HashMap<>();
+    private long lureMinute = Long.MIN_VALUE, thunderMinute = Long.MIN_VALUE;
     private long currentMinute;
     private double currentHours;
     private long moanIndexMinute = Long.MIN_VALUE / 2; // far past, without overflow in the subtraction
@@ -150,6 +157,19 @@ public final class Simulation {
     public void setPlayers(PlayerNearby p) { players = p == null ? NOBODY : p; }
 
     public PlayerNearby players() { return players; }
+
+    public void setWeather(Weather w) { weather = w == null ? Weather.CLEAR : w; }
+
+    public Weather weather() { return weather; }
+
+    /**
+     * A light that draws zombies at night (sub-project 5b spec goal 6): each lone zombie and each horde within
+     * {@code reach} tiles rolls once, with {@code chance}, to go to it and stay until {@code untilHours}.
+     */
+    public record Lure(long id, float x, float y, float reach, double chance, double untilHours) {}
+
+    /** The lights lit right now (empty by day). Any thread. */
+    public void setLures(List<Lure> l) { lures = l == null ? List.of() : List.copyOf(l); }
 
     /** Runs a change that moves zombies between wanderers and hordes (not a population change). */
     public void internal(Runnable r) {
@@ -252,6 +272,7 @@ public final class Simulation {
     private void wandererHears(ZombieRecord r, SoundEvent e) {
         float level = SoundModel.levelAt(e.loudnessDb(), Hearing.dist(r.x(), r.y(), e.x(), e.y()))
             + SoundModel.hearingBoostDb(SoundModel.perZombieHearing(s.hearingSetting(), r.id));
+        level -= weatherLossDb(e, r.x(), r.y());
         if (level < SoundModel.THRESHOLD_DB) return;
         if (r.hasTarget() && r.investigateUntilHours > currentHours) {
             float tx = r.targetX + 0.5f, ty = r.targetY + 0.5f;
@@ -265,6 +286,97 @@ public final class Simulation {
         if (random.getAsDouble() >= soundModel.loneChance(level)) return;
         sendTo(r, e, e.endHours() + INVESTIGATE_HOURS);
         e.wanderers++;
+    }
+
+    /**
+     * dB a sound loses to the weather on its way to a listener at (x, y) (sub-project 5b spec goal 4): rain at either
+     * end muffles it. Thunder is ignored inside a storm (infinite loss) and, outside, muffled only by the listener's
+     * own rain, so a stronger storm draws from further out instead of drowning its own thunder.
+     */
+    private float weatherLossDb(SoundEvent e, float x, float y) {
+        Weather w = weather;
+        if (e.kind == SoundEvent.THUNDER) return w.inStorm(x, y) ? Float.POSITIVE_INFINITY : w.muffleDb(x, y, x, y);
+        return w.muffleDb(e.x(), e.y(), x, y);
+    }
+
+    // ---- storms and lights (sub-project 5b) ----
+
+    /** World radius of thunder (vanilla's). */
+    public static final float THUNDER_RADIUS = 5000f;
+    /** Thunder a full-strength storm away from the players makes per in-game hour (Claude's call, tuning). */
+    static final double THUNDER_PER_HOUR = 3;
+
+    /**
+     * Storms away from every player thunder now and then (True Weathers' regional storms only; storms over a player
+     * thunder through the game), more often the stronger they are.
+     */
+    private void stormThunder(long minutes) {
+        Weather w = weather;
+        if (!w.regional) return;
+        for (Weather.Storm st : w.storms()) {
+            double chance = 1 - Math.pow(1 - THUNDER_PER_HOUR * st.peak() / 60.0, minutes);
+            if (random.getAsDouble() >= chance) continue;
+            int c = st.cells()[(int) Math.floor(random.getAsDouble() * st.cells().length)];
+            float x = w.cellX(c) + (float) ((random.getAsDouble() - 0.5) * w.step());
+            float y = w.cellY(c) + (float) ((random.getAsDouble() - 0.5) * w.step());
+            if (players.nearCell(Math.floorDiv((int) x, CELL), Math.floorDiv((int) y, CELL))) continue;
+            SoundEvent e = new SoundEvent(nextEventId++, x, y, SoundModel.dbFromRadius(THUNDER_RADIUS), currentHours,
+                currentHours + DISCRETE_MINUTES / 60, false, 0, SoundEvent.THUNDER, false, 0);
+            events.add(e);
+            broadcast(e);
+        }
+    }
+
+    /** A lured zombie heads for the light as for a quiet sound: any sound 6 dB louder than this takes it away. */
+    static final float LURE_DB = 36f;
+
+    /** Every lit light: walkers and hordes in reach that have not rolled for it roll once (once per in-game minute). */
+    private void lureAll() {
+        List<Lure> ls = lures;
+        if (ls.isEmpty()) {
+            lureRolled.clear();
+            return;
+        }
+        java.util.Set<Long> live = new java.util.HashSet<>();
+        for (Lure l : ls) {
+            live.add(l.id());
+            java.util.Set<Long> rolled = lureRolled.computeIfAbsent(l.id(), k -> new java.util.HashSet<>());
+            float rr = l.reach();
+            List<ZombieRecord> ws = new ArrayList<>();
+            grid.wanderersIn(l.x() - rr, l.y() - rr, l.x() + rr, l.y() + rr, r -> {
+                if (!(r.idle && r.building) && Hearing.dist(r.x(), r.y(), l.x(), l.y()) <= rr && rolled.add(r.id)) ws.add(r);
+            });
+            for (ZombieRecord r : ws) if (store.get(r.id) == r && random.getAsDouble() < l.chance()) lureTo(r, l);
+            List<Horde> hs = new ArrayList<>();
+            grid.nearHordes(l.x(), l.y(), rr, h -> { if (!h.dormant && rolled.add(-h.id)) hs.add(h); });
+            for (Horde h : hs) if (hordes.get(h.id) == h && random.getAsDouble() < l.chance()) lureTo(h, l);
+        }
+        lureRolled.keySet().retainAll(live);
+    }
+
+    private void lureTo(ZombieRecord r, Lure l) {
+        if (r.hasTarget() && r.investigateUntilHours > currentHours && r.targetDb > LURE_DB) return; // after a sound
+        r.idle = false;
+        r.lingerUntilHours = 0;
+        r.pauseMinutes = 0;
+        r.targetX = (int) Math.floor(l.x());
+        r.targetY = (int) Math.floor(l.y());
+        r.targetDb = LURE_DB;
+        r.investigateUntilHours = l.untilHours();
+        r.heading = (float) Math.atan2(l.y() - r.y(), l.x() - r.x());
+        schedule(r, currentMinute);
+    }
+
+    private void lureTo(Horde h, Lure l) {
+        if (!Float.isNaN(h.targetX) && h.investigateUntilHours > currentHours && h.targetDb > LURE_DB) return;
+        h.targetX = l.x();
+        h.targetY = l.y();
+        h.targetDb = LURE_DB;
+        h.investigateUntilHours = l.untilHours();
+        h.followHordeId = 0;
+        h.pauseMinutes = 0;
+        h.heading = (float) Math.atan2(l.y() - h.y, l.x() - h.x);
+        scheduleHorde(h, currentMinute);
     }
 
     private void sendTo(ZombieRecord r, SoundEvent e, double until) {
@@ -288,7 +400,7 @@ public final class Simulation {
         float d = Math.max(1f, Hearing.dist(h.x, h.y, e.x(), e.y()) - h.spread());
         // A horde hears with the setting's usual hearing (Random: Normal).
         int hs = s.hearingSetting() >= 1 && s.hearingSetting() <= 3 ? s.hearingSetting() : 2;
-        float level = SoundModel.levelAt(e.loudnessDb(), d) + SoundModel.hearingBoostDb(hs);
+        float level = SoundModel.levelAt(e.loudnessDb(), d) + SoundModel.hearingBoostDb(hs) - weatherLossDb(e, h.x, h.y);
         if (level < SoundModel.THRESHOLD_DB) return;
         if (!h.dormant && !Float.isNaN(h.targetX) && h.investigateUntilHours > currentHours) {
             if (Hearing.dist(h.targetX, h.targetY, e.x(), e.y()) <= SAME_SPOT) {
@@ -300,7 +412,9 @@ public final class Simulation {
             if (level < current + SoundModel.SWITCH_DB) return;
         }
         int n = h.size();
-        int k = (int) Math.floor(soundModel.hordeShare(level, n) * n + random.getAsDouble());
+        // Thunder (sub-project 5b): the horde rolls once, as one, whether to turn to it.
+        int k = e.kind == SoundEvent.THUNDER ? (random.getAsDouble() < soundModel.loneChance(level) ? n : 0)
+            : (int) Math.floor(soundModel.hordeShare(level, n) * n + random.getAsDouble());
         if (k <= 0) return;
         double until = e.endHours() + INVESTIGATE_HOURS;
         e.hordes++;
@@ -627,6 +741,15 @@ public final class Simulation {
         currentMinute = minuteOf(nowHours);
         expireSounds(nowHours);
         drainSounds(t0, budgetNanos);
+        if (lureMinute != currentMinute) {
+            lureMinute = currentMinute;
+            lureAll();
+        }
+        if (thunderMinute != currentMinute) {
+            long minutes = thunderMinute == Long.MIN_VALUE ? 1 : Math.max(1, Math.min(60, currentMinute - thunderMinute));
+            thunderMinute = currentMinute;
+            stormThunder(minutes);
+        }
         if (gatherChecked.size() > 4096) gatherChecked.clear();
         if (!pendingIdle.isEmpty()) groupBuildings();
         if (currentMinute - moanIndexMinute >= HORDE_INDEX_MINUTES) rebuildMoanIndex();

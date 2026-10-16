@@ -9,7 +9,7 @@ package truehordes.sim;
  */
 public final class SoundEvent {
     public static final int OTHER = 0, GUNFIRE = 1, VEHICLE = 2, APPLIANCE = 3, ALARM = 4, DEBUG = 5, HELICOPTER = 6,
-        META = 7, THUNDER = 8;
+        META = 7, THUNDER = 8, SCREAM = 9, DOG = 10, CAR_ALARM = 11, ALIFE = 12;
 
     private final long id;
     private final float x, y, loudnessDb;

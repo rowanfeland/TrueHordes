@@ -27,6 +27,8 @@ public final class TestRunner {
         RealHearingTest.class,
         MillTest.class,
         LockdownTest.class,
+        EventsTest.class,
+        WeatherLightsTest.class,
         EncountersTest.class,
         SimulationTest.class,
         SimSpeedTest.class,
