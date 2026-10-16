@@ -98,3 +98,26 @@ hordes after 10 in-game days, most after a month, and two city-sized hordes roam
 | 8 | Near a big held horde (find one with `Hordes_hordes()`), fire repeatedly from 600-800 tiles | each shot splits part of it off (new purple circles heading to you, list `split` counts); after many shots the rest follows (hive mind) |
 | 9 | Stand just outside a big held horde's reach, then walk towards it (or let it come) | distant zombie groans from its direction, more and louder as it gets closer or bigger; silence when none is near |
 | 10 | Sandbox: `SoundEdgeChance` 0 and `SoundCertainShare` 0.5 in a new game | fewer zombies at the edges of sounds respond, everyone inside half the radius does |
+
+
+## Sub-project 5b acceptance: events (single player, debug)
+
+Turn on `Hordes_debug("core", true)` first: every event the mod fires is logged in `console.txt` (`far meta event`,
+`near gunshot`, `car alarm set off`, `A-Life fight`). Fast-forward to make the schedules come round.
+
+| # | Do | Expect |
+|---|---|---|
+| 1 | New game, check `console.txt` | no `[TrueHordes]` errors; the game's own far gunshots never happen (only the mod's) |
+| 2 | Fast-forward 1-3 in-game days, `Hordes_map()` | a far event 300-1000 tiles away: `meta event` (gunshots, several circles a few tenths of a second apart), `scream` or `dog`; dots near it respond |
+| 3 | Listen when one fires (iso and Viewpoint) | the sound comes from its direction; closer ones are louder |
+| 4 | Louder Gunshots at 5 vs off | far gunshot circles are r1000 with it, r600 without |
+| 5 | At night after day 29 (outside a city) | owls and wolf howls still play now and then (ambience, no circle on the map) |
+| 6 | Month 1: wait for `near gunshot` | gunshots 50-100 tiles away, loud; real zombies around you turn to it |
+| 7 | Month 1, parked cars around: wait for `car alarm set off` | a real car 50-100 tiles away blares (yellow `car alarm` circle); it keeps going past vanilla's normal time; walk off so it unloads, come back later: still sounding and the battery lower; sit in the driver seat: it stops |
+| 8 | A-Life enabled, let a while pass | console: `Project A-Life compatibility on`; `A-Life fight` entries; red `A-Life fight` circles off screen, zombies drawn there |
+| 9 | Vanilla weather, heavy rain: fire a shot vs on a dry day | fewer zombies respond in the rain (the circle's counts) |
+| 10 | True Weathers - Gameplay with regional weather on, `Hordes_map()` | blue shading where it rains; `storm thunder` circles over storms away from you; dots outside a storm head into it, dots inside ignore it |
+| 11 | After the power shuts off, at night run a generator with lights on in a house | yellow light dots on the map; some zombies (about 1 in 4) and some hordes turn up at the house; with a generator on a streetlight, rarely one stands under it until morning |
+| 12 | At night after the shutoff, shine a flashlight at zombies that have not seen you | about 1 in 10 of those the beam touches comes to you |
+| 13 | During the day | no light luring (no new zombies drawn by lights) |
+| 14 | Save and quit during a sounding car alarm and with lights lit, reload | the alarm keeps going (battery drained for the time passed); the light dots are still on the map |
