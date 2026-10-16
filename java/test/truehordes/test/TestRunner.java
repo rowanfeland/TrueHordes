@@ -21,6 +21,7 @@ public final class TestRunner {
         TravelTest.class,
         SpatialGridTest.class,
         HearingTest.class,
+        SoundModelTest.class,
         EncountersTest.class,
         SimulationTest.class,
         SimSpeedTest.class,

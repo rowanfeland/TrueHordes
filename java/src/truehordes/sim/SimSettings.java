@@ -8,7 +8,8 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
                           double offRoadChance, double breakAwayChance, int sightSetting, int speedSetting,
                           double realSecondsPerGameMinute, double trailChance, double moanResponsePerHour,
                           double joinChancePerHour, int buildingStragglerOneIn,
-                          double bumpFollowChance, int peakDay) {
+                          double bumpFollowChance, int peakDay, double soundEdgeChance,
+                          double soundCertainShare) {
 
     /** Share of the time an off-screen zombie spends walking rather than standing (vanilla zombies idle a lot). */
     public static final double DUTY = 0.5;
@@ -36,6 +37,10 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         checkChance(joinChancePerHour, "joinChancePerHour");
         checkChance(bumpFollowChance, "bumpFollowChance");
         if (peakDay < 1) throw new IllegalArgumentException("peakDay must be at least 1");
+        checkChance(soundEdgeChance, "soundEdgeChance");
+        if (!(soundCertainShare > 0 && soundCertainShare <= 1)) {
+            throw new IllegalArgumentException("soundCertainShare must be in (0, 1]");
+        }
         if (!(realSecondsPerGameMinute > 0)) throw new IllegalArgumentException("realSecondsPerGameMinute must be > 0");
     }
 
@@ -50,7 +55,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
      * chance reached on the population peak day (vanilla default day 28); it ramps up from none on day 1.
      */
     public static SimSettings defaults() {
-        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 1.0, 28);
+        return new SimSettings(75, 10, 5, 0.01, 0.15, 0.005, 2, SPEED_SHAMBLER, 2.5, 0.30, 0.01, 0.05, 10, 1.0, 28, 0.40, 0.25);
     }
 
     public Builder toBuilder() { return new Builder(this); }
@@ -59,7 +64,7 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         private int stragglerOneIn, hordeFormSize, hordeMinSize, sightSetting, speedSetting, buildingStragglerOneIn,
             peakDay;
         private double followChancePerHour, offRoadChance, breakAwayChance, realSecondsPerGameMinute, trailChance,
-            moanResponsePerHour, joinChancePerHour, bumpFollowChance;
+            moanResponsePerHour, joinChancePerHour, bumpFollowChance, soundEdgeChance, soundCertainShare;
 
         private Builder(SimSettings s) {
             stragglerOneIn = s.stragglerOneIn;
@@ -77,6 +82,8 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
             buildingStragglerOneIn = s.buildingStragglerOneIn;
             bumpFollowChance = s.bumpFollowChance;
             peakDay = s.peakDay;
+            soundEdgeChance = s.soundEdgeChance;
+            soundCertainShare = s.soundCertainShare;
         }
 
         public Builder stragglerOneIn(int v) { stragglerOneIn = v; return this; }
@@ -94,11 +101,14 @@ public record SimSettings(int stragglerOneIn, int hordeFormSize, int hordeMinSiz
         public Builder buildingStragglerOneIn(int v) { buildingStragglerOneIn = v; return this; }
         public Builder bumpFollowChance(double v) { bumpFollowChance = v; return this; }
         public Builder peakDay(int v) { peakDay = v; return this; }
+        public Builder soundEdgeChance(double v) { soundEdgeChance = v; return this; }
+        public Builder soundCertainShare(double v) { soundCertainShare = v; return this; }
 
         public SimSettings build() {
             return new SimSettings(stragglerOneIn, hordeFormSize, hordeMinSize, followChancePerHour, offRoadChance,
                 breakAwayChance, sightSetting, speedSetting, realSecondsPerGameMinute, trailChance, moanResponsePerHour,
-                joinChancePerHour, buildingStragglerOneIn, bumpFollowChance, peakDay);
+                joinChancePerHour, buildingStragglerOneIn, bumpFollowChance, peakDay, soundEdgeChance,
+                soundCertainShare);
         }
     }
 }

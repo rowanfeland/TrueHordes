@@ -143,3 +143,23 @@ option TrueHordes.BumpFollowChance
 	page = TrueHordes,
 	translation = TrueHordes_BumpFollowChance,
 }
+
+option TrueHordes.SoundEdgeChance
+{
+	type = double,
+	min = 0,
+	max = 1,
+	default = 0.4,
+	page = TrueHordes,
+	translation = TrueHordes_SoundEdgeChance,
+}
+
+option TrueHordes.SoundCertainShare
+{
+	type = double,
+	min = 0.01,
+	max = 1,
+	default = 0.25,
+	page = TrueHordes,
+	translation = TrueHordes_SoundCertainShare,
+}
