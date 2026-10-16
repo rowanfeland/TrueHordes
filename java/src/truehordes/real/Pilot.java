@@ -28,8 +28,6 @@ public final class Pilot {
     /** Where it was when last checked for being stuck, and when. */
     public float checkX, checkY;
     public long checkMs;
-    /** Since when (wall clock ms) it has been far and out of sight (0 = it is not). */
-    public long unseenSinceMs;
     /** In-game hours until which it stands (milling at a lure, a straggler lingering). */
     public double waitUntilHours;
     /** Its column slot in its horde (0 = front); set when the horde's members are counted. */

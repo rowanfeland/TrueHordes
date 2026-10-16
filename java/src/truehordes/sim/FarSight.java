@@ -19,6 +19,11 @@ public final class FarSight {
 
     /** Up to {@code max} figures within {@code reach} of (px, py), nearest first, none in a loaded chunk. */
     public static float[] figures(Simulation sim, float px, float py, float reach, int max) {
+        return nearest(collect(sim, px, py, reach, max), max);
+    }
+
+    /** The candidates {x, y, heading, speed, distance} (under the core's lock; at most {@code max} per horde). */
+    public static List<float[]> collect(Simulation sim, float px, float py, float reach, int max) {
         PlayerNearby loaded = sim.players();
         SimSettings s = sim.settings();
         Movement mv = sim.movement();
@@ -38,15 +43,25 @@ public final class FarSight {
             if (hd - h.spread() > reach) continue;
             float v = h.pauseMinutes > 0 ? 0 : mv.speedTilesPerGameMinute(h.size(), s.speedSetting(), h.id, h.allCrawlers());
             float spread = h.spread();
+            int taken = 0;
             for (ZombieRecord m : h.members) {
+                if (taken >= max) break;
                 long k = Movement.mix(m.id * 0x9E3779B97F4A7C15L);
                 double a = (k & 0xFFFF) / 65536.0 * 2 * Math.PI, rr = spread * Math.sqrt(((k >>> 16) & 0xFFFF) / 65536.0);
                 float x = (float) (h.x + Math.cos(a) * rr), y = (float) (h.y + Math.sin(a) * rr);
                 if (inLoaded(loaded, x, y)) continue;
                 float d = Hearing.dist(px, py, x, y);
-                if (d <= reach) out.add(new float[] {x, y, h.heading, v, d});
+                if (d <= reach) {
+                    out.add(new float[] {x, y, h.heading, v, d});
+                    taken++;
+                }
             }
         }
+        return out;
+    }
+
+    /** The nearest {@code max} candidates, flattened (no lock needed). */
+    public static float[] nearest(List<float[]> out, int max) {
         out.sort((a, b) -> Float.compare(a[4], b[4]));
         int n = Math.min(max, out.size());
         float[] flat = new float[n * STRIDE];

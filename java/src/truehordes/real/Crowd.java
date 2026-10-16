@@ -24,6 +24,8 @@ public final class Crowd {
     /** How long a drifting zombie heads for a group (in-game hours), as off screen. */
     static final double DRIFT_HOURS = 3;
     static final int CROWD_MIN = 3;
+    /** Neighbour cells: SIGHT wide, so the 3x3 round a zombie covers everything in sight. */
+    static final int CELL = 40;
 
     /** The chances, already ramped for the day, and the horde sizes. */
     public record Rules(double joinPerHour, double bumpChance, double followPerHour, double driftPerHour,
@@ -142,13 +144,20 @@ public final class Crowd {
                 continue;
             }
             if (p.followId == 0) {
+                // Nearest first; the chain-loop check only for the one picked (performance pass: checking every pair
+                // walked chains for each of up to a thousand neighbours every second).
                 Pilot touching = null, inSight = null;
+                float best = Float.MAX_VALUE;
                 for (Pilot w : near(cells, p.x, p.y)) {
-                    if (w == p || leads(p, w, byId)) continue;
+                    if (w == p) continue;
                     float d = dist(p.x, p.y, w.x, w.y);
-                    if (d <= BUMP && touching == null) touching = w;
-                    if (d <= SIGHT && (inSight == null || d < dist(p.x, p.y, inSight.x, inSight.y))) inSight = w;
+                    if (d <= SIGHT && d < best) {
+                        best = d;
+                        inSight = w;
+                    }
                 }
+                if (inSight != null && leads(p, inSight, byId)) inSight = null;
+                if (inSight != null && best <= BUMP) touching = inSight;
                 if (touching != null && touching.id != p.bumpedId && rng.getAsDouble() < r.bumpChance()) {
                     p.followId = touching.id;
                 } else if (inSight != null && rng.getAsDouble() < follow) {
@@ -219,14 +228,14 @@ public final class Crowd {
     }
 
     static long cell(float x, float y) {
-        return ((long) Math.floorDiv((int) Math.floor(x), 32) << 32) | (Math.floorDiv((int) Math.floor(y), 32) & 0xFFFFFFFFL);
+        return ((long) Math.floorDiv((int) Math.floor(x), CELL) << 32) | (Math.floorDiv((int) Math.floor(y), CELL) & 0xFFFFFFFFL);
     }
 
     static List<Pilot> near(Map<Long, List<Pilot>> cells, float x, float y) {
         List<Pilot> out = new ArrayList<>();
-        int cx = Math.floorDiv((int) Math.floor(x), 32), cy = Math.floorDiv((int) Math.floor(y), 32);
-        for (int dx = -2; dx <= 2; dx++) {
-            for (int dy = -2; dy <= 2; dy++) {
+        int cx = Math.floorDiv((int) Math.floor(x), CELL), cy = Math.floorDiv((int) Math.floor(y), CELL);
+        for (int dx = -1; dx <= 1; dx++) {
+            for (int dy = -1; dy <= 1; dy++) {
                 List<Pilot> l = cells.get(((long) (cx + dx) << 32) | ((cy + dy) & 0xFFFFFFFFL));
                 if (l != null) out.addAll(l);
             }

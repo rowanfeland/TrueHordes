@@ -6,23 +6,10 @@ import java.util.Random;
 import truehordes.real.BreakIn;
 import truehordes.real.Crowd;
 import truehordes.real.Pilot;
-import truehordes.real.RealZone;
 
 /** Sub-project 6: the real zone, crowd break-in times, real-horde columns and forming. */
 public final class BridgeTest {
     private BridgeTest() {}
-
-    public static void testRealZoneChunksAndMargin() {
-        RealZone z = new RealZone();
-        z.set(new float[] {1000, 1000}, 50);
-        Check.isTrue(z.on(), "on with a radius");
-        Check.isTrue(z.chunkInside(125, 125), "the player's own chunk");
-        Check.isTrue(!z.chunkInside(131, 125), "a chunk reaching past 50 tiles is not wholly inside");
-        Check.isTrue(z.near(1060, 1000, RealZone.DEMAT_MARGIN), "60 tiles: still inside radius + margin");
-        Check.isTrue(!z.near(1070, 1000, RealZone.DEMAT_MARGIN), "70 tiles: beyond radius + margin");
-        z.set(new float[] {1000, 1000}, 0);
-        Check.isTrue(!z.on(), "radius 0: off");
-    }
 
     public static void testBreakInTimesFollowD15() {
         Check.near(5, BreakIn.hours(true, 1), 1e-9, "a lone zombie: a window in 5 h");

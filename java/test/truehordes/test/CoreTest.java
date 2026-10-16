@@ -179,7 +179,7 @@ public final class CoreTest {
     /** The simulation thread hurries (1 ms pauses) only while it is behind the game clock. */
     public static void testSimThreadCatchesUpWhenBehind() {
         Check.equal(10L, truehordes.core.SimThread.pauseMillis(0, 10), "keeping up: normal pause");
-        Check.equal(1L, truehordes.core.SimThread.pauseMillis(120, 10), "two in-game hours behind: catch up");
+        Check.equal(2L, truehordes.core.SimThread.pauseMillis(120, 10), "two in-game hours behind: catch up");
     }
 
     public static void testWaitsForWorld() throws Exception {

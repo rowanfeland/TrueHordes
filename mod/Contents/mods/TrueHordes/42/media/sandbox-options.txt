@@ -316,22 +316,12 @@ option TrueHordes.StreetlightReach
 	translation = TrueHordes_StreetlightReach,
 }
 
-option TrueHordes.RealRadius
-{
-	type = double,
-	min = 0,
-	max = 300,
-	default = 50,
-	page = TrueHordes,
-	translation = TrueHordes_RealRadius,
-}
-
 option TrueHordes.PilotOrdersPerTick
 {
 	type = integer,
 	min = 1,
 	max = 500,
-	default = 25,
+	default = 8,
 	page = TrueHordes,
 	translation = TrueHordes_PilotOrdersPerTick,
 }

@@ -250,8 +250,22 @@ public final class Simulation {
      * section 4): at once, not at their next update, so far zombies on slow updates hear a single gunshot too. A big
      * circle walks only the occupied chunks.
      */
+    /** How far a gunshot sets test ring hordes loose (tiles). */
+    static final float RING_WAKE = 400f;
+
     private void broadcast(SoundEvent e) {
         e.lastBroadcastMinute = currentMinute;
+        if (e.kind == SoundEvent.GUNFIRE) {
+            List<Horde> ring = new ArrayList<>();
+            for (Horde h : hordes.all()) {
+                if (h.ring && h.dormant && Hearing.dist(h.x, h.y, e.x(), e.y()) <= RING_WAKE) ring.add(h);
+            }
+            for (Horde h : ring) {
+                h.ring = false;
+                h.rolledSoundId = e.id();
+                wake(h, e.x(), e.y(), e.endHours() + INVESTIGATE_HOURS, 0);
+            }
+        }
         float range = e.radius() * SoundModel.maxReachFactor(s.hearingSetting()), ex = e.x(), ey = e.y();
         List<ZombieRecord> ws = new ArrayList<>();
         grid.wanderersIn(ex - range, ey - range, ex + range, ey + range, r -> {

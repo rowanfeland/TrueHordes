@@ -156,21 +156,10 @@ public final class HandOver {
         return out;
     }
 
-    /** Whether the horde's circle touches a loaded chunk at all (seen-scan candidates; main thread). */
-    public static boolean touchesAnyLoaded(Horde h, PlayerNearby players) {
-        float r = h.spread();
-        int x0 = Math.floorDiv((int) Math.floor(h.x - r), 8), x1 = Math.floorDiv((int) Math.floor(h.x + r), 8);
-        int y0 = Math.floorDiv((int) Math.floor(h.y - r), 8), y1 = Math.floorDiv((int) Math.floor(h.y + r), 8);
-        for (int cx = x0; cx <= x1; cx++) {
-            for (int cy = y0; cy <= y1; cy++) if (players.nearChunk(cx, cy)) return true;
-        }
-        return false;
-    }
-
-    /** Lays out every horde touching the loaded area where a player can see its places (seen scan). */
+    /** Lays out every horde touching the loaded area, each once (not once per chunk it touches). */
     public List<ZombieRecord> layOutInLoaded(Takeover.FloorCheck floors) {
         List<Horde> touching = new ArrayList<>();
-        for (Horde h : sim.hordes().all()) if (touchesAnyLoaded(h, sim.players())) touching.add(h);
+        for (Horde h : sim.hordes().all()) if (touchesLoaded(h, sim.players())) touching.add(h);
         List<ZombieRecord> out = new ArrayList<>();
         for (Horde h : touching) out.addAll(layOut(h, floors));
         return out;

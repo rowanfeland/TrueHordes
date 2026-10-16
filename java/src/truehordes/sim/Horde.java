@@ -54,6 +54,9 @@ public final class Horde {
     /** A real horde near a player, stood in only so held zombies hear its moaning (sub-project 6): its size. */
     public int phantom;
 
+    /** A test ring horde (Hordes_ringHordes): any gunshot within RING_WAKE tiles sets it loose (not saved). */
+    public boolean ring;
+
     /** Zombies moaning in it (members, or a real horde's real count). */
     public int moaners() { return members.size() + phantom; }
 

@@ -305,14 +305,16 @@ public final class LuaApi {
         if (c == null || c.state() != Core.State.RUNNING) return null;
         try {
             float[] f;
+            java.util.List<float[]> cand;
             double rspm;
             synchronized (c) {
                 truehordes.sim.Simulation sim = c.simulation();
                 if (sim == null) return null;
-                f = truehordes.sim.FarSight.figures(sim, LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0),
-                    LuaArgs.toFloat(reach, 200), LuaArgs.toInt(max, 600));
+                cand = truehordes.sim.FarSight.collect(sim, LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0),
+                    LuaArgs.toFloat(reach, 200), LuaArgs.toInt(max, 250));
                 rspm = sim.settings().realSecondsPerGameMinute();
             }
+            f = truehordes.sim.FarSight.nearest(cand, LuaArgs.toInt(max, 250));
             KahluaTable t = LuaManager.platform.newTable();
             t.rawset("n", (double) (f.length / truehordes.sim.FarSight.STRIDE));
             t.rawset("rspm", rspm);
@@ -343,10 +345,12 @@ public final class LuaApi {
                     spot = truehordes.sim.TestHordes.roadSpot(sim.movement().map(), ppx, ppy, 250);
                 }
                 if (spot == null) return "no highway found 150-350 tiles from you; give x, y";
-                truehordes.sim.Horde h = truehordes.sim.TestHordes.walking(sim, c.store(), size, spot[0], spot[1], spot[2],
-                    new java.util.Random());
-                return String.format(java.util.Locale.ROOT, "horde %d of %d at %.0f,%.0f heading %.0f degrees", h.id, size,
-                    spot[0], spot[1], Math.toDegrees(spot[2]));
+                truehordes.sim.Horde h = truehordes.sim.TestHordes.toward(sim, c.store(), size, spot[0], spot[1], spot[2],
+                    ppx, ppy, new java.util.Random());
+                String msg = String.format(java.util.Locale.ROOT, "horde %d of %d at %.0f,%.0f heading for you", h.id,
+                    size, spot[0], spot[1]);
+                Log.info("Hordes_roadHorde: " + msg);
+                return msg;
             }
         } catch (Throwable t) {
             Log.errorOnce("lua:roadHorde:" + t.getClass().getName(), "road horde failed", t);
@@ -367,7 +371,10 @@ public final class LuaApi {
                 float r = LuaArgs.toFloat(radius, 120);
                 int placed = truehordes.sim.TestHordes.ring(sim, c.store(), k, s, r, LuaArgs.toFloat(px, 0),
                     LuaArgs.toFloat(py, 0), new java.util.Random());
-                return placed + " dormant hordes of " + s + " placed " + (int) r + " tiles round you (a gunshot sets them loose)";
+                String msg = placed + " dormant hordes of " + s + " placed " + (int) r
+                    + " tiles round you (any gunshot within 400 tiles sets them loose)";
+                Log.info("Hordes_ringHordes: " + msg);
+                return msg;
             }
         } catch (Throwable t) {
             Log.errorOnce("lua:ringHordes:" + t.getClass().getName(), "ring hordes failed", t);
@@ -420,6 +427,30 @@ public final class LuaApi {
                 }
                 hs.rawset("n", (double) n);
                 t.rawset("hordes", hs);
+                // Real zombies in view (sub-project 6): x, y, in a horde (1/0), and real hordes: x, y, size.
+                KahluaTable rz = LuaManager.platform.newTable();
+                int m = 0;
+                for (zombie.characters.IsoZombie z : zombie.iso.IsoWorld.instance.currentCell.getZombieList()) {
+                    if (z == null || z.isDead() || m >= 4000) continue;
+                    float zx = z.getX(), zy = z.getY();
+                    if (zx < x0 || zx >= x1 || zy < y0 || zy >= y1) continue;
+                    rz.rawset((double) (m * 3 + 1), (double) zx);
+                    rz.rawset((double) (m * 3 + 2), (double) zy);
+                    rz.rawset((double) (m * 3 + 3), Hooks.PILOTS.hordeIdOf(z) != 0 ? 1.0 : 0.0);
+                    m++;
+                }
+                rz.rawset("n", (double) m);
+                t.rawset("real", rz);
+                KahluaTable rh = LuaManager.platform.newTable();
+                int g = 0;
+                for (truehordes.real.Crowd.Group gr : Hooks.PILOTS.realGroups()) {
+                    rh.rawset((double) (g * 3 + 1), (double) gr.cx);
+                    rh.rawset((double) (g * 3 + 2), (double) gr.cy);
+                    rh.rawset((double) (g * 3 + 3), (double) gr.members.size());
+                    g++;
+                }
+                rh.rawset("n", (double) g);
+                t.rawset("realHordes", rh);
                 return t;
             }
         } catch (Throwable t) {

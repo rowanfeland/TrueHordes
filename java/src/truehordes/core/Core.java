@@ -38,7 +38,7 @@ public final class Core {
     private final Scheduler scheduler = new Scheduler(stats);
     private final World world = new World();
     private final Takeover takeover = new Takeover(store);
-    private State state = State.IDLE;
+    private volatile State state = State.IDLE;
     private String disabledReason = "";
     private String lastLoad = "";
     private double lastSaveHours = Double.NaN;
@@ -47,9 +47,9 @@ public final class Core {
     private final SaveWriter saveWriter = new SaveWriter();
     /** How long a full save or stop waits for the save thread, in real milliseconds. */
     static final long SAVE_FLUSH_MS = 10_000L;
-    private truehordes.sim.SimSettings simSettings = truehordes.sim.SimSettings.defaults();
-    private truehordes.sim.Simulation sim;
-    private SimThread simThread;
+    private volatile truehordes.sim.SimSettings simSettings = truehordes.sim.SimSettings.defaults();
+    private volatile truehordes.sim.Simulation sim;
+    private volatile SimThread simThread;
     /** World hour as of the last tick, for the simulation thread (it never calls into the game). */
     private volatile double simNowHours;
     /** Mirrors takesOverPopulation() without the lock, for the per-zombie, per-frame rally hook. */
@@ -60,8 +60,9 @@ public final class Core {
     private double lastConservationHours = Double.NaN;
 
     /** Background slice length and pause (spec 5). */
-    static final long SIM_SLICE_NANOS = 2_000_000L;
-    static final long SIM_SLEEP_MILLIS = 10L;
+    /** 1 ms slices (performance pass): the game's main thread waits at most this long for the lock. */
+    static final long SIM_SLICE_NANOS = 1_000_000L;
+    static final long SIM_SLEEP_MILLIS = 5L;
 
     public Core(GameEnv env) {
         this(env, System::currentTimeMillis);
@@ -84,21 +85,21 @@ public final class Core {
     public World world() { return world; }
 
     /** The off-screen simulation (null unless running). Use under this core's lock. */
-    public synchronized truehordes.sim.Simulation simulation() { return sim; }
+    public truehordes.sim.Simulation simulation() { return sim; }
 
-    public synchronized SimThread simThread() { return simThread; }
+    public SimThread simThread() { return simThread; }
 
     /** The simulation settings read when the core started (defaults before that). */
-    public synchronized truehordes.sim.SimSettings simSettings() { return simSettings; }
+    public truehordes.sim.SimSettings simSettings() { return simSettings; }
 
     /** Hand-over bookkeeping; changed only under this core's lock. */
     public Takeover takeover() { return takeover; }
 
     /** The mod owns the zombies right now: running on the machine that owns the simulation. */
-    public synchronized boolean ownsPopulation() { return state == State.RUNNING && !env.isClient(); }
+    public boolean ownsPopulation() { return state == State.RUNNING && !env.isClient(); }
 
     /** The native spawner must stay switched off (even before the core starts, at world load). */
-    public synchronized boolean takesOverPopulation() {
+    public boolean takesOverPopulation() {
         return state != State.DISABLED && !env.isClient() && env.enabled();
     }
 
@@ -106,7 +107,7 @@ public final class Core {
      * The game's room zombie spawn is skipped: the mod seeds (or seeded) this world's buildings. Also before the core
      * starts in a new world, because the game can see the first rooms in the frames before the core's first tick.
      */
-    public synchronized boolean skipRoomSpawns() {
+    public boolean skipRoomSpawns() {
         if (state == State.RUNNING) return population.seededWorld() && population.buildingZombiesSeeded();
         return state == State.IDLE && !env.isClient() && env.enabled() && env.populationSettings().buildingZombiesSeeded
             && env.newWorld();
@@ -243,7 +244,7 @@ public final class Core {
 
     public synchronized void setEdgePool(int n) { population.setEdgePool(n); }
 
-    /** Lays out held hordes touching the loaded area wherever a player can see their places; returns their chunks. */
+    /** Lays out held hordes touching the loaded area (one pass); returns the chunks their members landed in. */
     public synchronized java.util.Set<Long> layOutHordesInLoaded(truehordes.population.Takeover.FloorCheck floors) {
         java.util.Set<Long> chunks = new java.util.HashSet<>();
         if (sim == null || state != State.RUNNING) return chunks;

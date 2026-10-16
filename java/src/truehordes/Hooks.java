@@ -47,7 +47,6 @@ public final class Hooks {
             }
             long now = System.currentTimeMillis();
             PILOTS.tick(c, now);
-            PopulationBridge.scanSeen(c, now);
         } catch (Throwable t) {
             Log.errorOnce("hook:pilots:" + t.getClass().getName(), "steering real zombies failed", t);
         }

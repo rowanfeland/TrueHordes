@@ -349,6 +349,29 @@ function Hordes_MapPanel:prerender()
             end
         end
         self:drawHordes(s.hordes)
+        -- Real zombies (loaded area): green, bright green in a real horde; real hordes ringed in cyan.
+        local rz = s.real
+        if rz and rz.n then
+            for i = 0, rz.n - 1 do
+                local sx, sy = self:worldToScreen(rz[i * 3 + 1], rz[i * 3 + 2])
+                if rz[i * 3 + 3] == 1 then
+                    self:drawRect(sx - 1, sy - 1, 3, 3, 1, 0.3, 1.0, 0.4)
+                else
+                    self:drawRect(sx - 1, sy - 1, 3, 3, 1, 0.1, 0.6, 0.2)
+                end
+            end
+        end
+        local rh = s.realHordes
+        if rh and rh.n then
+            for i = 0, rh.n - 1 do
+                local cx, cy = self:worldToScreen(rh[i * 3 + 1], rh[i * 3 + 2])
+                local r = math.max(4, (2 + math.sqrt(rh[i * 3 + 3]) * 0.5) * self.zoom)
+                for k = 0, 23 do
+                    local a = k / 24 * 2 * math.pi
+                    self:drawRect(cx + math.cos(a) * r - 1, cy + math.sin(a) * r - 1, 2, 2, 1, 0.2, 0.9, 1.0)
+                end
+            end
+        end
     end
     if self.showSounds then self:drawSounds(now) end
     if player then
@@ -361,7 +384,8 @@ function Hordes_MapPanel:prerender()
     elseif s.density then
         status = string.format("%d in view, density cells of %d tiles", s.total, s.cell)
     else
-        status = string.format("%d wanderers in view, %d hordes (purple)", s.total, s.hordes and s.hordes.n or 0)
+        status = string.format("%d wanderers in view, %d hordes (purple), %d real (green), %d real hordes (cyan)",
+            s.total, s.hordes and s.hordes.n or 0, s.real and s.real.n or 0, s.realHordes and s.realHordes.n or 0)
     end
     self:drawText(string.format("zoom %.2f px/tile | %s%s", self.zoom, status, self.follow and " | following" or ""),
         4, 4, 1, 1, 1, 1, UIFont.Small)

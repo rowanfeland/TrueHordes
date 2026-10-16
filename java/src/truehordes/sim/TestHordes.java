@@ -96,6 +96,17 @@ public final class TestHordes {
         return h[0];
     }
 
+    /** As walking, heading for (tx, ty) for the next 12 in-game hours (it walks in to the player). */
+    public static Horde toward(Simulation sim, Store store, int n, float x, float y, float heading, float tx, float ty,
+                               java.util.Random rnd) {
+        Horde h = walking(sim, store, n, x, y, heading, rnd);
+        h.targetX = tx;
+        h.targetY = ty;
+        h.targetDb = 60f;
+        h.investigateUntilHours = sim.currentHours() + 12;
+        return h;
+    }
+
     /** Ground near (x, y) a horde can stand on (searching outwards up to 4 chunks), or null. */
     public static float[] ground(MapView map, float x, float y) {
         int cx = Math.floorDiv((int) Math.floor(x), 8), cy = Math.floorDiv((int) Math.floor(y), 8);
@@ -126,6 +137,7 @@ public final class TestHordes {
             sim.internal(() -> {
                 for (ZombieRecord r : ms) store.remove(r.id);
                 Horde h = sim.hordes().createDormant(g[0], g[1], ms);
+                h.ring = true;
                 sim.grid().putHorde(h);
             });
             placed++;

@@ -10,7 +10,6 @@ import se.krka.kahlua.vm.KahluaTable;
 import truehordes.core.Core;
 import truehordes.real.Crowd;
 import truehordes.real.Pilot;
-import truehordes.real.RealZone;
 import truehordes.sim.Encounters;
 import truehordes.sim.Hearing;
 import truehordes.sim.Movement;
@@ -34,88 +33,54 @@ import zombie.network.GameServer;
  * Steers real zombies by the simulation's rules (sub-project 6 spec goals 1-7): every real zombie has a {@link Pilot};
  * when vanilla is not busy with it (no target, not attacking, thumping, eating, lying or sitting), it is sent with
  * {@code pathToLocation} to a waypoint 12-20 tiles on, picked by its own {@link Movement} (travel, milling at home,
- * following a sound or a light, walking behind its horde's leader in a column). Real zombies far from every player and
- * out of every player's sight go back to the simulation, still walking. Main thread only.
+ * following a sound or a light, walking behind its horde's leader in a column). Every zombie in the loaded area is
+ * real (user, 2026-10-16: hiding unseen ones made invisible zombies; not worth it). Main thread only.
  */
 final class Pilots {
-    final RealZone zone = new RealZone();
     private final WeakHashMap<IsoZombie, Pilot> pilots = new WeakHashMap<>();
     private Map<Long, Crowd.Group> groups = new HashMap<>();
     private final Random rnd = new Random();
     private Movement movement;
     private SimSettings movementSettings;
     private truehordes.sim.MapView movementMap;
-    float radius = 50;
-    int ordersPerTick = 25;
+    int ordersPerTick = 8;
     private int cursor;
-    private long lastZoneMs, lastCrowdMs;
+    private long lastCrowdMs;
     private double lastCrowdHours = Double.NaN;
-    private int orders, sentBack;
+    private int orders;
 
     /** Tiles ahead a waypoint is put (about 12-20 with the walker's speed rounding). */
-    static final float LOOK = 16f;
+    static final float LOOK = 24f;
     /** A zombie this close to its lure mills there. */
     static final float MILL = 4f;
     static final double INVESTIGATE_HOURS = 6;
     /** Zombies looked at per tick (each comes round again every few ticks). */
     static final int PER_TICK = 200;
     static final long BUDGET_NANOS = 2_000_000L;
-    /** How long a far real zombie must be out of every player's sight before it goes back to the simulation. */
-    static final long UNSEEN_MS = 5000;
 
     void readSettings() {
-        radius = (float) Math.max(0, GameEnvImpl.sandboxDouble("TrueHordes.RealRadius", 50));
-        ordersPerTick = (int) Math.max(1, GameEnvImpl.sandboxDouble("TrueHordes.PilotOrdersPerTick", 25));
+        ordersPerTick = (int) Math.max(1, GameEnvImpl.sandboxDouble("TrueHordes.PilotOrdersPerTick", 8));
     }
 
     int count() { return pilots.size(); }
 
+    /** The real hordes as of the last crowd pass (for the debug map). */
+    java.util.Collection<Crowd.Group> realGroups() { return groups.values(); }
+
+    /** The horde a real zombie is in (0 none), for the debug map. */
+    long hordeIdOf(IsoZombie z) {
+        Pilot p = pilots.get(z);
+        return p == null ? 0 : p.hordeId;
+    }
+
     String stats() {
-        return "pilots " + pilots.size() + ", real hordes " + groups.size() + ", orders " + orders + ", sent back "
-            + sentBack + ", real radius " + (int) radius;
+        return "pilots " + pilots.size() + ", real hordes " + groups.size() + ", orders " + orders;
     }
 
     static double nowHours() { return GameTime.getInstance().getWorldAgeHours(); }
 
-    /** Positions of every player this game runs zombies for: all connected players on a server, local ones otherwise. */
-    static List<IsoPlayer> players() {
-        List<IsoPlayer> out = new ArrayList<>();
-        if (GameServer.server) {
-            for (IsoPlayer p : GameServer.getPlayers()) if (p != null && !p.isDead()) out.add(p);
-        } else {
-            for (int i = 0; i < IsoPlayer.numPlayers; i++) {
-                IsoPlayer p = IsoPlayer.players[i];
-                if (p != null && !p.isDead()) out.add(p);
-            }
-        }
-        return out;
-    }
-
-    private void publishZone() {
-        List<IsoPlayer> ps = players();
-        float[] xy = new float[ps.size() * 2];
-        for (int i = 0; i < ps.size(); i++) {
-            xy[i * 2] = ps.get(i).getX();
-            xy[i * 2 + 1] = ps.get(i).getY();
-        }
-        zone.set(xy, radius);
-    }
-
-    /** A local player can see the tile (x, y, z) right now (always false on a dedicated server: sub-project 7). */
-    static boolean seen(float x, float y, float z) {
-        if (GameServer.server) return false;
-        IsoGridSquare sq = IsoWorld.instance.currentCell.getGridSquare((double) x, (double) y, (double) z);
-        if (sq == null) return false;
-        for (int i = 0; i < IsoPlayer.numPlayers; i++) if (IsoPlayer.players[i] != null && sq.isCouldSee(i)) return true;
-        return false;
-    }
-
     void tick(Core c, long nowMs) {
         if (!c.ownsPopulation()) return;
-        if (nowMs - lastZoneMs >= 250) {
-            lastZoneMs = nowMs;
-            publishZone();
-        }
         SimSettings s = c.simSettings();
         truehordes.sim.MapView map = c.mapView();
         if (s == null || map == null) return;
@@ -134,7 +99,6 @@ final class Pilots {
         if (n == 0) return;
         long t0 = System.nanoTime();
         int budget = ordersPerTick;
-        List<IsoZombie> back = new ArrayList<>();
         for (int k = 0; k < Math.min(n, PER_TICK); k++) {
             if (cursor >= n) cursor = 0;
             IsoZombie z = list.get(cursor++);
@@ -146,28 +110,11 @@ final class Pilots {
                 p.wpX = Float.NaN;
                 continue;
             }
-            if (zone.on() && !zone.near(p.x, p.y, RealZone.DEMAT_MARGIN) && !seen(p.x, p.y, z.getZ())) {
-                // Out of sight a few seconds (a player glancing round does not make zombies blink in and out).
-                if (p.unseenSinceMs == 0) p.unseenSinceMs = nowMs;
-                if (nowMs - p.unseenSinceMs >= UNSEEN_MS) {
-                    back.add(z);
-                    continue;
-                }
-            } else {
-                p.unseenSinceMs = 0;
-            }
             if (budget > 0 && due(p, z, nowMs, now, s)) {
                 order(p, z, nowMs, now, s);
                 budget--;
             }
             if ((k & 15) == 15 && System.nanoTime() - t0 > BUDGET_NANOS) break;
-        }
-        for (IsoZombie z : back) {
-            Pilot p = pilots.get(z);
-            if (p != null && PopulationBridge.sendBack(c, z, p)) {
-                pilots.remove(z);
-                sentBack++;
-            }
         }
     }
 
@@ -270,10 +217,10 @@ final class Pilots {
     private boolean due(Pilot p, IsoZombie z, long nowMs, double now, SimSettings s) {
         if (p.dormant || now < p.waitUntilHours) return false;
         if (Float.isNaN(p.wpX) || nowMs >= p.nextOrderMs) return true;
-        if (Crowd_dist(p.x, p.y, p.wpX, p.wpY) < 2.5f) return true;
+        if (Crowd_dist(p.x, p.y, p.wpX, p.wpY) < 4f) return true;
         // A follower whose slot moved on (its leader took a new waypoint).
         float[] want = followTarget(p);
-        if (want != null && Crowd_dist(want[0], want[1], p.wpX, p.wpY) > 3f) return true;
+        if (want != null && Crowd_dist(want[0], want[1], p.wpX, p.wpY) > 6f) return true;
         if (nowMs - p.checkMs >= 6000) {
             boolean stuck = Crowd_dist(p.x, p.y, p.checkX, p.checkY) < 1f;
             p.checkMs = nowMs;
@@ -361,7 +308,8 @@ final class Pilots {
         z.pathToLocation((int) Math.floor(tx), (int) Math.floor(ty), (int) Math.floor(z.getZ()));
         p.wpX = tx;
         p.wpY = ty;
-        p.nextOrderMs = nowMs + 4000 + rnd.nextInt(4000);
+        // Performance pass: each order is a path search on the game's pathfinding thread, shared with chasing zombies.
+        p.nextOrderMs = nowMs + 8000 + rnd.nextInt(7000);
         orders++;
         writeModData(z, p);
     }
@@ -395,7 +343,17 @@ final class Pilots {
         Crowd.Rules rules = new Crowd.Rules(s.joinChancePerHour() * ramp, s.bumpFollowChance() * ramp,
             s.followChancePerHour() * ramp, s.crowdDriftPerHour() * ramp, s.hordeFormSize(), s.hordeMinSize());
         try {
-            groups = Crowd.update(ps, dt, now, rules, id -> heldPart(c, id), h -> newHorde(c, h), rnd::nextDouble);
+            // One lock for all the "is part of it still held" questions (performance pass).
+            java.util.Set<Long> ids = new java.util.HashSet<>();
+            for (Pilot p : ps) if (p.hordeId != 0) ids.add(p.hordeId);
+            java.util.Set<Long> held = new java.util.HashSet<>();
+            if (!ids.isEmpty()) {
+                synchronized (c) {
+                    Simulation sim = c.simulation();
+                    if (sim != null) for (long id : ids) if (sim.hordes().get(id) != null) held.add(id);
+                }
+            }
+            groups = Crowd.update(ps, dt, now, rules, held::contains, h -> newHorde(c, h), rnd::nextDouble);
             // Held zombies hear real hordes' moaning too.
             float[] packed = new float[groups.size() * 4];
             int i = 0;

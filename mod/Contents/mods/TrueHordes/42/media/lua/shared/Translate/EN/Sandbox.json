@@ -66,8 +66,6 @@
     "Sandbox_TrueHordes_LightReach_tooltip": "How far away zombies notice a lit building, floodlight or lamp.",
     "Sandbox_TrueHordes_StreetlightReach": "Streetlight reach (tiles)",
     "Sandbox_TrueHordes_StreetlightReach_tooltip": "How far away zombies notice a lit streetlight.",
-    "Sandbox_TrueHordes_RealRadius": "Real zombie radius (tiles)",
-    "Sandbox_TrueHordes_RealRadius_tooltip": "Zombies are real game objects within this many tiles of a player, or where a player can see them. Further out in the loaded area they keep walking in the mod's simulation, which costs far less. 0 makes the whole loaded area real.",
     "Sandbox_TrueHordes_PilotOrdersPerTick": "Real zombie orders per tick",
     "Sandbox_TrueHordes_PilotOrdersPerTick_tooltip": "Most path orders given to real zombies each tick. Lower is cheaper; higher keeps big crowds moving more smoothly.",
     "Sandbox_TrueHordes_CrowdBreakIn": "Crowd break-in",
