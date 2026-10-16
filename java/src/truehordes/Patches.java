@@ -159,6 +159,15 @@ public final class Patches {
         public static void exit() { Hooks.soundsDuring(0); }
     }
 
+    /** A lightning strike: a sound zombies inside the storm hear too (sub-project 5b). */
+    @Patch(className = HookTargets.THUNDERSTORM, methodName = HookTargets.TRIGGER_THUNDER)
+    public static class LightningStrike {
+        @Patch.OnExit
+        public static void exit(@Patch.Argument(0) int x, @Patch.Argument(1) int y, @Patch.Argument(2) boolean strike) {
+            Hooks.lightning(x, y, strike);
+        }
+    }
+
     /** Server: the gunshot meta event. */
     @Patch(className = HookTargets.AMBIENT_SOUND, methodName = HookTargets.GUN_EVENT)
     public static class MetaGunServer {

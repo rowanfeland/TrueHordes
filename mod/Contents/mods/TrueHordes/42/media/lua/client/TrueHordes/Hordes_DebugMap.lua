@@ -39,6 +39,7 @@ local SOUND_KINDS = {
     [11] = { 1.00, 0.75, 0.10, "car alarm" },
     [12] = { 1.00, 0.20, 0.20, "A-Life fight" },
     [13] = { 0.45, 0.45, 0.90, "storm thunder" },
+    [14] = { 0.85, 0.85, 1.00, "lightning" },
 }
 local SOUND_FADE_MS = 30000 -- an ended sound fades out over 30 real seconds
 local SOUND_RINGS = 6

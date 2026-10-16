@@ -63,6 +63,34 @@ public final class Hooks {
         return false;
     }
 
+    /** World radius of a lightning strike's crack (Claude's call). */
+    static final int LIGHTNING_RADIUS = 150;
+    /** Vanilla's helicopter radius: A-Life's helicopters are heard like it. */
+    static final int HELICOPTER_RADIUS = 500;
+
+    /** A lightning strike at (x, y): a world sound that is not thunder, so zombies inside the storm hear it. */
+    public static void lightning(int x, int y, boolean strike) {
+        if (!strike) return;
+        Core c = core;
+        if (c == null || c.soundSink() == null || c.state() != Core.State.RUNNING || !WEATHER.on) return;
+        try {
+            soundAs(truehordes.sim.SoundEvent.LIGHTNING, x, y, LIGHTNING_RADIUS);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:lightning:" + t.getClass().getName(), "lightning strike sound failed", t);
+        }
+    }
+
+    /** A world sound made by the mod, labelled {@code kind} for the capture. */
+    static void soundAs(int kind, int x, int y, int radius) {
+        int before = SoundCapture.during;
+        SoundCapture.during = kind;
+        try {
+            zombie.WorldSoundManager.instance.addSound(null, x, y, 0, radius, radius);
+        } finally {
+            SoundCapture.during = before;
+        }
+    }
+
     /** Vanilla's random ambient: skipped (true) while the mod runs meta events; owls and wolves are kept. */
     public static boolean randomAmbient() {
         try {

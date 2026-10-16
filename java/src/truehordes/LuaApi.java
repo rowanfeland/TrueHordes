@@ -152,6 +152,19 @@ public final class LuaApi {
         }
     }
 
+    /** Project A-Life compatibility: one of A-Life's helicopter noises, heard like the game's own helicopter. */
+    @LuaMethod(name = "Hordes_j_heliNoise", global = true)
+    public static void heliNoise(Object x, Object y) {
+        try {
+            Core c = Hooks.core();
+            if (c == null || c.soundSink() == null) return;
+            Hooks.soundAs(truehordes.sim.SoundEvent.HELICOPTER, (int) LuaArgs.toFloat(x, 0), (int) LuaArgs.toFloat(y, 0),
+                Hooks.HELICOPTER_RADIUS);
+        } catch (Throwable t) {
+            Log.errorOnce("lua:heliNoise", "A-Life helicopter noise failed", t);
+        }
+    }
+
     @LuaMethod(name = "Hordes_j_sound", global = true)
     public static String sound(Object x, Object y, Object radius) {
         Core c = Hooks.core();
