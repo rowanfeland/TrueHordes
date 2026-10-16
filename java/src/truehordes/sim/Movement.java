@@ -465,9 +465,10 @@ public final class Movement {
         }
         double tilesPerSecond = cls == SimSettings.SPEED_SPRINTER ? SimSettings.SPRINTER
             : cls == SimSettings.SPEED_FAST_SHAMBLER ? SimSettings.FAST : SimSettings.SHAMBLER;
-        double v = tilesPerSecond * SimSettings.DUTY * s.realSecondsPerGameMinute();
+        // A horde on the move walks steadily at the game's zombie speed (user, 2026-10-16: never faster or slower than
+        // the real ones, so the player cannot outwalk it unfairly either way); lone zombies idle part of the time.
+        double v = tilesPerSecond * (members > 1 ? 1 : SimSettings.DUTY) * s.realSecondsPerGameMinute();
         if (crawler) v *= CRAWLER;
-        if (members > 10) v *= Math.max(0.5, 1 - 0.5 * (Math.log10(members) - 1) / 3);
         return (float) v;
     }
 

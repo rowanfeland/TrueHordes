@@ -160,13 +160,15 @@ public final class MovementTest {
         Check.isTrue(off > 50, "leaves the road sometimes with chance 1 (" + off + ")");
     }
 
-    public static void testCrowdingSlowsBigHordes() {
+    /** User, 2026-10-16: hordes walk steadily at the game's speed whatever their size; lone zombies idle half the time. */
+    public static void testHordesWalkAtTheGamesSpeed() {
         Movement mv = move(new TextMap("O"), 0.1);
         float one = mv.speedTilesPerGameMinute(1, SimSettings.SPEED_SHAMBLER, 1, false);
-        Check.near(one, mv.speedTilesPerGameMinute(10, SimSettings.SPEED_SHAMBLER, 1, false), 1e-6, "10 at full speed");
-        Check.near(one * 0.5, mv.speedTilesPerGameMinute(10000, SimSettings.SPEED_SHAMBLER, 1, false), one * 0.02,
-            "10,000 at half speed");
-        Check.near(SimSettings.SHAMBLER * SimSettings.DUTY * 2.5, one, 1e-6, "shambler tiles per in-game minute");
+        Check.near(SimSettings.SHAMBLER * SimSettings.DUTY * 2.5, one, 1e-6, "a lone shambler, idling half the time");
+        Check.near(SimSettings.SHAMBLER * 2.5, mv.speedTilesPerGameMinute(10, SimSettings.SPEED_SHAMBLER, 1, false), 1e-6,
+            "a horde at the shambler's full pace");
+        Check.near(SimSettings.SHAMBLER * 2.5, mv.speedTilesPerGameMinute(10000, SimSettings.SPEED_SHAMBLER, 1, false),
+            1e-6, "however big");
         Check.isTrue(mv.speedTilesPerGameMinute(1, SimSettings.SPEED_SHAMBLER, 1, true) < one * 0.5, "crawlers are slow");
     }
 
