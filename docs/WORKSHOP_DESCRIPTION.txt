@@ -1,0 +1,55 @@
+[h1]WORK IN PROGRESS - EARLY ACCESS[/h1]
+[b]True Hordes is an early-access, work-in-progress mod.[/b] Expect bugs, balance changes, performance rough edges and save-breaking updates. Back up your saves, and please report what you find.
+
+[h2]What it is[/h2]
+Walking Dead style hordes that form for real reasons and roam the whole map, whether you are near them or not.
+
+True Hordes replaces Project Zomboid's off-screen zombie population with its own simulation. Every zombie on the map keeps living while you are away: it wanders, hears, gathers and moves, then walks into your area as a real zombie, and walks back out again.
+
+[h2]Features[/h2]
+[list]
+[*][b]A living map.[/b] Every zombie is simulated off screen, all the time. Towns empty and fill, roads carry traffic, and nothing is spawned in front of you to fake it.
+[*][b]Hordes that form naturally.[/b] Zombies follow each other, bump together, gather at sounds and merge. Over days and weeks, crowds snowball into roaming hordes. Over months, cities can produce mega-hordes.
+[*][b]Highways and towns.[/b] Hordes travel roads and highways, now and then turn off into towns, and cut across yards and fields.
+[*][b]Sound matters.[/b] Gunshots, alarms, helicopters, thunder and the moaning of other hordes draw zombies from far away. A loud fight can pull in a crowd from across town.
+[*][b]Real zombies follow the same rules.[/b] Zombies near you keep roaming, join hordes and leave your area again, instead of standing still.
+[*][b]Sleeping buildings.[/b] Zombies inside houses wait until something wakes them, then pour out together.
+[*][b]Events.[/b] Distant gunfire, screams, dogs, car alarms and storms happen across the map and move the population around.
+[*][b]Night lights.[/b] After the power goes out, lit buildings, streetlights and flashlights can lure zombies in.
+[*][b]Crowd break-ins.[/b] One zombie at a door takes a long time. A hundred take minutes.
+[*][b]See them coming.[/b] Hordes beyond your loaded area show as dark shapes in the distance, and you can hear big ones moaning before they arrive.
+[*][b]Respawns arrive as hordes[/b] from the map's edge, bigger the older your world is.
+[*][b]Multiplayer.[/b] Dedicated servers run the simulation; each player's game moves the zombies near them.
+[/list]
+
+[h2]Requirements[/h2]
+[list]
+[*][b]Build 42[/b] (42.21 or newer).
+[*][b]ZombieBuddy[/b], including its Java part: the jar, [i]zbNative.dll[/i] and the [i]-agentlib:zbNative[/i] launch option. Follow ZombieBuddy's install guide. On a server, both the server and every player need it.
+[*]When ZombieBuddy asks whether to allow the True Hordes Java mod, answer yes.
+[/list]
+
+[h2]Compatibility[/h2]
+[list]
+[*][b]Not compatible with Wandering Zombies[/b] (both control the same zombies).
+[*]Built-in support for [b]True Weathers - Gameplay[/b] (rain muffles sound, storms thunder), [b]Louder Gunshots[/b] and [b]Project A-Life[/b] (off-screen fights and helicopters make noise).
+[*]Best on a [b]new save[/b]. Existing saves are taken over gradually.
+[/list]
+
+[h2]Multiplayer notes[/h2]
+[list]
+[*]Set the server's zombie cull ([i]ZombiesCountBeforeDelete[/i]) high so the server does not delete zombies the mod is managing.
+[*]Admins can use [i]Hordes_stats()[/i], [i]Hordes_map()[/i] and the test commands [i]Hordes_roadHorde(300)[/i] and [i]Hordes_ringHordes(6, 100, 120)[/i] from the debug console.
+[/list]
+
+[h2]Settings[/h2]
+Everything is on the [b]True Hordes[/b] sandbox page: how often hordes form, how roads are used, sound and weather, events, lights, break-ins, far sight, and more.
+
+[h2]Known issues (early access)[/h2]
+[list]
+[*]Lots of zombies near you still cost frames, as in vanilla. The simulation itself runs in the background.
+[*]Balance (how fast hordes form, how big they get, how often events happen) is still being tuned.
+[*]Multiplayer is new and lightly tested.
+[/list]
+
+Feedback and bug reports are very welcome. Please include your [i]console.txt[/i] (or [i]server-console.txt[/i]) if something breaks.
