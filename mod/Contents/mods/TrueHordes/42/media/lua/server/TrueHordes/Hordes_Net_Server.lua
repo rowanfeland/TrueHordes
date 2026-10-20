@@ -83,6 +83,8 @@ local function onClientCommand(module, command, player, args)
         J.mpLure(args.o, args.x, args.y)
     elseif command == "off" then
         J.mpOff(args.o, args.x, args.y, args.v)
+    elseif command == "chase" or command == "chasefar" then
+        J.mpChase(args.o, args.x, args.y, args.v, command == "chasefar")
     elseif command == "cmd" then
         if not isAdmin(player) then
             reply(player, "True Hordes commands are for admins")

@@ -326,6 +326,16 @@ option TrueHordes.PilotOrdersPerTick
 	translation = TrueHordes_PilotOrdersPerTick,
 }
 
+option TrueHordes.ChaseHours
+{
+	type = double,
+	min = 0.0,
+	max = 24.0,
+	default = 1.0,
+	page = TrueHordes,
+	translation = TrueHordes_ChaseHours,
+}
+
 option TrueHordes.CrowdBreakIn
 {
 	type = boolean,

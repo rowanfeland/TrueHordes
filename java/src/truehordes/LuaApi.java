@@ -135,6 +135,17 @@ public final class LuaApi {
         }
     }
 
+    /** Server: a client's zombie lost a player and chases to (x, y) until v; far = the second leg's point. */
+    @LuaMethod(name = "Hordes_j_mpChase", global = true)
+    public static void mpChase(Object o, Object x, Object y, Object v, Object far) {
+        try {
+            Hooks.PILOTS.clientChase(LuaArgs.toInt(o, -1), LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0),
+                LuaArgs.toFloat(v, 0), Boolean.TRUE.equals(far));
+        } catch (Throwable t) {
+            Log.errorOnce("lua:mpChase:" + t.getClass().getName(), "client chase failed", t);
+        }
+    }
+
     /** Server: a client's zombie walked to the loaded edge heading out; (x, y) is just past it. */
     @LuaMethod(name = "Hordes_j_mpOff", global = true)
     public static void mpOff(Object o, Object x, Object y, Object heading) {

@@ -109,8 +109,11 @@ final class PopulationBridge {
     /** Arrivals for every chunk loaded right now (after the core starts or the seeding finishes). */
     /** Held zombies walked into these chunks: make them real where the chunk is (still) loaded. */
     static void spawnChunks(Core c, long[] keys) {
-        for (long k : keys) if (loaded.contains(k)) arrive(c, (int) (k >> 32), (int) k);
+        for (long k : keys) if (loaded.contains(k)) walkedIn += arrive(c, (int) (k >> 32), (int) k);
     }
+
+    /** Held zombies that walked into the loaded area and were made real (for Hordes_stats). */
+    static volatile int walkedIn;
 
     /**
      * Every loaded chunk's held zombies made real, after laying out the hordes touching the loaded area. One pass over
@@ -127,28 +130,32 @@ final class PopulationBridge {
         }
     }
 
-    private static void arrive(Core c, int chunkX, int chunkY) {
+    private static int arrive(Core c, int chunkX, int chunkY) {
         synchronized (c) {
+            int n = 0;
             // Hordes touching this chunk are laid out first; members that land in other loaded chunks spawn there too.
             for (long k : c.layOutHordesTouching(chunkX, chunkY, Spawner::floorAt)) {
                 int x = (int) (k >> 32), y = (int) k;
-                if ((x != chunkX || y != chunkY) && loaded.contains(k)) spawnChunk(c, x, y);
+                if ((x != chunkX || y != chunkY) && loaded.contains(k)) n += spawnChunk(c, x, y);
             }
-            spawnChunk(c, chunkX, chunkY);
+            return n + spawnChunk(c, chunkX, chunkY);
         }
     }
 
     /** Makes the chunk's held records real (caller holds the core's lock). */
-    private static void spawnChunk(Core c, int chunkX, int chunkY) {
+    private static int spawnChunk(Core c, int chunkX, int chunkY) {
         List<ZombieRecord> spawn = c.takeover().arrivals(chunkX, chunkY, PopulationBridge::live, Spawner::floorAt);
+        int n = 0;
         for (ZombieRecord r : spawn) {
             try {
                 if (Spawner.spawn(r) == Spawner.Result.REFUSED) c.takeover().refused(r);
+                else n++;
             } catch (Throwable t) {
                 c.takeover().failed(r);
                 Log.errorOnce("bridge:spawn:" + t.getClass().getName(), "spawning a held zombie failed (kept held)", t);
             }
         }
+        return n;
     }
 
     private static boolean live(int persistentId) {

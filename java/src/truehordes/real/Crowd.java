@@ -46,7 +46,35 @@ public final class Crowd {
 
         public Pilot leader() { return members.get(0); }
 
+        /** The leader the rest walk behind: the first member not off chasing a player alone. */
+        public Pilot leader(double nowHours) {
+            for (Pilot p : members) if (!p.chasing(nowHours)) return p;
+            return members.get(0);
+        }
+
         public float spread() { return (float) (2 + Math.sqrt(members.size()) * 0.5); }
+    }
+
+    /**
+     * Chase memory (user, 2026-10-20): only the zombies that saw the player chase, unless more than half of the horde
+     * did; then the rest follow the latest chase. Returns how many joined.
+     */
+    public static int chaseRule(Group g, double nowHours) {
+        Pilot latest = null;
+        int n = 0;
+        for (Pilot p : g.members) {
+            if (!p.chasing(nowHours)) continue;
+            n++;
+            if (latest == null || p.chaseUntilHours > latest.chaseUntilHours) latest = p;
+        }
+        if (latest == null || n * 2 <= g.members.size() || n == g.members.size()) return 0;
+        int joined = 0;
+        for (Pilot p : g.members) {
+            if (p.chasing(nowHours)) continue;
+            p.chaseWith(latest);
+            joined++;
+        }
+        return joined;
     }
 
     /** The real hordes among {@code ps}: members ordered by id (the oldest leads), slots set, middles computed. */

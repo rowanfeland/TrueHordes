@@ -93,6 +93,51 @@ public final class BridgeTest {
         Check.isTrue(back[0] < 100, "later slots are behind (heading east, so west)");
     }
 
+    public static void testChaseGoesToTheSpotThenOnAlongTheHeading() {
+        Pilot p = at(1, 90, 100);
+        p.chase(100, 100, 3, 0, 5, 60);
+        Check.near(100, p.lureX, 1e-4, "first to where it last saw the player");
+        Check.isTrue(p.chasing(4.9) && !p.chasing(5.1), "for the chase time");
+        Check.isTrue(p.chaseOn(), "at the spot it goes on");
+        Check.near(100 + Pilot.CHASE_FAR, p.lureX, 1e-3, "on along the player's heading");
+        Check.near(100, p.lureY, 1e-3, "same line");
+        Check.isTrue(p.chasing(4.9), "still chasing on the second leg");
+        Check.isTrue(!p.chaseOn(), "only once");
+    }
+
+    public static void testAStandingPlayerLeavesNoHeading() {
+        Pilot p = at(1, 90, 100);
+        p.chase(100, 100, 0, 0, 5, 60);
+        Check.isTrue(!p.chaseOn(), "no heading: it stays at the spot");
+    }
+
+    public static void testANewLureEndsTheChase() {
+        Pilot p = at(1, 90, 100);
+        p.chase(100, 100, 1, 0, 5, 60);
+        p.lure(0, 0, 6, 80);
+        Check.isTrue(!p.chasing(1), "a louder sound took over");
+        Check.isTrue(!p.chaseOn(), "and the second leg is gone");
+    }
+
+    public static void testHordeFollowsOnlyWhenMoreThanHalfChase() {
+        List<Pilot> ps = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            Pilot p = at(i + 1, 100 + i, 100);
+            p.hordeId = 7;
+            ps.add(p);
+        }
+        Crowd.Group g = Crowd.groups(ps).get(7L);
+        for (int i = 0; i < 5; i++) ps.get(i).chase(200, 100, 1, 0, 5, 60);
+        Check.equal(0, Crowd.chaseRule(g, 1), "half is not enough");
+        Check.isTrue(!ps.get(9).chasing(1), "the rest stay");
+        Check.isTrue(g.leader(1) == ps.get(5), "the first one not chasing leads the rest");
+        ps.get(5).chase(200, 100, 1, 0, 5, 60);
+        Check.equal(4, Crowd.chaseRule(g, 1), "more than half: the other four follow");
+        Check.isTrue(ps.get(9).chasing(1), "all chasing");
+        Check.near(200, ps.get(9).lureX, 1e-4, "to the same spot");
+        Check.isTrue(ps.get(9).chaseOn(), "and on along the same heading");
+    }
+
     static Pilot at(long id, float x, float y) {
         Pilot p = new Pilot(id);
         p.x = x;

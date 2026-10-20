@@ -32,6 +32,17 @@ public final class Pilot {
     public double waitUntilHours;
     /** Its column slot in its horde (0 = front); set when the horde's members are counted. */
     public int slot;
+    /**
+     * Chase memory (user, 2026-10-20): after losing a player it goes to where it last saw them, then on along their
+     * heading. Until when, and the far point of the second leg (NaN once it is on it, or with no heading).
+     */
+    public double chaseUntilHours;
+    public float chaseFarX = Float.NaN, chaseFarY = Float.NaN;
+    /** While vanilla has it after a player: where it last saw them (NaN none) and the way they were going. */
+    public float seenX = Float.NaN, seenY = Float.NaN, seenDx, seenDy;
+
+    /** How far along the player's heading the second leg aims; the chase time ends it long before. */
+    public static final float CHASE_FAR = 500f;
 
     public Pilot(long id) { this.id = id; }
 
@@ -42,9 +53,44 @@ public final class Pilot {
         lureY = ly;
         lureUntilHours = untilHours;
         lureDb = db;
+        chaseUntilHours = 0;
+        chaseFarX = Float.NaN;
         dormant = false;
         waitUntilHours = 0;
         nextOrderMs = 0;
+    }
+
+    public boolean chasing(double nowHours) { return chaseUntilHours > nowHours; }
+
+    /** Lost the player: to (sx, sy), where it last saw them, then on along (dx, dy) until {@code untilHours}. */
+    public void chase(float sx, float sy, float dx, float dy, double untilHours, float db) {
+        lure(sx, sy, untilHours, db);
+        float len = (float) Math.hypot(dx, dy);
+        if (len > 1e-3f) {
+            chaseFarX = sx + dx / len * CHASE_FAR;
+            chaseFarY = sy + dy / len * CHASE_FAR;
+        }
+        chaseUntilHours = untilHours;
+    }
+
+    /** At the spot: on along the player's heading (once). False with no second leg. */
+    public boolean chaseOn() {
+        if (Float.isNaN(chaseFarX)) return false;
+        float fx = chaseFarX, fy = chaseFarY;
+        double until = chaseUntilHours;
+        lure(fx, fy, until, lureDb);
+        chaseUntilHours = until;
+        return true;
+    }
+
+    /** Joins {@code o}'s chase (its horde followed it): the same spot, heading and time. */
+    public void chaseWith(Pilot o) {
+        float fx = o.chaseFarX, fy = o.chaseFarY;
+        double until = o.chaseUntilHours;
+        lure(o.lureX, o.lureY, until, o.lureDb);
+        chaseFarX = fx;
+        chaseFarY = fy;
+        chaseUntilHours = until;
     }
 
     /** Spacing between zombies in a real horde's column, in tiles (as the hand-over lays them out). */

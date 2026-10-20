@@ -8,7 +8,7 @@ TrueHordes = TrueHordes or {}
 TrueHordes.net = TrueHordes.net or {}
 
 local MODULE = "TrueHordes"
-local KINDS = { [1] = "lure", [2] = "off" }
+local KINDS = { [1] = "lure", [2] = "off", [3] = "chase", [4] = "chasefar" }
 
 local function onServerCommand(module, command, args)
     if module ~= MODULE then return end

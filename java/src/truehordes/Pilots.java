@@ -62,7 +62,12 @@ final class Pilots {
 
     void readSettings() {
         ordersPerTick = (int) Math.max(1, GameEnvImpl.sandboxDouble("TrueHordes.PilotOrdersPerTick", 8));
+        chaseHours = Math.max(0, GameEnvImpl.sandboxDouble("TrueHordes.ChaseHours", 1));
     }
+
+    /** Chase memory (user, 2026-10-20): in-game hours a zombie that lost a player keeps after them (0 off). */
+    double chaseHours = 1;
+    private int chases;
 
     int count() { return pilots.size(); }
 
@@ -76,8 +81,8 @@ final class Pilots {
     }
 
     String stats() {
-        return "pilots " + pilots.size() + ", real hordes " + groups.size() + ", orders " + orders + ", walked off "
-            + walkedOff;
+        return "pilots " + pilots.size() + ", real hordes " + groups.size() + ", orders " + orders + ", walked in "
+            + PopulationBridge.walkedIn + ", walked off " + walkedOff + ", chases " + chases;
     }
 
     static double nowHours() { return GameTime.getInstance().getWorldAgeHours(); }
@@ -117,7 +122,7 @@ final class Pilots {
     private truehordes.sim.MapView clientMap;
     private final java.util.ArrayDeque<double[]> out = new java.util.ArrayDeque<>();
     /** Outgoing message kinds: a lure the zombie heard, a zombie walked off the loaded edge. */
-    static final int OUT_LURE = 1, OUT_OFF = 2;
+    static final int OUT_LURE = 1, OUT_OFF = 2, OUT_CHASE = 3, OUT_CHASE_FAR = 4;
 
     /** The client's own copy of the map (built in the background on first use; the pilots' Movement needs it). */
     truehordes.world.World clientWorld() { return clientWorld; }
@@ -156,6 +161,7 @@ final class Pilots {
                     byId.put(p.id, p);
                 }
                 groups = Crowd.groups(ps);
+                chaseRules(now);
             }
             steer(list, nowMs, now, clientSettings, clientMap, true);
         } catch (Throwable t) {
@@ -184,7 +190,7 @@ final class Pilots {
             p.followId = (long) rows[i + 2];
             p.dormant = rows[i + 3] != 0;
             p.straggler = rows[i + 4] != 0;
-            if (!Double.isNaN(rows[i + 5]) && rows[i + 7] > p.lureUntilHours + 0.01) {
+            if (!Double.isNaN(rows[i + 5]) && rows[i + 7] > p.lureUntilHours + 0.01 && !p.chasing(nowHours())) {
                 p.lure((float) rows[i + 5], (float) rows[i + 6], rows[i + 7], p.lureDb);
             }
             if (Float.isNaN(p.wpX)) p.heading = (float) rows[i + 8];
@@ -219,6 +225,20 @@ final class Pilots {
     void clientLure(int onlineId, float x, float y) {
         IsoZombie z = ServerMap.instance.zombieMap.get((short) onlineId);
         if (z != null) heard(z, x, y, SoundModel.THRESHOLD_DB + 20);
+    }
+
+    /** Server: a client's zombie reached the loaded edge heading out; the mod takes it just past the edge. */
+    void clientChase(int onlineId, float x, float y, double untilHours, boolean far) {
+        IsoZombie z = ServerMap.instance.zombieMap.get((short) onlineId);
+        if (z == null) return;
+        Pilot p = pilot(z);
+        if (far) {
+            p.chaseFarX = x;
+            p.chaseFarY = y;
+            return;
+        }
+        if (!p.chasing(nowHours())) chases++;
+        p.chase(x, y, 0, 0, untilHours, SoundModel.THRESHOLD_DB + 20);
     }
 
     /** Server: a client's zombie reached the loaded edge heading out; the mod takes it just past the edge. */
@@ -258,6 +278,7 @@ final class Pilots {
             p.x = z.getX();
             p.y = z.getY();
             soundPath(z, p, now, client);
+            sight(z, p, now, client);
             if (busy(z)) {
                 p.wpX = Float.NaN;
                 continue;
@@ -285,6 +306,47 @@ final class Pilots {
         p.wpY = ty;
         p.nextOrderMs = System.currentTimeMillis() + 8000;
         if (client) out.add(new double[] {OUT_LURE, z.getOnlineID(), tx, ty, p.lureUntilHours});
+    }
+
+    /**
+     * Chase memory (user, 2026-10-20): while vanilla has a zombie after a player, note where it last saw them and the
+     * way they were going; when vanilla gives up, it goes to that spot and on along that heading for chaseHours.
+     */
+    private void sight(IsoZombie z, Pilot p, double now, boolean client) {
+        if (z.getTarget() instanceof IsoPlayer pl) {
+            float px = pl.getX(), py = pl.getY();
+            if (Float.isNaN(p.seenX)) {
+                p.seenDx = 0;
+                p.seenDy = 0;
+            } else {
+                float dx = px - p.seenX, dy = py - p.seenY;
+                if (dx * dx + dy * dy > 0.25f) {
+                    p.seenDx = dx;
+                    p.seenDy = dy;
+                }
+            }
+            p.seenX = px;
+            p.seenY = py;
+            return;
+        }
+        if (Float.isNaN(p.seenX) || z.getTarget() != null) return;
+        float sx = p.seenX, sy = p.seenY;
+        p.seenX = Float.NaN;
+        if (chaseHours <= 0) return;
+        p.chase(sx, sy, p.seenDx, p.seenDy, now + chaseHours, SoundModel.THRESHOLD_DB + 20);
+        p.wpX = Float.NaN;
+        chases++;
+        if (client) {
+            out.add(new double[] {OUT_CHASE, z.getOnlineID(), sx, sy, p.chaseUntilHours});
+            if (!Float.isNaN(p.chaseFarX)) {
+                out.add(new double[] {OUT_CHASE_FAR, z.getOnlineID(), p.chaseFarX, p.chaseFarY, p.chaseUntilHours});
+            }
+        }
+    }
+
+    /** Chase memory: a real horde more than half of which is chasing a player follows them. */
+    private void chaseRules(double now) {
+        for (Crowd.Group g : groups.values()) Crowd.chaseRule(g, now);
     }
 
     Pilot pilot(IsoZombie z) {
@@ -328,8 +390,10 @@ final class Pilots {
         r.strRolled = true;
         r.idle = p.dormant;
         if (p.lured(now)) {
-            r.targetX = (int) Math.floor(p.lureX);
-            r.targetY = (int) Math.floor(p.lureY);
+            // A chase taken off screen keeps going along the player's heading.
+            boolean far = p.chasing(now) && !Float.isNaN(p.chaseFarX);
+            r.targetX = (int) Math.floor(far ? p.chaseFarX : p.lureX);
+            r.targetY = (int) Math.floor(far ? p.chaseFarY : p.lureY);
             r.investigateUntilHours = p.lureUntilHours;
             r.targetDb = p.lureDb;
         }
@@ -388,7 +452,7 @@ final class Pilots {
         if (Float.isNaN(p.wpX) || nowMs >= p.nextOrderMs) return true;
         if (Crowd_dist(p.x, p.y, p.wpX, p.wpY) < 4f) return true;
         // A follower whose slot moved on (its leader took a new waypoint).
-        float[] want = followTarget(p);
+        float[] want = p.chasing(now) ? null : followTarget(p, now);
         if (want != null && Crowd_dist(want[0], want[1], p.wpX, p.wpY) > 6f) return true;
         if (nowMs - p.checkMs >= 6000) {
             boolean stuck = Crowd_dist(p.x, p.y, p.checkX, p.checkY) < 1f;
@@ -405,11 +469,11 @@ final class Pilots {
     }
 
     /** Where a horde member or a follower wants to be: its slot behind its leader, or just behind the one it follows. */
-    private float[] followTarget(Pilot p) {
+    private float[] followTarget(Pilot p, double now) {
         if (p.hordeId != 0) {
             Crowd.Group g = groups.get(p.hordeId);
-            if (g == null || g.members.isEmpty() || g.leader() == p) return null;
-            Pilot l = g.leader();
+            if (g == null || g.members.isEmpty() || g.leader(now) == p) return null;
+            Pilot l = g.leader(now);
             float bx = Float.isNaN(l.wpX) ? l.x : l.wpX, by = Float.isNaN(l.wpX) ? l.y : l.wpY;
             return Pilot.slot(p.slot, g.members.size(), bx, by, l.heading);
         }
@@ -430,14 +494,19 @@ final class Pilots {
             p.homeY = p.y;
             p.lureX = Float.NaN;
         }
-        float[] slot = followTarget(p);
+        boolean chasing = p.chasing(now);
+        float[] slot = chasing ? null : followTarget(p, now);
         Crowd.Group g = p.hordeId == 0 ? null : groups.get(p.hordeId);
         int members = g == null ? 1 : g.members.size();
-        boolean leads = g == null || g.leader() == p;
+        boolean leads = g == null || chasing || g.leader(now) == p;
+        if (chasing && Crowd_dist(p.x, p.y, p.lureX, p.lureY) <= MILL + (g == null ? 0 : g.spread()) && p.chaseOn()) {
+            // Chase memory: at the spot it last saw the player, on along their heading.
+            if (steeringClient) out.add(new double[] {OUT_CHASE, z.getOnlineID(), p.lureX, p.lureY, p.chaseUntilHours});
+        }
         if (slot != null) {
             tx = slot[0];
             ty = slot[1];
-            p.heading = g.leader().heading;
+            p.heading = g.leader(now).heading;
         } else if (p.lured(now) && leads) {
             float d = Crowd_dist(p.x, p.y, p.lureX, p.lureY);
             if (d <= MILL + (g == null ? 0 : g.spread())) {
@@ -562,6 +631,7 @@ final class Pilots {
                 }
             }
             groups = Crowd.update(ps, dt, now, rules, held::contains, h -> newHorde(c, h), rnd::nextDouble);
+            chaseRules(now);
             // Held zombies hear real hordes' moaning too.
             float[] packed = new float[groups.size() * 4];
             int i = 0;
