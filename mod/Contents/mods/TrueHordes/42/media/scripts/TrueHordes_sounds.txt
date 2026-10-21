@@ -1,0 +1,174 @@
+module Base
+{
+    /* True Hordes: the far horde moan (Hordes_Moan.lua). The game's own zombie groan files, played as plain clips:
+       its zombie voice events stay silent without a zombie's own sound parameters. */
+    sound TrueHordesMoan1
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_MaleZombie_01.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan2
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_MaleZombie_02.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan3
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_MaleZombie_03.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan4
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_MaleZombie_04.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan5
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_MaleZombie_05.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan6
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_MaleZombie_06.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan7
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_MaleZombie_07.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan8
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_MaleZombie_08.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan9
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_Female_zombie_01.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan10
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_Female_zombie_02.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan11
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_Female_zombie_03.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan12
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_Female_zombie_04.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan13
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_Female_zombie_05.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan14
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_Female_zombie_06.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan15
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_Female_zombie_07.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan16
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_Female_zombie_08.wav,
+            distanceMax = 60,
+        }
+    }
+
+    sound TrueHordesMoan17
+    {
+        category = Zombie,
+        clip
+        {
+            file = media/sound/PZ_Female_zombie_09.wav,
+            distanceMax = 60,
+        }
+    }
+}

@@ -5,11 +5,11 @@
 
 local POLL_MS = 1000
 local MOAN_VOLUME = 0.8   -- loudest volume (0..1), tuning
--- Tiles towards the horde the voices come from. The game's zombie voices fade out within about 20 tiles of the
--- listener, so 40 (the first value) was silent; close in, the direction still reads and volume carries the distance.
+-- Tiles towards the horde the voices come from: close in, the direction still reads and volume carries the distance.
 local AHEAD = 10
-local VOICES = { "MaleZombieVoiceA", "MaleZombieVoiceB", "MaleZombieVoiceC",
-                 "FemaleZombieVoiceA", "FemaleZombieVoiceB", "FemaleZombieVoiceC" }
+-- The game's own groan files as plain clips (media/scripts/TrueHordes_sounds.txt). In-game test 2026-10-21: its zombie
+-- voice events (MaleZombieVoiceA...) started but were silent on a free emitter, without a zombie's sound parameters.
+local VOICE_COUNT = 17
 
 local lastPoll = 0
 local told = false
@@ -37,7 +37,7 @@ local function onTick()
         local ey = py + dy / d * ahead + ZombRand(-6, 7)
         local emitter = world:getFreeEmitter(ex, ey, player:getZ())
         if emitter then
-            local id = emitter:playSound(VOICES[ZombRand(#VOICES) + 1])
+            local id = emitter:playSound("TrueHordesMoan" .. (ZombRand(VOICE_COUNT) + 1))
             if id and id ~= 0 then emitter:setVolume(id, volume) end
             if not told then
                 told = true
