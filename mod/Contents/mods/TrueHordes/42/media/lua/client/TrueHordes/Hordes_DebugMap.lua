@@ -44,7 +44,7 @@ local SOUND_KINDS = {
 local SOUND_FADE_MS = 30000 -- an ended sound fades out over 30 real seconds
 local SOUND_RINGS = 6
 local SOUND_LIST_ROWS = 20
-local SOUND_LIST_W = 230
+local SOUND_LIST_W = 340
 
 Hordes_MapPanel = ISPanel:derive("Hordes_MapPanel")
 
