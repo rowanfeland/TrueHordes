@@ -56,6 +56,9 @@ final class Pilots {
     /** A zombie this close to its lure mills there. */
     static final float MILL = 4f;
     static final double INVESTIGATE_HOURS = 6;
+    /** A horde at a sound roams this far round it (tiles) for ROAM_HOURS, picking up wanderers, then walks on. */
+    static final float ROAM = 30f;
+    static final double ROAM_HOURS = 1;
     /** Zombies looked at per tick (each comes round again every few ticks). */
     static final int PER_TICK = 200;
     static final long BUDGET_NANOS = 2_000_000L;
@@ -536,15 +539,23 @@ final class Pilots {
             p.heading = g.leader(now).heading;
         } else if (p.lured(now) && leads) {
             float d = Crowd_dist(p.x, p.y, p.lureX, p.lureY);
-            if (d <= MILL + (g == null ? 0 : g.spread())) {
-                // Arrived: mill about the spot a few minutes at a time.
-                p.waitUntilHours = now + (2 + 3 * rnd.nextDouble()) / 60.0;
-                if (g != null && !chasing) {
-                    // A horde moves on through like a wave (user, 2026-10-21: loaded hordes stood about too much); a
-                    // lone zombie keeps investigating.
-                    double until = Math.min(p.lureUntilHours, p.waitUntilHours);
+            if (g != null && !chasing && (p.roaming || d <= MILL + g.spread())) {
+                // A horde at its sound roams the area for an hour, sweeping round it so it picks up wanderers, then
+                // walks on (user, 2026-10-21: loaded hordes stood about at sounds too much); never standing.
+                if (!p.roaming) {
+                    p.roaming = true;
+                    double until = Math.min(p.lureUntilHours, now + ROAM_HOURS);
                     for (Pilot m : g.members) if (m.lured(now)) m.lureUntilHours = Math.min(m.lureUntilHours, until);
                 }
+                double a = Math.atan2(p.y - p.lureY, p.x - p.lureX)
+                    + ((g.id & 1) == 0 ? 1 : -1) * (0.5 + 0.7 * rnd.nextDouble());
+                float r = 8 + (float) rnd.nextDouble() * (ROAM - 8);
+                tx = p.lureX + (float) (Math.cos(a) * r);
+                ty = p.lureY + (float) (Math.sin(a) * r);
+                p.heading = (float) Math.atan2(ty - p.y, tx - p.x);
+            } else if (d <= MILL + (g == null ? 0 : g.spread())) {
+                // Arrived: a lone zombie mills about the spot a few minutes at a time.
+                p.waitUntilHours = now + (2 + 3 * rnd.nextDouble()) / 60.0;
                 tx = p.lureX + (float) ((rnd.nextDouble() - 0.5) * 8);
                 ty = p.lureY + (float) ((rnd.nextDouble() - 0.5) * 8);
             } else if (d <= LOOK) {

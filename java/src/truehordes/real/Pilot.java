@@ -30,6 +30,8 @@ public final class Pilot {
     /** Where it was when last checked for being stuck, and when. */
     public float checkX, checkY;
     public long checkMs;
+    /** A horde leader at its sound: it roams the area until the lure ends, rather than heading back to the spot. */
+    public boolean roaming;
     /** Stuck checks in a row it failed (0: moving); a follower's slot is jittered by it. */
     public int stuck;
     /** In-game hours until which it stands (milling at a lure, a straggler lingering). */
@@ -60,6 +62,7 @@ public final class Pilot {
         chaseUntilHours = 0;
         chaseFarX = Float.NaN;
         dormant = false;
+        roaming = false;
         waitUntilHours = 0;
         nextOrderMs = 0;
     }
