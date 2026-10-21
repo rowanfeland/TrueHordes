@@ -46,10 +46,18 @@ public final class Crowd {
 
         public Pilot leader() { return members.get(0); }
 
-        /** The leader the rest walk behind: the first member not off chasing a player alone. */
+        /**
+         * The leader the rest walk behind: the first member not off chasing a player alone and not held by vanilla
+         * (in-game test 2026-10-21: a horde stood around a sitting or lying leader).
+         */
         public Pilot leader(double nowHours) {
-            for (Pilot p : members) if (!p.chasing(nowHours)) return p;
-            return members.get(0);
+            Pilot free = null;
+            for (Pilot p : members) {
+                if (p.chasing(nowHours)) continue;
+                if (!p.busy) return p;
+                if (free == null) free = p;
+            }
+            return free != null ? free : members.get(0);
         }
 
         public float spread() { return (float) (2 + Math.sqrt(members.size()) * 0.5); }
@@ -138,9 +146,13 @@ public final class Crowd {
         gs = groups(ps);
         Map<Long, Pilot> byId = new HashMap<>();
         Map<Long, List<Pilot>> cells = new HashMap<>();
+        Map<Long, List<Pilot>> memberCells = new HashMap<>();
         List<Pilot> loose = new ArrayList<>();
         for (Pilot p : ps) {
             byId.put(p.id, p);
+            if (p.hordeId != 0 && gs.containsKey(p.hordeId)) {
+                memberCells.computeIfAbsent(cell(p.x, p.y), k -> new ArrayList<>()).add(p);
+            }
             if (p.hordeId != 0 || p.dormant || p.straggler) continue;
             loose.add(p);
             cells.computeIfAbsent(cell(p.x, p.y), k -> new ArrayList<>()).add(p);
@@ -164,6 +176,18 @@ public final class Crowd {
                     break;
                 }
                 if (d <= SIGHT && seen == null) seen = g;
+            }
+            if (!joined) {
+                // Touching any member (in-game test 2026-10-21: a long column walked past loaded zombies, as only
+                // its middle counted): the horde picks it up as it goes.
+                for (Pilot m : near(memberCells, p.x, p.y)) {
+                    if (dist(p.x, p.y, m.x, m.y) <= BUMP) {
+                        p.hordeId = m.hordeId;
+                        p.followId = 0;
+                        joined = true;
+                        break;
+                    }
+                }
             }
             if (joined) continue;
             if (seen != null && rng.getAsDouble() < join) {

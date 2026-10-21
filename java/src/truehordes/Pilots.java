@@ -81,8 +81,20 @@ final class Pilots {
     }
 
     String stats() {
+        // Why real horde members stand (in-game test 2026-10-21: half of a loaded horde was not moving).
+        int members = 0, dormant = 0, waiting = 0, held = 0, stuck = 0;
+        double now = nowHours();
+        for (Pilot p : pilots.values()) {
+            if (p.hordeId == 0) continue;
+            members++;
+            if (p.dormant) dormant++;
+            else if (p.busy) held++;
+            else if (now < p.waitUntilHours) waiting++;
+            else if (p.stuck > 0) stuck++;
+        }
         return "pilots " + pilots.size() + ", real hordes " + groups.size() + ", orders " + orders + ", walked in "
-            + PopulationBridge.walkedIn + ", walked off " + walkedOff + ", chases " + chases;
+            + PopulationBridge.walkedIn + ", walked off " + walkedOff + ", chases " + chases + "; horde members "
+            + members + ": dormant " + dormant + ", held by vanilla " + held + ", waiting " + waiting + ", stuck " + stuck;
     }
 
     static double nowHours() { return GameTime.getInstance().getWorldAgeHours(); }
@@ -281,6 +293,7 @@ final class Pilots {
             p.y = z.getY();
             soundPath(z, p, now, client);
             sight(z, p, now, client);
+            p.busy = held(z, p);
             if (busy(z) || Hooks.DOORS.clawing(z)) {
                 p.wpX = Float.NaN;
                 continue;
@@ -411,6 +424,11 @@ final class Pilots {
 
     // ---- vanilla in charge ----
 
+    /** Vanilla has it, or it waits inside: it does not lead a real horde (the rest would stand around it). */
+    private static boolean held(IsoZombie z, Pilot p) {
+        return p.dormant || busy(z) || Hooks.DOORS.clawing(z);
+    }
+
     /** Vanilla is busy with it: chasing, fighting, thumping, eating, falling, lying or sitting. */
     static boolean busy(IsoZombie z) {
         if (z.getTarget() != null || z.isUseless() || z.isFakeDead()) return true;
@@ -461,6 +479,7 @@ final class Pilots {
             p.checkMs = nowMs;
             p.checkX = p.x;
             p.checkY = p.y;
+            p.stuck = stuck ? p.stuck + 1 : 0;
             if (stuck) {
                 // Blocked or the path failed: turn aside (90 to 180 degrees) and try again.
                 p.heading += (float) ((rnd.nextBoolean() ? 1 : -1) * (Math.PI / 2 + rnd.nextDouble() * Math.PI / 2));
@@ -508,12 +527,24 @@ final class Pilots {
         if (slot != null) {
             tx = slot[0];
             ty = slot[1];
+            if (p.stuck > 0) {
+                // Its slot is blocked (a wall, a fence, a car): somewhere near it instead, further each failed check.
+                float j = Math.min(6f, 2f * p.stuck);
+                tx += (float) ((rnd.nextDouble() - 0.5) * 2 * j);
+                ty += (float) ((rnd.nextDouble() - 0.5) * 2 * j);
+            }
             p.heading = g.leader(now).heading;
         } else if (p.lured(now) && leads) {
             float d = Crowd_dist(p.x, p.y, p.lureX, p.lureY);
             if (d <= MILL + (g == null ? 0 : g.spread())) {
                 // Arrived: mill about the spot a few minutes at a time.
                 p.waitUntilHours = now + (2 + 3 * rnd.nextDouble()) / 60.0;
+                if (g != null && !chasing) {
+                    // A horde moves on through like a wave (user, 2026-10-21: loaded hordes stood about too much); a
+                    // lone zombie keeps investigating.
+                    double until = Math.min(p.lureUntilHours, p.waitUntilHours);
+                    for (Pilot m : g.members) if (m.lured(now)) m.lureUntilHours = Math.min(m.lureUntilHours, until);
+                }
                 tx = p.lureX + (float) ((rnd.nextDouble() - 0.5) * 8);
                 ty = p.lureY + (float) ((rnd.nextDouble() - 0.5) * 8);
             } else if (d <= LOOK) {
@@ -615,6 +646,7 @@ final class Pilots {
             p.id = idOf(z);
             p.x = z.getX();
             p.y = z.getY();
+            p.busy = held(z, p);
             ps.add(p);
             byId.put(p.id, p);
         }

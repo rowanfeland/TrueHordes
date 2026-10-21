@@ -300,6 +300,39 @@ public final class BridgeTest {
         Check.equal(7L, loner.hordeId, "touching a real horde joins it");
     }
 
+    public static void testTouchingTheTailOfALongColumnJoins() {
+        // In-game test 2026-10-21: a real horde walked past loaded zombies without picking them up (only its middle counted).
+        List<Pilot> ps = new ArrayList<>();
+        for (int i = 0; i < 60; i++) {
+            Pilot p = at(i + 1, 200 + i * 1.2f, 200);
+            p.hordeId = 7;
+            ps.add(p);
+        }
+        Pilot loner = at(99, 200 + 59 * 1.2f + 1.5f, 200.5f);
+        ps.add(loner);
+        Pilot far = at(98, 200 + 59 * 1.2f + 6f, 200);
+        ps.add(far);
+        Crowd.Rules r = new Crowd.Rules(0, 0, 0, 0, 10, 5);
+        Crowd.update(ps, 0.01, 100, r, id -> false, h -> 0, new Random(2)::nextDouble);
+        Check.equal(7L, loner.hordeId, "touching any member joins the horde");
+        Check.equal(0L, far.hordeId, "six tiles off the end is not touching");
+    }
+
+    public static void testABusyMemberDoesNotLead() {
+        // In-game test 2026-10-21: a horde stood still around a leader vanilla held (sitting, lying, after a target).
+        List<Pilot> ps = new ArrayList<>();
+        for (int i = 0; i < 5; i++) {
+            Pilot p = at(i + 1, 200 + i, 200);
+            p.hordeId = 7;
+            ps.add(p);
+        }
+        ps.get(0).busy = true;
+        Crowd.Group g = Crowd.groups(ps).get(7L);
+        Check.equal(2L, g.leader(1).id, "the first free member leads");
+        for (Pilot p : ps) p.busy = true;
+        Check.equal(1L, g.leader(1).id, "all held: the first leads");
+    }
+
     public static void testSmallRealHordeBreaksUpUnlessPartIsHeld() {
         List<Pilot> ps = new ArrayList<>();
         for (int i = 0; i < 3; i++) {

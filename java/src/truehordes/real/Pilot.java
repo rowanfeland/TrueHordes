@@ -22,12 +22,16 @@ public final class Pilot {
     public boolean dormant;
     public boolean straggler;
     public boolean crawler;
+    /** Vanilla has it (a target, attacking, sitting, lying...); set each steering and crowd pass. It does not lead. */
+    public boolean busy;
     /** The order it was given (NaN none), when, and when it is due again (wall clock ms). */
     public float wpX = Float.NaN, wpY = Float.NaN;
     public long nextOrderMs;
     /** Where it was when last checked for being stuck, and when. */
     public float checkX, checkY;
     public long checkMs;
+    /** Stuck checks in a row it failed (0: moving); a follower's slot is jittered by it. */
+    public int stuck;
     /** In-game hours until which it stands (milling at a lure, a straggler lingering). */
     public double waitUntilHours;
     /** Its column slot in its horde (0 = front); set when the horde's members are counted. */
