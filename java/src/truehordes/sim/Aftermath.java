@@ -9,7 +9,8 @@ import java.util.Map;
  * Consequences while away (sub-project 8): what happened off screen that the game must show when the area loads.
  * Sieges: a horde standing at a spot (a sound, a light, a chase brought it) for some hours, kept per chunk with its
  * biggest crowd and its hours there; the main thread breaks doors and windows near it by the crowd break-in times (D15).
- * Corpses: zombies killed off screen (gunfire meta events, A-Life fights), made into bodies where they fell. Held
+ * Trails: where a big horde walked, its footprint every few tiles; crops there are trampled and, for bigger crowds,
+ * fences flattened. Corpses: zombies killed off screen (gunfire meta events, A-Life fights), made into bodies where they fell. Held
  * under the core lock; taken by chunk when the chunk loads.
  */
 public final class Aftermath {
@@ -20,6 +21,23 @@ public final class Aftermath {
         public double hours;
     }
 
+    /** A big horde's footprint at (x, y): its radius and its biggest crowd. */
+    public static final class Trample {
+        public float x, y, r;
+        public int crowd;
+    }
+
+    /** Hordes smaller than this leave no trail (Claude's call, tuning). */
+    public static final int TRAMPLE_MIN = 20;
+    static final int TRAMPLES_PER_CHUNK = 24;
+    /** Rain washes floor blood at this rate per hour of full rain (about three quarters in a day; Claude's call). */
+    static final double WASH_PER_HOUR = 1 / 16.0;
+
+    /** The share of blood a rain of {@code rainHours} (hours times intensity) washes away. */
+    public static double washed(double rainHours) {
+        return rainHours <= 0 ? 0 : 1 - Math.exp(-WASH_PER_HOUR * rainHours);
+    }
+
     /** Sieges this close together are one. */
     static final float SAME = 6f;
     /** At most this many corpses per chunk are kept (the rest are lost, as bodies would be eaten and trampled). */
@@ -27,6 +45,7 @@ public final class Aftermath {
 
     private final Map<Long, List<Siege>> sieges = new HashMap<>();
     private final Map<Long, List<float[]>> corpses = new HashMap<>();
+    private final Map<Long, List<Trample>> tramples = new HashMap<>();
 
     static long chunk(float x, float y) {
         return SpatialGrid.key((int) Math.floor(x / 8), (int) Math.floor(y / 8));
@@ -49,6 +68,47 @@ public final class Aftermath {
         s.crowd = n;
         s.hours = hours;
         list.add(s);
+    }
+
+    /** A horde of {@code n} with footprint radius {@code r} walked from (x0, y0) to (x1, y1). */
+    public void trample(float x0, float y0, float x1, float y1, float r, int n) {
+        if (n < TRAMPLE_MIN) return;
+        r = Math.max(2, Math.min(8, r));
+        float len = Hearing.dist(x0, y0, x1, y1);
+        int steps = Math.max(1, (int) Math.ceil(len / r));
+        for (int i = 1; i <= steps; i++) {
+            float f = (float) i / steps;
+            footprint(x0 + (x1 - x0) * f, y0 + (y1 - y0) * f, r, n);
+        }
+    }
+
+    private void footprint(float x, float y, float r, int n) {
+        List<Trample> list = tramples.computeIfAbsent(chunk(x, y), k -> new ArrayList<>());
+        for (Trample t : list) {
+            if (Hearing.dist(t.x, t.y, x, y) <= Math.max(t.r, r) * 0.75f) {
+                t.crowd = Math.max(t.crowd, n);
+                t.r = Math.max(t.r, r);
+                return;
+            }
+        }
+        if (list.size() >= TRAMPLES_PER_CHUNK) return;
+        Trample t = new Trample();
+        t.x = x;
+        t.y = y;
+        t.r = r;
+        t.crowd = n;
+        list.add(t);
+    }
+
+    public List<Trample> takeTramples(int chunkX, int chunkY) {
+        List<Trample> l = tramples.remove(SpatialGrid.key(chunkX, chunkY));
+        return l == null ? List.of() : l;
+    }
+
+    public int trampleCount() {
+        int n = 0;
+        for (List<Trample> l : tramples.values()) n += l.size();
+        return n;
     }
 
     /** A zombie killed off screen at (x, y, z) wearing {@code outfit}. */
@@ -98,9 +158,25 @@ public final class Aftermath {
         return sb.toString();
     }
 
-    public void load(String siegeText, String corpseText) {
+    public String tramplesString() {
+        StringBuilder sb = new StringBuilder();
+        for (List<Trample> l : tramples.values()) {
+            for (Trample t : l) sb.append(t.x).append(',').append(t.y).append(',').append(t.r).append(',').append(t.crowd).append(';');
+        }
+        return sb.toString();
+    }
+
+    public void load(String siegeText, String corpseText) { load(siegeText, corpseText, ""); }
+
+    public void load(String siegeText, String corpseText, String trampleText) {
         sieges.clear();
         corpses.clear();
+        tramples.clear();
+        for (String e : trampleText == null ? new String[0] : trampleText.split(";")) {
+            String[] f = e.split(",");
+            if (f.length < 4) continue;
+            footprint(Float.parseFloat(f[0]), Float.parseFloat(f[1]), Float.parseFloat(f[2]), Integer.parseInt(f[3]));
+        }
         for (String e : siegeText == null ? new String[0] : siegeText.split(";")) {
             String[] f = e.split(",");
             if (f.length < 4) continue;

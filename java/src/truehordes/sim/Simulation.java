@@ -1080,6 +1080,10 @@ public final class Simulation {
                 h.heading = st.heading();
                 tight = st.tightChunks();
                 grid.moveHorde(h, ox, oy, oldSpread);
+                // Sub-project 8: a big horde off screen tramples crops and flattens fences where it walks.
+                if (h.size() >= Aftermath.TRAMPLE_MIN && !HandOver.touchesLoaded(h, players)) {
+                    aftermath.trample(ox, oy, h.x, h.y, h.spread(), h.size());
+                }
                 h.pauseMinutes = st.boxedIn() ? 10f : 0f;
                 internal(() -> encounters.sweep(h, ox, oy));
             }

@@ -44,9 +44,13 @@ public final class Hooks {
                 pilotsStarted = true;
                 PILOTS.readSettings();
                 BREAK_IN.readSettings();
+                DOORS.readSettings();
+                RAIN.readSettings();
             }
             long now = System.currentTimeMillis();
             PILOTS.tick(c, now);
+            if (c.ownsPopulation()) DOORS.tick(now);
+            RAIN.tick(now);
         } catch (Throwable t) {
             Log.errorOnce("hook:pilots:" + t.getClass().getName(), "steering real zombies failed", t);
         }
@@ -73,6 +77,8 @@ public final class Hooks {
     /** Real zombies steered by the simulation's rules (sub-project 6). */
     static final Pilots PILOTS = new Pilots();
     static final BreakInHook BREAK_IN = new BreakInHook();
+    static final DoorSwing DOORS = new DoorSwing();
+    static final RainWash RAIN = new RainWash();
     private static boolean pilotsStarted;
 
     /** Meta events, lights (sub-project 5b) and the weather the simulation hears through. */
@@ -240,6 +246,11 @@ public final class Hooks {
             Log.errorOnce("hook:unload:" + t.getClass().getName(), "taking zombies from an unloading area failed", t);
         }
         AftermathBridge.onUnloading(chunk);
+        try {
+            if (core != null && core.ownsPopulation()) RAIN.onUnloading(chunk);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:rain:" + t.getClass().getName(), "remembering blood in an unloading area failed", t);
+        }
     }
 
     /** True when the mod took the zombie and the game's own hand-over must be skipped. */
@@ -258,6 +269,7 @@ public final class Hooks {
         } catch (Throwable t) {
             Log.errorOnce("hook:arrive:" + t.getClass().getName(), "bringing held zombies into a loaded area failed", t);
         }
+        if (core != null && core.ownsPopulation()) RAIN.onLoaded(chunk);
         try {
             AftermathBridge.onLoaded(core, chunk);
         } catch (Throwable t) {

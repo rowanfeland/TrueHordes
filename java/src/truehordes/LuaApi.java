@@ -273,6 +273,17 @@ public final class LuaApi {
         }
     }
 
+    /** Sub-project 8: crop squares a big horde trampled off screen, "x,y,z;..." (server or single player). */
+    @LuaMethod(name = "Hordes_j_takeCrops", global = true)
+    public static String takeCrops() {
+        try {
+            return AftermathBridge.takeCrops();
+        } catch (Throwable t) {
+            Log.errorOnce("lua:takeCrops", "trampled crops failed", t);
+            return "";
+        }
+    }
+
     /** Project A-Life compatibility (sub-project 5b): an off-screen squad fight at (x, y) with its casualties. */
     @LuaMethod(name = "Hordes_j_alifeFight", global = true)
     public static void alifeFight(Object x, Object y, Object casualties) {

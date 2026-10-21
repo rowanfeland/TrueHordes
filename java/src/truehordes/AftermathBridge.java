@@ -25,7 +25,8 @@ import zombie.iso.objects.IsoWindow;
 /**
  * Consequences while away (sub-project 8), the game's side. When a chunk loads: doors, windows, barricades and
  * player-built objects near where an off-screen horde stood are broken (or worn down) by the crowd break-in times (D15),
- * with blood and glass, and the zombies shot off screen lie there as corpses. When a chunk unloads with a running
+ * with blood and glass, and the zombies shot off screen lie there as corpses. Where a big horde walked, crops are
+ * trampled (through the game's farming system, Lua) and fences flattened. When a chunk unloads with a running
  * generator: its lit building keeps luring off-screen zombies only until the generator's fuel would have run out.
  * Main thread (the server's in multiplayer).
  */
@@ -38,11 +39,21 @@ final class AftermathBridge {
         if (c == null || chunk == null || !c.ownsPopulation()) return;
         List<Aftermath.Siege> sieges;
         List<float[]> corpses;
+        List<Aftermath.Trample> trails;
         synchronized (c) {
             Simulation sim = c.simulation();
             if (sim == null) return;
             sieges = sim.aftermath().takeSieges(chunk.wx, chunk.wy);
             corpses = sim.aftermath().takeCorpses(chunk.wx, chunk.wy);
+            trails = sim.aftermath().takeTramples(chunk.wx, chunk.wy);
+        }
+        if (!GameEnvImpl.sandboxBool("TrueHordes.HordeTrample", true)) trails = List.of();
+        for (Aftermath.Trample t : trails) {
+            try {
+                trail(t);
+            } catch (Throwable e) {
+                Log.errorOnce("aftermath:trail:" + e.getClass().getName(), "applying a horde's trail failed", e);
+            }
         }
         for (Aftermath.Siege s : sieges) {
             try {
@@ -124,6 +135,48 @@ final class AftermathBridge {
                 broke(sq);
             } else {
                 t.setHealth(Math.max(1, t.getHealth() - (int) (f * Math.max(1, t.getMaxHealth()))));
+            }
+        }
+    }
+
+    // ---- trails ----
+
+    /** Low fences go down under this many zombies or more, surely at FLATTEN_SURE; tall wire ones under TALL_MIN. */
+    static final int FLATTEN_MIN = 50, FLATTEN_SURE = 150, TALL_MIN = 150, TALL_SURE = 500;
+
+    /** Crop squares a trail crossed, "x,y,z;", for the farming system (Lua) to trample. */
+    private static final StringBuilder crops = new StringBuilder();
+
+    static String takeCrops() {
+        String s = crops.toString();
+        crops.setLength(0);
+        return s;
+    }
+
+    private static void trail(Aftermath.Trample t) {
+        int x0 = (int) Math.floor(t.x - t.r), x1 = (int) Math.floor(t.x + t.r);
+        int y0 = (int) Math.floor(t.y - t.r), y1 = (int) Math.floor(t.y + t.r);
+        for (int x = x0; x <= x1; x++) {
+            for (int y = y0; y <= y1; y++) {
+                if (Math.hypot(x + 0.5 - t.x, y + 0.5 - t.y) > t.r) continue;
+                IsoGridSquare sq = IsoWorld.instance.currentCell.getGridSquare(x, y, 0);
+                if (sq == null) continue;
+                for (IsoObject o : sq.getObjects().toArray(new IsoObject[0])) {
+                    String name = o.getSprite() == null ? null : o.getSprite().getName();
+                    if (name != null && name.startsWith("vegetation_farming")) {
+                        if (crops.length() < 200_000) crops.append(x).append(',').append(y).append(",0;");
+                        continue;
+                    }
+                    if (o instanceof IsoDoor || o instanceof IsoWindow) continue;
+                    boolean tall = o.isTallHoppable();
+                    if (!tall && !o.isHoppable()) continue;
+                    if (o instanceof IsoThumpable th ? th.isDoor() : name == null || !name.startsWith("fencing")) continue;
+                    double p = tall ? (t.crowd < TALL_MIN ? 0 : (double) t.crowd / TALL_SURE)
+                        : (t.crowd < FLATTEN_MIN ? 0 : (double) t.crowd / FLATTEN_SURE);
+                    if (Rand.Next(0f, 1f) >= p) continue;
+                    if (o instanceof IsoThumpable th) th.destroy();
+                    else sq.transmitRemoveItemFromSquare(o);
+                }
             }
         }
     }

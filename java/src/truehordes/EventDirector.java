@@ -66,6 +66,7 @@ final class EventDirector {
         nearGunFreq = Math.max(0.01, GameEnvImpl.sandboxDouble("TrueHordes.NearGunshotFrequency", 1));
         carFreq = Math.max(0.01, GameEnvImpl.sandboxDouble("TrueHordes.CarAlarmFrequency", 1));
         batteryHours = Math.max(0.25, GameEnvImpl.sandboxDouble("TrueHordes.CarAlarmBatteryHours", 6));
+        killShots = Math.max(0, (int) GameEnvImpl.sandboxDouble("TrueHordes.OffscreenShotsPerKill", 3));
         lights.readSettings();
     }
 
@@ -90,7 +91,7 @@ final class EventDirector {
             synchronized (core) {
                 truehordes.sim.Simulation sim = core.simulation();
                 if (sim != null) {
-                    sim.aftermath().load(pendingAftermath[0], pendingAftermath[1]);
+                    sim.aftermath().load(pendingAftermath[0], pendingAftermath[1], pendingAftermath[2]);
                     pendingAftermath = null;
                 }
             }
@@ -175,8 +176,8 @@ final class EventDirector {
         if (k.gun()) shootDead(x, y, n);
     }
 
-    /** Off-screen shooting kills zombies near it (sub-project 8): one per KILL_SHOTS shots, within KILL_RADIUS. */
-    static final int KILL_SHOTS = 3;
+    /** Off-screen shooting kills zombies near it (sub-project 8): one per killShots shots (0: none), within KILL_RADIUS. */
+    static int killShots = 3;
     static final float KILL_RADIUS = 25;
 
     private static void shootDead(float x, float y, int shots) {
@@ -184,7 +185,7 @@ final class EventDirector {
         if (c == null || !c.ownsPopulation()) return;
         synchronized (c) {
             truehordes.sim.Simulation sim = c.simulation();
-            if (sim != null) sim.shootDead(x, y, KILL_RADIUS, shots / KILL_SHOTS);
+            if (sim != null && killShots > 0) sim.shootDead(x, y, KILL_RADIUS, shots / killShots);
         }
     }
 
@@ -435,6 +436,7 @@ final class EventDirector {
             }
             pr.setProperty("alarms", sb.toString());
             pr.setProperty("lights", lights.saveString());
+            pr.setProperty("rain", Hooks.RAIN.saveString());
             truehordes.core.Core c = Hooks.core();
             if (c != null) pr.setProperty("edgePool", Integer.toString(c.edgePool()));
             if (c != null) {
@@ -443,6 +445,7 @@ final class EventDirector {
                     if (sim != null) {
                         pr.setProperty("sieges", sim.aftermath().siegesString());
                         pr.setProperty("corpses", sim.aftermath().corpsesString());
+                        pr.setProperty("tramples", sim.aftermath().tramplesString());
                     }
                 }
             }
@@ -478,9 +481,10 @@ final class EventDirector {
                 alarms.add(a);
             }
             lights.loadString(pr.getProperty("lights", ""));
+            Hooks.RAIN.loadString(pr.getProperty("rain", ""));
             truehordes.core.Core c = Hooks.core();
             if (c != null) c.setEdgePool(Integer.parseInt(pr.getProperty("edgePool", "0")));
-            pendingAftermath = new String[] {pr.getProperty("sieges", ""), pr.getProperty("corpses", "")};
+            pendingAftermath = new String[] {pr.getProperty("sieges", ""), pr.getProperty("corpses", ""), pr.getProperty("tramples", "")};
         } catch (Throwable t) {
             Log.errorOnce("events:load", "could not read the meta-event state; starting fresh", t);
         }

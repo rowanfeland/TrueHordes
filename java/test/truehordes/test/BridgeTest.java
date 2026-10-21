@@ -168,12 +168,36 @@ public final class BridgeTest {
         Check.equal(1, a.siegeCount(), "the other chunk's siege waits");
     }
 
+    public static void testBigHordesTrampleAlongTheirPath() {
+        truehordes.sim.Aftermath a = new truehordes.sim.Aftermath();
+        a.trample(100, 100, 100, 100 + 30, 4, 10);
+        Check.equal(0, a.trampleCount(), "a small horde leaves no trail");
+        a.trample(100, 100, 100, 100 + 30, 4, 60);
+        Check.equal(true, a.trampleCount() >= 7, "a big one leaves its footprint every few tiles: " + a.trampleCount());
+        a.trample(100, 100, 100, 100 + 30, 4, 200);
+        int before = a.trampleCount();
+        Check.equal(true, before <= 9, "walking the same way again merges: " + before);
+        var t = a.takeTramples(12, 13);
+        Check.equal(true, !t.isEmpty(), "taken by chunk");
+        Check.equal(200, t.get(0).crowd, "the biggest crowd counts");
+        Check.equal(before - t.size(), a.trampleCount(), "taken once");
+    }
+
+    public static void testRainWashesBloodOverDays() {
+        Check.near(0, truehordes.sim.Aftermath.washed(0), 1e-9, "no rain: nothing washed");
+        double day = truehordes.sim.Aftermath.washed(24);
+        Check.equal(true, day > 0.6 && day < 0.9, "a day of full rain washes most of it: " + day);
+        Check.equal(true, truehordes.sim.Aftermath.washed(3) < 0.25, "a shower washes a little");
+    }
+
     public static void testAftermathSurvivesASave() {
         truehordes.sim.Aftermath a = new truehordes.sim.Aftermath();
         a.linger(100, 100, 20, 1.5);
         a.corpse(101, 99, 0, 7);
         truehordes.sim.Aftermath b = new truehordes.sim.Aftermath();
-        b.load(a.siegesString(), a.corpsesString());
+        a.trample(200, 200, 200, 220, 3, 80);
+        b.load(a.siegesString(), a.corpsesString(), a.tramplesString());
+        Check.equal(a.trampleCount(), b.trampleCount(), "trails kept");
         Check.near(1.5, b.takeSieges(12, 12).get(0).hours, 1e-9, "siege kept");
         float[] c = b.takeCorpses(12, 12).get(0);
         Check.near(7, c[3], 1e-9, "corpse outfit kept");
