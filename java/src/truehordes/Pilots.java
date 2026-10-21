@@ -270,7 +270,9 @@ final class Pilots {
         long t0 = System.nanoTime();
         int budget = ordersPerTick;
         for (int k = 0; k < Math.min(n, PER_TICK); k++) {
-            if (cursor >= n) cursor = 0;
+            // A zombie walking off the loaded edge leaves the list mid-loop (PopulationBridge.walkOff).
+            if (list.isEmpty()) break;
+            if (cursor >= list.size()) cursor = 0;
             IsoZombie z = list.get(cursor++);
             if (z == null || z.isDead() || z.isReanimatedPlayer()) continue;
             if (client && z.isRemoteZombie()) continue; // another player's machine runs it

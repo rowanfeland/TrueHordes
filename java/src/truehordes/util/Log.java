@@ -25,7 +25,13 @@ public final class Log {
     public static void warn(String msg) { sink.accept(TAG + "WARN " + msg); }
 
     public static void error(String msg, Throwable t) {
-        sink.accept(TAG + "ERROR " + msg + (t == null ? "" : ": " + t));
+        StringBuilder b = new StringBuilder(TAG + "ERROR " + msg);
+        if (t != null) {
+            b.append(": ").append(t);
+            StackTraceElement[] st = t.getStackTrace();
+            for (int i = 0; i < Math.min(6, st.length); i++) b.append(" <- ").append(st[i]);
+        }
+        sink.accept(b.toString());
     }
 
     /** Logs only the first occurrence of each key. Returns true if this call logged. */

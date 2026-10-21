@@ -484,6 +484,7 @@ public final class LuaApi {
                     LuaArgs.toInt(maxSingles, 300));
                 rspm = sim.settings().realSecondsPerGameMinute();
             }
+            f = occlude(c, f, truehordes.sim.FarSight.FAR_STRIDE, x, y);
             KahluaTable t = LuaManager.platform.newTable();
             t.rawset("n", (double) (f.length / truehordes.sim.FarSight.FAR_STRIDE));
             t.rawset("rspm", rspm);
@@ -500,6 +501,18 @@ public final class LuaApi {
      * nearest first, at most {@code max}: {@code n}, {@code rspm} (real seconds per in-game minute), then x, y, heading,
      * speed (tiles per in-game minute) per figure. Nil when the simulation is not running here.
      */
+    /** Far marks the player cannot see past walls, woods or buildings are dropped (main thread). */
+    private static float[] occlude(Core c, float[] f, int stride, Object x, Object y) {
+        zombie.characters.IsoPlayer p = zombie.characters.IsoPlayer.getInstance();
+        int z = p == null ? 0 : (int) Math.floor(p.getZ());
+        truehordes.sim.MapView map;
+        synchronized (c) {
+            map = c.simulation() == null ? null : c.simulation().movement().map();
+        }
+        return Occlusion.visible(f, stride, map, LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0), z,
+            zombie.iso.IsoChunkMap.chunkWidthInTiles / 2f);
+    }
+
     @LuaMethod(name = "Hordes_j_farSight", global = true)
     public static KahluaTable farSight(Object x, Object y, Object reach, Object max) {
         Core c = Hooks.core();
@@ -518,6 +531,7 @@ public final class LuaApi {
                 rspm = sim.settings().realSecondsPerGameMinute();
             }
             f = truehordes.sim.FarSight.nearest(cand, LuaArgs.toInt(max, 250));
+            f = occlude(c, f, truehordes.sim.FarSight.STRIDE, x, y);
             KahluaTable t = LuaManager.platform.newTable();
             t.rawset("n", (double) (f.length / truehordes.sim.FarSight.STRIDE));
             t.rawset("rspm", rspm);

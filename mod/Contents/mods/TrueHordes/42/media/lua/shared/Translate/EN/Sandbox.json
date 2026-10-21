@@ -82,7 +82,7 @@
     "Sandbox_TrueHordes_OffscreenShotsPerKill_tooltip": "Gunfire you hear far off (and A-Life fights) kills one held zombie near it per this many shots; they lie there as corpses when you arrive. 0: shooting off screen kills nobody.",
     "Sandbox_TrueHordes_HordeTrample": "Big hordes trample",
     "Sandbox_TrueHordes_HordeTrample_tooltip": "Where a horde of 20 or more walked off screen, crops are trampled; 50 or more knock down low fences, 150 or more tall wire ones.",
-    "Sandbox_TrueHordes_DoorSwingChance": "Doors swing shut behind zombies (%)",
+    "Sandbox_TrueHordes_DoorSwingChance": "Doors swing shut behind zombies, percent",
     "Sandbox_TrueHordes_DoorSwingChance_tooltip": "Chance an open door swings shut behind a zombie walking in from outside, shutting it in; it claws at the door for an hour. Up to three times as likely in strong wind. 0 turns it off.",
     "Sandbox_TrueHordes_RainWashesBlood": "Rain washes blood away",
     "Sandbox_TrueHordes_RainWashesBlood_tooltip": "Blood on open ground fades in the rain, most of it after a day of steady rain. Areas you are away from are washed by the rain that fell there meanwhile (regional with True Weathers).",

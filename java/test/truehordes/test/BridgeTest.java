@@ -210,6 +210,19 @@ public final class BridgeTest {
         Check.equal(1, truehordes.sim.FarSight.farMarks(sim, 4000, 4000, 300, 4096, 10, 0).length / st, "singles capped");
     }
 
+    public static void testBuildingsHideFarFigures() {
+        truehordes.sim.MapView town = new truehordes.sim.MapView() {
+            @Override public int rank(int cx, int cy) { return 4; }
+            @Override public boolean inMap(int cx, int cy) { return true; }
+            @Override public boolean tight(int cx, int cy) { return false; }
+            @Override public boolean building(int cx, int cy) { return cx == 120 && cy == 100; } // x 960..967
+        };
+        Check.equal(true, truehordes.sim.Sightline.buildingsBlock(town, 800, 804, 1100, 804, 60), "a building between hides it");
+        Check.equal(false, truehordes.sim.Sightline.buildingsBlock(town, 800, 900, 1100, 900, 60), "open ground: seen");
+        Check.equal(false, truehordes.sim.Sightline.buildingsBlock(town, 800, 804, 966, 804, 60), "in the town's edge: seen");
+        Check.equal(false, truehordes.sim.Sightline.buildingsBlock(town, 800, 804, 1100, 804, 200), "inside the loaded part: not this test");
+    }
+
     public static void testRainWashesBloodOverDays() {
         Check.near(0, truehordes.sim.Aftermath.washed(0), 1e-9, "no rain: nothing washed");
         double day = truehordes.sim.Aftermath.washed(24);

@@ -85,7 +85,7 @@ final class AftermathBridge {
                     if (Math.hypot(x + 0.5 - s.x, y + 0.5 - s.y) > r) continue;
                     IsoGridSquare sq = IsoWorld.instance.currentCell.getGridSquare(x, y, 0);
                     if (sq == null) continue;
-                    IsoObject[] objs = sq.getObjects().toArray(new IsoObject[0]);
+                    IsoObject[] objs = objects(sq);
                     for (IsoObject o : objs) {
                         if ((o instanceof IsoBarricade) == (pass == 0)) press(chunk, sq, o, s);
                     }
@@ -162,7 +162,7 @@ final class AftermathBridge {
                 if (Math.hypot(x + 0.5 - t.x, y + 0.5 - t.y) > t.r) continue;
                 IsoGridSquare sq = IsoWorld.instance.currentCell.getGridSquare(x, y, 0);
                 if (sq == null) continue;
-                for (IsoObject o : sq.getObjects().toArray(new IsoObject[0])) {
+                for (IsoObject o : objects(sq)) {
                     String name = o.getSprite() == null ? null : o.getSprite().getName();
                     if (name != null && name.startsWith("vegetation_farming")) {
                         if (crops.length() < 200_000) crops.append(x).append(',').append(y).append(",0;");
@@ -180,6 +180,14 @@ final class AftermathBridge {
                 }
             }
         }
+    }
+
+    /** A copy of the square's objects: the game's list cannot be iterated (its iterator and toArray throw). */
+    static IsoObject[] objects(IsoGridSquare sq) {
+        var list = sq.getObjects();
+        IsoObject[] a = new IsoObject[list.size()];
+        for (int i = 0; i < a.length; i++) a[i] = list.get(i);
+        return a;
     }
 
     /** Blood where a crowd broke something. */
@@ -212,7 +220,7 @@ final class AftermathBridge {
                     for (int x = 0; x < 8; x++) {
                         IsoGridSquare sq = chunk.getGridSquare(x, y, z);
                         if (sq == null) continue;
-                        for (IsoObject o : sq.getObjects()) {
+                        for (IsoObject o : objects(sq)) {
                             if (o instanceof IsoGenerator g && g.isActivated()) generator(g, sq);
                         }
                     }

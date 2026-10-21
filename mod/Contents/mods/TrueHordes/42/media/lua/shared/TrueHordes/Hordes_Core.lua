@@ -44,7 +44,11 @@ local function server(name, a, b, c)
         print(r)
         return r
     end
-    return call(name, a, b, c)
+    -- Only the arguments given: Java methods count trailing nils as arguments.
+    if c ~= nil then return call(name, a, b, c) end
+    if b ~= nil then return call(name, a, b) end
+    if a ~= nil then return call(name, a) end
+    return call(name)
 end
 
 function Hordes_status() return server("status") end
