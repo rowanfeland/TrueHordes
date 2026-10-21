@@ -27,6 +27,11 @@ public final class Horde {
      * keepUntilHours) it is not broken up for being small. Not saved.
      */
     public boolean wasReal;
+    /**
+     * Members came back off the loaded area into it: it is laid out again only once its centre walks back in, not while
+     * its circle just touches the edge (in-game test 2026-10-21: it followed the loaded edge). Not saved.
+     */
+    public boolean cameBack;
     public double keepUntilHours;
     /** Where it heard a sound and keeps heading after the sound ends, until investigateUntilHours (not saved). */
     public float targetX = Float.NaN, targetY = Float.NaN;

@@ -145,6 +145,47 @@ public final class HandOverTest {
         Check.isTrue(s.get(r.id) == r, "a wanderer");
     }
 
+    /** In-game test 2026-10-21: members strung out behind a chase came back as lone zombies; they go back to it. */
+    public static void testStrungOutMemberRejoinsItsHorde() {
+        Store s = new Store();
+        Simulation sim = sim(s);
+        Horde h = horde(sim, 500, 500, 0, 30);
+        Takeover t = new Takeover(s);
+        t.setRejoin(sim.handOver()::rejoin);
+        ZombieRecord r = t.taken(new ZombieSnapshot(640, 500, 0, (byte) 0, 7, 4, 0, ZombieRecord.NO_TARGET,
+            ZombieRecord.NO_TARGET, null), h.id);
+        Check.equal(31, h.size(), "rejoined its own horde 140 tiles off");
+        Check.isTrue(s.get(r.id) == null, "not a wanderer");
+    }
+
+    /**
+     * In-game test 2026-10-21: a horde whose members unloaded re-formed just past the loaded edge, still touching it,
+     * and was laid out again at once, its column shifted in towards the player: it followed the loaded edge. It comes
+     * back in only when it walks in (its centre in the real area).
+     */
+    public static void testHordeThatJustLeftIsNotPulledBackIn() {
+        Store s = new Store();
+        Simulation sim = sim(s);
+        sim.setPlayers(new truehordes.population.PlayerNearby() {
+            @Override public boolean nearCell(int cellX, int cellY) { return true; }
+            @Override public boolean nearChunk(int chunkX, int chunkY) { return chunkX >= 70; } // x >= 560
+        });
+        Horde h = horde(sim, 557, 500, 0, 30);
+        Takeover t = new Takeover(s);
+        t.setRejoin(sim.handOver()::rejoin);
+        t.taken(new ZombieSnapshot(557, 501, 0, (byte) 0, 7, 4, 0, ZombieRecord.NO_TARGET, ZombieRecord.NO_TARGET, null),
+            h.id);
+        Check.isTrue(truehordes.sim.HandOver.touchesLoaded(h, sim.players()), "its circle touches the loaded area");
+        Check.equal(0, sim.handOver().layOutInLoaded(ALL_FLOOR).size(), "not laid out again at the edge");
+        Check.equal(0, sim.handOver().layOutTouching(70, 62, ALL_FLOOR).size(), "nor when that chunk loads");
+        Check.equal(31, h.size(), "still held whole");
+        float sp = h.spread();
+        h.x = 580;
+        sim.internal(() -> sim.grid().moveHorde(h, 557, 500, sp));
+        Check.isTrue(sim.handOver().layOutInLoaded(ALL_FLOOR).size() > 0, "walking in, it comes in");
+        Check.equal("", sim.checkConservation("test"), "conservation");
+    }
+
     public static void testKilledMemberNeverRejoins() {
         Store s = new Store();
         Simulation sim = sim(s);

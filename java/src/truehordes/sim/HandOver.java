@@ -20,6 +20,8 @@ public final class HandOver {
     static final int FLOOR_SEARCH = 4;
     /** A real zombie rejoins its horde if it is within this much more than twice the horde's spread (tiles). */
     static final float REJOIN_MARGIN = 32f;
+    /** ...and always within this (tiles): members strung out behind a chase go back to it (user, 2026-10-21). */
+    static final float REJOIN_OWN = 200f;
 
     private final Simulation sim;
     private final Store store;
@@ -76,6 +78,7 @@ public final class HandOver {
             }
             if (!gone.isEmpty()) {
                 sim.hordes().removeMembers(h, gone);
+                h.cameBack = false;
                 h.wasReal = true; // its members re-form it when they unload (user, 2026-10-16)
                 h.keepUntilHours = sim.currentHours() + GATHER_HOURS;
             }
@@ -152,14 +155,19 @@ public final class HandOver {
             if (dx * dx + dy * dy <= r * r) touching.add(h);
         }
         List<ZombieRecord> out = new ArrayList<>();
-        for (Horde h : touching) out.addAll(layOut(h, floors));
+        for (Horde h : touching) if (comesIn(h)) out.addAll(layOut(h, floors));
         return out;
+    }
+
+    /** A horde whose members just came back out stays out until its centre walks into the real area. */
+    private boolean comesIn(Horde h) {
+        return !h.cameBack || sim.players().realAt(h.x, h.y);
     }
 
     /** Lays out every horde touching the loaded area, each once (not once per chunk it touches). */
     public List<ZombieRecord> layOutInLoaded(Takeover.FloorCheck floors) {
         List<Horde> touching = new ArrayList<>();
-        for (Horde h : sim.hordes().all()) if (touchesLoaded(h, sim.players())) touching.add(h);
+        for (Horde h : sim.hordes().all()) if (touchesLoaded(h, sim.players()) && comesIn(h)) touching.add(h);
         List<ZombieRecord> out = new ArrayList<>();
         for (Horde h : touching) out.addAll(layOut(h, floors));
         return out;
@@ -198,13 +206,14 @@ public final class HandOver {
                 taken.idle = false;
                 Horde back = sim.reformHorde(taken.hordeId, taken.x(), taken.y(), heading, taken);
                 back.wasReal = true;
+                back.cameBack = true;
                 back.keepUntilHours = sim.currentHours() + GATHER_HOURS;
             });
             rejoined++;
             return true;
         }
         h.keepUntilHours = Math.max(h.keepUntilHours, sim.currentHours() + GATHER_HOURS);
-        float reach = 2 * h.spread() + REJOIN_MARGIN;
+        float reach = Math.max(REJOIN_OWN, 2 * h.spread() + REJOIN_MARGIN);
         if (Hearing.dist(taken.x(), taken.y(), h.x, h.y) > reach) return false;
         sim.internal(() -> {
             float old = h.spread();
@@ -213,6 +222,7 @@ public final class HandOver {
             taken.idle = false;
             sim.hordes().addMember(h, taken);
             sim.grid().moveHorde(h, h.x, h.y, old);
+            h.cameBack = true;
         });
         rejoined++;
         return true;
