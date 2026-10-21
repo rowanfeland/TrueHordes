@@ -713,6 +713,17 @@ public final class Simulation {
             if (level < SoundModel.THRESHOLD_DB || (best != null && level <= best[2])) continue;
             best = new float[] {h.x, h.y, level, h.size()};
         }
+        // Real hordes moan too (in-game test 2026-10-21: silence once a horde was real): id, x, y, size each.
+        float[] real = realHordes;
+        for (int i = 0; i + 3 < real.length; i += 4) {
+            int n = (int) real[i + 3];
+            if (n < minSize) continue;
+            float db = (float) (40 + 10 * Math.log10(n));
+            float level = SoundModel.levelAt(db + PLAYER_EAR_DB,
+                Math.max(1f, Hearing.dist(px, py, real[i + 1], real[i + 2]) - Horde.spreadOf(n)));
+            if (level < SoundModel.THRESHOLD_DB || (best != null && level <= best[2])) continue;
+            best = new float[] {real[i + 1], real[i + 2], level, n};
+        }
         return best;
     }
 

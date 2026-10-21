@@ -210,6 +210,19 @@ public final class BridgeTest {
         Check.equal(1, truehordes.sim.FarSight.farMarks(sim, 4000, 4000, 300, 4096, 10, 0).length / st, "singles capped");
     }
 
+    /** In-game test 2026-10-21: no moaning once a horde was real; it moans real or held. */
+    public static void testRealHordeMoans() {
+        truehordes.store.Store s = new truehordes.store.Store();
+        truehordes.sim.Simulation sim = new truehordes.sim.Simulation(s, SimulationTest.openMap(500, -1),
+            SimulationTest.quiet(), 12, 24 * 10);
+        Check.isTrue(sim.loudestMoanAt(1000, 1000, 50) == null, "nothing to hear");
+        sim.setRealHordes(new float[] {4001, 1040, 1000, 300});
+        float[] m = sim.loudestMoanAt(1000, 1000, 50);
+        Check.isTrue(m != null && m[0] == 1040 && m[3] == 300, "the real horde 40 tiles off is heard");
+        sim.setRealHordes(new float[] {4002, 1040, 1000, 20});
+        Check.isTrue(sim.loudestMoanAt(1000, 1000, 50) == null, "a small real group is not a horde's moan");
+    }
+
     public static void testBuildingsHideFarFigures() {
         truehordes.sim.MapView town = new truehordes.sim.MapView() {
             @Override public int rank(int cx, int cy) { return 4; }
