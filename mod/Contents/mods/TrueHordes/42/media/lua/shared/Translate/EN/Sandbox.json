@@ -77,7 +77,7 @@
     "Sandbox_TrueHordes_FarSightTiles": "See hordes coming: reach (tiles)",
     "Sandbox_TrueHordes_FarSightTiles_tooltip": "How far from you the outlines are drawn.",
     "Sandbox_TrueHordes_HordeMoan": "Hear hordes moaning",
-    "Sandbox_TrueHordes_HordeMoan_tooltip": "Big hordes nearby can be heard groaning from where they are, louder the bigger and closer they are. Only you hear it; zombies do not.",
+    "Sandbox_TrueHordes_HordeMoan_tooltip": "Big hordes nearby can be heard from their direction: a chorus of chase gurgles, fuller the bigger the horde and louder the closer it is. Only you hear it; zombies do not.",
     "Sandbox_TrueHordes_HordeMoanVolume": "Hear hordes moaning: volume",
     "Sandbox_TrueHordes_HordeMoanVolume_tooltip": "How loud the horde moaning is, out of 100.",
     "Sandbox_TrueHordes_EdgeHordes": "Respawns arrive as hordes",
