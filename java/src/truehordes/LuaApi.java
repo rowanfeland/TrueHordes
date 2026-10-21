@@ -308,6 +308,33 @@ public final class LuaApi {
         }
     }
 
+    private static long alifeSoundMs;
+    private static float alifeSoundX = Float.NaN, alifeSoundY;
+
+    /**
+     * Project A-Life compatibility: one of A-Life's ambient sounds started on {@code emitter} (its position); the ones
+     * with a source become a world sound there (events.ALifeSounds). A burst of shots at one spot within a second and a
+     * half is one sound.
+     */
+    @LuaMethod(name = "Hordes_j_alifeSound", global = true)
+    public static void alifeSound(Object emitter, Object name) {
+        try {
+            Core c = Hooks.core();
+            if (c == null || c.soundSink() == null || !(emitter instanceof fmod.fmod.FMODSoundEmitter e)) return;
+            int[] k = truehordes.events.ALifeSounds.classify(name instanceof String n ? n : null, EventDirector.louderMultiplier());
+            if (k == null) return;
+            long now = System.currentTimeMillis();
+            if (now - alifeSoundMs < 1500 && Math.abs(e.x - alifeSoundX) < 8 && Math.abs(e.y - alifeSoundY) < 8) return;
+            alifeSoundMs = now;
+            alifeSoundX = e.x;
+            alifeSoundY = e.y;
+            Hooks.soundAs(k[0], (int) e.x, (int) e.y, k[1]);
+            Log.debug("core", "A-Life sound " + name + " at " + (int) e.x + "," + (int) e.y + ", radius " + k[1]);
+        } catch (Throwable t) {
+            Log.errorOnce("lua:alifeSound", "A-Life ambient sound failed", t);
+        }
+    }
+
     @LuaMethod(name = "Hordes_j_sound", global = true)
     public static String sound(Object x, Object y, Object radius) {
         Core c = Hooks.core();

@@ -7,6 +7,9 @@
 -- layer is logged once and ignored. No A-Life code is copied.
 -- A-Life's helicopters make small noises (ProjectALife.HeliDirector.noise); after each one True Hordes adds a sound
 -- the size of the game's own helicopter, so zombies treat them alike.
+-- A-Life's ambient world sounds (distant gunfire, sirens, car crashes, screams; ProjectALife.AudioPolicy.playLocal)
+-- are played to the player only; after each one True Hordes makes the ones with a real source a world sound where it
+-- played (Java events.ALifeSounds), single player.
 
 local wrapper = nil
 local warned = false
@@ -63,6 +66,30 @@ local function wrapHeli()
     print("[TrueHordes] Project A-Life compatibility on: helicopters heard like the game's helicopter")
 end
 
+local audioWrapper = nil
+
+local function wrapAudio()
+    local p = ProjectALife and ProjectALife.AudioPolicy
+    if type(p) ~= "table" or type(p.playLocal) ~= "function" or p.playLocal == audioWrapper then return end
+    local original = p.playLocal
+    audioWrapper = function(emitter, name, volume)
+        local handle, played = original(emitter, name, volume)
+        if handle ~= nil then
+            local ok, err = pcall(function()
+                local j = TrueHordesJ
+                if j ~= nil and type(j.alifeSound) == "function" then j.alifeSound(emitter, played or name) end
+            end)
+            if not ok and not warned then
+                warned = true
+                print("[TrueHordes] A-Life ambient sound failed (ignored): " .. tostring(err))
+            end
+        end
+        return handle, played
+    end
+    p.playLocal = audioWrapper
+    print("[TrueHordes] Project A-Life compatibility on: its ambient gunfire, sirens and crashes are world sounds")
+end
+
 local lastCheck = 0
 
 local function onTick()
@@ -72,6 +99,7 @@ local function onTick()
     local ok, err = pcall(function()
         wrap()
         wrapHeli()
+        if not isClient() then wrapAudio() end
     end)
     if not ok and not warned then
         warned = true

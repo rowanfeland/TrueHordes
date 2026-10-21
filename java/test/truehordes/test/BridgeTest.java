@@ -223,6 +223,17 @@ public final class BridgeTest {
         Check.isTrue(sim.loudestMoanAt(1000, 1000, 50) == null, "a small real group is not a horde's moan");
     }
 
+    /** In-game test 2026-10-21: A-Life's ambient gunshots were heard by the player but by no zombie. */
+    public static void testALifeAmbientSoundsAreWorldSounds() {
+        int[] gun = truehordes.events.ALifeSounds.classify("MetaAssaultRifle1", 1f);
+        Check.equal(truehordes.sim.SoundEvent.ALIFE, gun[0], "gunfire as an A-Life fight's shot");
+        Check.equal(truehordes.events.Gunfire.RIFLE_RADIUS, gun[1], "a rifle's radius");
+        Check.equal(400, truehordes.events.ALifeSounds.classify("PALWorldShootout2", 2f)[1], "Louder Gunshots doubles it");
+        Check.equal(truehordes.sim.SoundEvent.SCREAM, truehordes.events.ALifeSounds.classify("PALWorldTortured", 1f)[0], "screams");
+        Check.isTrue(truehordes.events.ALifeSounds.classify("PALWorldEerie3", 1f) == null, "eerie ambience is not a world sound");
+        Check.isTrue(truehordes.events.ALifeSounds.classify("Helicopter", 1f) == null, "helicopters come through HeliDirector");
+    }
+
     public static void testBuildingsHideFarFigures() {
         truehordes.sim.MapView town = new truehordes.sim.MapView() {
             @Override public int rank(int cx, int cy) { return 4; }

@@ -217,7 +217,7 @@ function Hordes_MapPanel:drawSoundList(now)
         local c = SOUND_KINDS[seen.kind] or SOUND_KINDS[0]
         local y = 26 + (i - 1) * rowH
         local ago = seen.endedAt and string.format("%ds ago", math.floor((now - seen.endedAt) / 1000)) or "now"
-        local text = string.format("%-9s r%-5d %dw %dh %ds | %s", c[4], math.floor(seen.r), seen.w or 0, seen.h or 0,
+        local text = string.format("%-9s r%-4d drew %d lone, %d hordes, %d split | %s", c[4], math.floor(seen.r), seen.w or 0, seen.h or 0,
             seen.split or 0, ago)
         self:drawText(text, x0 + 4, y, c[1], c[2], c[3], 1, UIFont.Small)
         table.insert(self.listRows, { y = y, h = rowH, x = seen.x, wy = seen.y })
