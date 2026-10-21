@@ -426,6 +426,28 @@ public final class LuaApi {
     }
 
     /** Debug-map data for a rectangle, or nil when the core is not running. */
+    /** Far sight in Viewpoint's 3D view (see compat.ViewpointBridge): true when Viewpoint draws player pn's view. */
+    @LuaMethod(name = "Hordes_j_vpBegin", global = true)
+    public static boolean vpBegin(Object pn) {
+        return truehordes.compat.ViewpointBridge.begin(LuaArgs.toInt(pn, 0));
+    }
+
+    /** A standing figure at (x, y, z) in the 3D view: then vpX, vpY (feet, pixels) and vpH (height, pixels). */
+    @LuaMethod(name = "Hordes_j_vpFigure", global = true)
+    public static boolean vpFigure(Object x, Object y, Object z) {
+        return truehordes.compat.ViewpointBridge.figure(LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0),
+            LuaArgs.toFloat(z, 0));
+    }
+
+    @LuaMethod(name = "Hordes_j_vpX", global = true)
+    public static double vpX() { return truehordes.compat.ViewpointBridge.x(); }
+
+    @LuaMethod(name = "Hordes_j_vpY", global = true)
+    public static double vpY() { return truehordes.compat.ViewpointBridge.y(); }
+
+    @LuaMethod(name = "Hordes_j_vpH", global = true)
+    public static double vpH() { return truehordes.compat.ViewpointBridge.h(); }
+
     /**
      * Seeing hordes coming (sub-project 6): held zombies beyond the loaded area within {@code reach} tiles of (x, y),
      * nearest first, at most {@code max}: {@code n}, {@code rspm} (real seconds per in-game minute), then x, y, heading,
@@ -442,8 +464,10 @@ public final class LuaApi {
             synchronized (c) {
                 truehordes.sim.Simulation sim = c.simulation();
                 if (sim == null) return null;
+                // The reach counts from the loaded edge (only zombies beyond it are drawn), not from the player.
+                float edge = zombie.iso.IsoChunkMap.chunkWidthInTiles / 2f;
                 cand = truehordes.sim.FarSight.collect(sim, LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0),
-                    LuaArgs.toFloat(reach, 200), LuaArgs.toInt(max, 250));
+                    edge + LuaArgs.toFloat(reach, 200), LuaArgs.toInt(max, 250));
                 rspm = sim.settings().realSecondsPerGameMinute();
             }
             f = truehordes.sim.FarSight.nearest(cand, LuaArgs.toInt(max, 250));
