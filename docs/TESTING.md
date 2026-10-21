@@ -133,3 +133,59 @@ Turn on `Hordes_debug("core", true)` first: every event the mod fires is logged 
 | 5 | Debug map (`Hordes_map`) in town | real zombies green (bright in a real horde), real hordes ringed cyan; no invisible zombies or cars |
 | 6 | Save and reload with a real horde on screen | still one horde (debug map, `Hordes_stats` real hordes) |
 | 7 | 20+ zombies at a door | it breaks in well under an hour; a lone zombie takes about a day |
+
+## Chase memory, far sight, moan (branch `chase-memory`)
+
+| # | Do | Expect |
+|---|----|--------|
+| 1 | Get seen by a few zombies, break line of sight round a corner and keep running | they go to where they lost you, then on the way you were heading for about an in-game hour; `Hordes_stats` chases goes up |
+| 2 | Same with a real horde where under half see you | only those chase; with over half, the whole horde follows |
+| 3 | `Hordes_roadHorde(300)`, watch `Hordes_stats` | "walked in" climbs as the horde arrives |
+| 4 | Viewpoint 3D on, a horde beyond the loaded area | dark figures where the horde is, on the ground, moving; console "Viewpoint found" |
+| 5 | Viewpoint off (2D) | figures on the screen edge in the horde's direction |
+| 6 | A 50+ horde just outside the loaded area | moaning from its direction; console "horde moan heard" once |
+
+## Sub-project 8 acceptance: consequences while away
+
+| # | Do | Expect |
+|---|----|--------|
+| 1 | Lure a horde to a house off screen (e.g. `Hordes_sound` far away), wait some hours, `Hordes_stats` | sieges > 0 |
+| 2 | Walk back to that house | doors/windows broken or damaged by crowd size and hours, blood and glass |
+| 3 | A far gunfire event off screen, then visit the spot | corpses there (stats corpses count drops when loaded) |
+| 4 | Run a generator with lights at night, walk away | zombies lured until about when the fuel would run out, not after |
+| 5 | One zombie at a window | takes far longer than before (about 17 in-game hours) |
+
+
+## S8 extras (2026-10-21)
+| Check | How | Pass |
+|---|---|---|
+| Shots per kill option | Sandbox `OffscreenShotsPerKill` 0 → far gunfire leaves no corpses; 1 → many | |
+| Trample | Plant crops, leave (>1 cell away), `Hordes_roadHorde(300, x, y)` from beyond the crops so it walks over them while you are away, come back | crops destroyed, low fences down |
+| Door swing | `DoorSwingChance` 100, open a house door, lure a zombie in from outside | door shuts behind it ~1-3 s later (slam); the zombie claws at it and alone never breaks it; 3 together do in time (`DoorBreakMinCrowd`) |
+| Rain wash | Make blood outside, wait in rain (or set weather) a day | blood mostly gone; indoor blood stays |
+| Rain wash map wide | With True Weathers, leave a bloody spot in a town where it rains, come back a day later | washed there; a dry town's blood stays |
+| Edge crossing | Stand still an in-game hour, `Hordes_stats` twice | "walked in" and "walked off" both climb |
+| Far view (Viewpoint) | Viewpoint "Far world up to" at max, look out over open ground, `Hordes_roadHorde(300)` | figures with heads near the edge, bars further, dots far; the horde a moving patch of dots out to ~4 km; no FPS drop |
+
+## Retest after the 2026-10-21 test fixes
+
+| What | How | Expect |
+|---|---|---|
+| Hordes_stats / Hordes_status | Run them in the console | Text, no "expected 0 arguments" error |
+| No errors | Play 20 min with hordes, then search console.txt for `[TrueHordes] ERROR` | None (errors now carry `<-` stack frames: send them if any) |
+| Silhouettes occluded | Viewpoint 3D, stand behind a house / inside with walls / behind a car / in woods | Figures behind them are not drawn; through a window or open ground they are |
+| Leaving a real horde | `Hordes_roadHorde(300)`, let it reach you, run well away | It stays where it was left (no jump towards you, does not follow the loaded edge); debug map shows it purple again, not scattered red dots |
+| Coming back | Walk back to it | It comes in when its centre is in the real area |
+| Moan | Stand ~100-250 tiles from a held horde, then near a real one | Moaning both times, louder closer; console line `horde moan: ... sound started` (if "FAILED to start", report it). Now the game's groan files (b412e54): "started" but silent means the clip is out of range or the Zombie volume slider is down |
+| A-Life ambient gunfire | New game with Project A-Life (opener plays gunfire ~95 tiles away) | Debug map shows an "A-Life fight" sound there; `Hordes_debug("core", true)` logs `A-Life sound ...` |
+
+## Retest after test round 2 (2026-10-21)
+
+| What | How | Expect |
+|---|---|---|
+| Moan chorus | Stand 100-250 tiles from a held horde of 50+, turn around; then near a big one | A chorus of 3-10 chase gurgles from the horde's direction, quieter than before, fuller (not louder) for bigger hordes; console `horde moan: ... N voices ... started` |
+| Moan range | `Hordes_moanTest(10)`, call again to stop; try 5, 12, 20 | One chase gurgle from the east; note the farthest distance you still hear it (the chorus stands 12 tiles out) |
+| Moan options | Sandbox "Hear hordes moaning" off; volume 0-100 | Off: silence; volume scales it |
+| Far sight | New game | Outlines off by default (existing saves keep their setting) |
+| Loaded horde | Let a horde walk into the loaded area past loaded zombies | Whole horde keeps walking; zombies it brushes join; after reaching a sound it sweeps round the area (never standing) for about an in-game hour, then walks on |
+| Why standing | `Hordes_stats()` while watching a horde | `horde members N: dormant, held by vanilla, waiting, stuck` counts; report them if many stand |
