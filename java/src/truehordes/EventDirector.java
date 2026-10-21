@@ -76,12 +76,24 @@ final class EventDirector {
         return GameEnvImpl.sandboxDouble("LouderGunshots.Multiplier", Double.NaN);
     }
 
+    /** Sub-project 8's sieges and corpses read from the save, until the simulation is there to take them. */
+    private String[] pendingAftermath;
+
     /** Every frame while the mod runs the population. */
     void tick(truehordes.core.Core core) {
         if (!loaded) {
             loaded = true;
             readSettings();
             load(core.stateFile());
+        }
+        if (pendingAftermath != null) {
+            synchronized (core) {
+                truehordes.sim.Simulation sim = core.simulation();
+                if (sim != null) {
+                    sim.aftermath().load(pendingAftermath[0], pendingAftermath[1]);
+                    pendingAftermath = null;
+                }
+            }
         }
         long now = System.currentTimeMillis();
         fireDueShots(now);
@@ -160,6 +172,20 @@ final class EventDirector {
         long now = System.currentTimeMillis();
         for (double s : t) shots.add(new Shot(now + (long) (s * 1000), x, y, radius, viewKind));
         play(k.sound(u.getAsDouble()), x, y, radius);
+        if (k.gun()) shootDead(x, y, n);
+    }
+
+    /** Off-screen shooting kills zombies near it (sub-project 8): one per KILL_SHOTS shots, within KILL_RADIUS. */
+    static final int KILL_SHOTS = 3;
+    static final float KILL_RADIUS = 25;
+
+    private static void shootDead(float x, float y, int shots) {
+        truehordes.core.Core c = Hooks.core();
+        if (c == null || !c.ownsPopulation()) return;
+        synchronized (c) {
+            truehordes.sim.Simulation sim = c.simulation();
+            if (sim != null) sim.shootDead(x, y, KILL_RADIUS, shots / KILL_SHOTS);
+        }
     }
 
     /** An A-Life off-screen fight at (x, y): a scattered burst of rifle shots over about a minute. */
@@ -167,6 +193,7 @@ final class EventDirector {
         int radius = Gunfire.rifleRadius(louderMultiplier());
         int n = Gunfire.fightShots(casualties);
         double[] t = Gunfire.times(n, Gunfire.FIGHT_SECONDS, u);
+        shootDead(x, y, n);
         long now = System.currentTimeMillis();
         for (int i = 0; i < n; i++) shots.add(new Shot(now + (long) (t[i] * 1000), x, y, radius, SoundEvent.ALIFE));
         // The player hears a rifle burst every few shots when the fight is in reach of the meta sounds (1,000 tiles).
@@ -410,6 +437,15 @@ final class EventDirector {
             pr.setProperty("lights", lights.saveString());
             truehordes.core.Core c = Hooks.core();
             if (c != null) pr.setProperty("edgePool", Integer.toString(c.edgePool()));
+            if (c != null) {
+                synchronized (c) {
+                    truehordes.sim.Simulation sim = c.simulation();
+                    if (sim != null) {
+                        pr.setProperty("sieges", sim.aftermath().siegesString());
+                        pr.setProperty("corpses", sim.aftermath().corpsesString());
+                    }
+                }
+            }
             java.io.StringWriter w = new java.io.StringWriter();
             pr.store(w, "True Hordes events (sub-project 5b)");
             Files.writeString(file(stateFile), w.toString(), StandardCharsets.UTF_8);
@@ -444,6 +480,7 @@ final class EventDirector {
             lights.loadString(pr.getProperty("lights", ""));
             truehordes.core.Core c = Hooks.core();
             if (c != null) c.setEdgePool(Integer.parseInt(pr.getProperty("edgePool", "0")));
+            pendingAftermath = new String[] {pr.getProperty("sieges", ""), pr.getProperty("corpses", "")};
         } catch (Throwable t) {
             Log.errorOnce("events:load", "could not read the meta-event state; starting fresh", t);
         }

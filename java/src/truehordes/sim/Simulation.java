@@ -48,6 +48,7 @@ public final class Simulation {
     private final Random rng;
     private final java.util.function.DoubleSupplier random;
     private final Hordes hordes = new Hordes();
+    private final Aftermath aftermath = new Aftermath();
     private final SpatialGrid grid = new SpatialGrid();
     private final Movement movement;
     private final Encounters encounters;
@@ -124,6 +125,47 @@ public final class Simulation {
     }
 
     public Hordes hordes() { return hordes; }
+
+    /** Consequences while away (sub-project 8): sieges and corpses waiting for their chunks to load. */
+    public Aftermath aftermath() { return aftermath; }
+
+    /**
+     * Off-screen gunfire (sub-project 8): up to {@code kills} held zombies within {@code radius} of (x, y), outside the
+     * loaded area, are shot dead (wanderers and members of hordes there, picked at random); each leaves a corpse in
+     * the aftermath. Building zombies inside are safe. Returns how many died.
+     */
+    public int shootDead(float x, float y, float radius, int kills) {
+        if (kills <= 0) return 0;
+        List<ZombieRecord> loners = new ArrayList<>();
+        grid.wanderersIn(x - radius, y - radius, x + radius, y + radius, r -> {
+            if (!r.idle && Hearing.dist(x, y, r.x(), r.y()) <= radius && !FarSight.inLoaded(players, r.x(), r.y())) loners.add(r);
+        });
+        List<Horde> near = new ArrayList<>();
+        for (Horde h : hordes.all()) {
+            if (!h.dormant && h.size() > 2 && Hearing.dist(x, y, h.x, h.y) <= radius + h.spread()
+                && !FarSight.inLoaded(players, h.x, h.y)) near.add(h);
+        }
+        int dead = 0;
+        while (dead < kills && (!loners.isEmpty() || !near.isEmpty())) {
+            boolean lone = near.isEmpty() || (!loners.isEmpty() && random.getAsDouble() < 0.5);
+            if (lone) {
+                ZombieRecord r = loners.remove((int) (random.getAsDouble() * loners.size()) % loners.size());
+                aftermath.corpse(r.x(), r.y(), (int) r.z, r.outfitId);
+                store.remove(r.id);
+            } else {
+                Horde h = near.get((int) (random.getAsDouble() * near.size()) % near.size());
+                float old = h.spread();
+                ZombieRecord r = hordes.removeMemberAt(h, (int) (random.getAsDouble() * h.members.size()) % h.members.size());
+                conservation.removed(1);
+                double a = random.getAsDouble() * 2 * Math.PI, d = old * Math.sqrt(random.getAsDouble());
+                aftermath.corpse((float) (h.x + Math.cos(a) * d), (float) (h.y + Math.sin(a) * d), 0, r.outfitId);
+                grid.moveHorde(h, h.x, h.y, old);
+                if (h.size() <= 2) near.remove(h);
+            }
+            dead++;
+        }
+        return dead;
+    }
 
     public SpatialGrid grid() { return grid; }
 
@@ -974,6 +1016,11 @@ public final class Simulation {
             listen(h, dt);
             return;
         }
+        // Sub-project 8: a horde standing at the spot a sound, light or chase drew it to presses on what is there.
+        if (!Float.isNaN(h.targetX) && h.investigateUntilHours > now
+            && Hearing.dist(h.x, h.y, h.targetX, h.targetY) <= h.spread() + 4 && !HandOver.touchesLoaded(h, players)) {
+            aftermath.linger(h.x, h.y, h.size(), dt / 60.0);
+        }
         int iv = interval(h.x, h.y);
         // Touching the loaded area: the main thread lays out the members whose place is inside it (the rest walk on).
         if (iv < LevelOfDetail.FAR_MINUTES && HandOver.touchesLoaded(h, players)) layoutDue = true;
@@ -1147,10 +1194,10 @@ public final class Simulation {
         for (Horde h : hordes.all()) biggest = Math.max(biggest, h.size());
         return String.format(Locale.ROOT,
             "sim: behind %d in-game min, wanderers %d, hordes %d (biggest %d, %d members), updates %d, queue %d, last step %.2f ms (max %.2f, slowest update %.2f ms: %s), "
-                + "formed %d, joined %d, merged %d, left behind %d, broke up %d, sounds %d | conservation %s",
+                + "formed %d, joined %d, merged %d, left behind %d, broke up %d, sounds %d, sieges %d, corpses %d | conservation %s",
             lagMinutes(), store.size(), hordes.size(), biggest, hordes.memberCount(), updatesTotal, queued, lastStepNanos / 1e6,
             maxStepNanos / 1e6, maxUpdateNanos / 1e6, maxUpdateWhat, encounters.formed(), encounters.joined(), encounters.merged(), encounters.brokeAway(),
-            encounters.dissolved(), events.size(), conservation.summary());
+            encounters.dissolved(), events.size(), aftermath.siegeCount(), aftermath.corpseCount(), conservation.summary());
     }
 
     /** Growable stack of walker keys for one in-game minute. */

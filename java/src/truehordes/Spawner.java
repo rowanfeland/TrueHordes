@@ -83,6 +83,16 @@ final class Spawner {
         return Result.SPAWNED;
     }
 
+    /** A plain standing zombie at (x, y, z) in {@code outfit} (for an off-screen corpse, sub-project 8), or null. */
+    static IsoZombie standing(float x, float y, int z, int outfit) throws ReflectiveOperationException {
+        if (!floorAt((int) Math.floor(x), (int) Math.floor(y), z)) return null;
+        ArrayList<IsoZombie> list = IsoWorld.instance.currentCell.getZombieList();
+        int before = list.size();
+        addStanding.invoke(ZombiePopulationManager.instance, x, y, (float) z, IsoDirections.fromIndex(zombie.core.random.Rand.Next(8)),
+            outfit, ZombieStateFlags.fromInt(0), zombie.core.random.Rand.Next(1, Integer.MAX_VALUE));
+        return list.size() <= before ? null : list.get(list.size() - 1);
+    }
+
     /** Sends a value to the native spawner's config. */
     static void configFloat(String key, float value) throws ReflectiveOperationException {
         configFloat.invoke(null, key, value);

@@ -10,7 +10,9 @@ public final class BreakIn {
     private BreakIn() {}
 
     static final double[] CROWD = {1, 10, 1000};
-    static final double[] WINDOW_HOURS = {5, 1, 10 / 60.0};
+    /** Windows take 28% less time than doors (user, 2026-10-21: one zombie broke windows far too fast at 5 h). */
+    static final double WINDOW_SHARE = 0.72;
+    static final double[] WINDOW_HOURS = {24 * WINDOW_SHARE, 5 * WINDOW_SHARE, 10 / 60.0 * WINDOW_SHARE};
     static final double[] DOOR_HOURS = {24, 5, 10 / 60.0};
     /** Thumps one zombie lands per real second while thumping (the thump animation; Claude's estimate, tuning). */
     public static final double THUMPS_PER_SECOND = 0.75;

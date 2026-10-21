@@ -12,12 +12,12 @@ public final class BridgeTest {
     private BridgeTest() {}
 
     public static void testBreakInTimesFollowD15() {
-        Check.near(5, BreakIn.hours(true, 1), 1e-9, "a lone zombie: a window in 5 h");
+        Check.near(24 * 0.72, BreakIn.hours(true, 1), 1e-9, "a lone zombie: a window in 28% less than a door");
         Check.near(24, BreakIn.hours(false, 1), 1e-9, "a lone zombie: a door in 24 h");
-        Check.near(1, BreakIn.hours(true, 10), 1e-9, "10: a window in 1 h");
+        Check.near(5 * 0.72, BreakIn.hours(true, 10), 1e-9, "10: a window in 3.6 h");
         Check.near(5, BreakIn.hours(false, 10), 1e-9, "10: a door in 5 h");
         Check.near(10 / 60.0, BreakIn.hours(false, 1000), 1e-9, "1,000: 10 minutes");
-        Check.near(10 / 60.0, BreakIn.hours(true, 5000), 1e-9, "more than 1,000: no faster");
+        Check.near(10 / 60.0 * 0.72, BreakIn.hours(true, 5000), 1e-9, "more than 1,000: no faster");
         double h100 = BreakIn.hours(false, 100);
         Check.isTrue(h100 < 5 && h100 > 10 / 60.0, "100 in between (" + h100 + ")");
         // A door of 1,000 health, 1-hour days (2.5 real s per game minute): the whole crowd's thumps add up to it.
@@ -43,6 +43,23 @@ public final class BridgeTest {
         Check.equal(60, sim.hordes().memberCount(), "all 60 in it");
         Check.equal(0, s.size(), "none left as wanderers");
         Check.equal("", sim.checkConservation("test"), "conservation");
+    }
+
+    public static void testOffScreenGunfireLeavesCorpses() {
+        truehordes.store.Store s = new truehordes.store.Store();
+        truehordes.sim.Simulation sim = new truehordes.sim.Simulation(s, SimulationTest.openMap(200, -1),
+            SimulationTest.quiet(), 12, 24 * 10);
+        List<truehordes.store.ZombieRecord> rs = new ArrayList<>();
+        for (int i = 0; i < 30; i++) rs.add(SimulationTest.add(s, 400 + (i % 6), 400 + i / 6, 0));
+        sim.edgeHorde(rs, 0f);
+        for (int i = 0; i < 10; i++) SimulationTest.add(s, 405 + i, 395, 0);
+        SimulationTest.add(s, 900, 900, 0); // far away: safe
+        int dead = sim.shootDead(405, 400, 25, 12);
+        Check.equal(12, dead, "twelve shot");
+        Check.equal(41L - 12, sim.held(), "gone from the population");
+        Check.equal(12, sim.aftermath().corpseCount(), "each leaves a corpse");
+        Check.equal("", sim.checkConservation("test"), "conservation (counted as deaths)");
+        Check.equal(28 - 2, sim.shootDead(405, 400, 25, 1000), "everyone in reach but the far one and the last two of the horde");
     }
 
     public static void testRingHordesWaitUntilASound() {
@@ -136,6 +153,30 @@ public final class BridgeTest {
         Check.isTrue(ps.get(9).chasing(1), "all chasing");
         Check.near(200, ps.get(9).lureX, 1e-4, "to the same spot");
         Check.isTrue(ps.get(9).chaseOn(), "and on along the same heading");
+    }
+
+    public static void testSiegesMergeByChunkAndKeepTheBiggestCrowd() {
+        truehordes.sim.Aftermath a = new truehordes.sim.Aftermath();
+        a.linger(100, 100, 20, 1);
+        a.linger(102, 101, 50, 2);
+        a.linger(140, 100, 10, 1);
+        var s = a.takeSieges(12, 12);
+        Check.equal(1, s.size(), "two crowds at one spot are one siege");
+        Check.equal(50, s.get(0).crowd, "the biggest crowd counts");
+        Check.near(3, s.get(0).hours, 1e-9, "hours add up");
+        Check.equal(0, a.takeSieges(12, 12).size(), "taken once");
+        Check.equal(1, a.siegeCount(), "the other chunk's siege waits");
+    }
+
+    public static void testAftermathSurvivesASave() {
+        truehordes.sim.Aftermath a = new truehordes.sim.Aftermath();
+        a.linger(100, 100, 20, 1.5);
+        a.corpse(101, 99, 0, 7);
+        truehordes.sim.Aftermath b = new truehordes.sim.Aftermath();
+        b.load(a.siegesString(), a.corpsesString());
+        Check.near(1.5, b.takeSieges(12, 12).get(0).hours, 1e-9, "siege kept");
+        float[] c = b.takeCorpses(12, 12).get(0);
+        Check.near(7, c[3], 1e-9, "corpse outfit kept");
     }
 
     static Pilot at(long id, float x, float y) {

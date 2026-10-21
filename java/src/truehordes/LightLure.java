@@ -44,6 +44,16 @@ final class LightLure {
 
     /** Every lit light seen in a loaded area, by spot; kept while unloaded. */
     private final Map<Long, Light> remembered = new HashMap<>();
+    /** Sub-project 8: building lights a generator powers, and when its fuel would run out (in-game hours). */
+    private final Map<Long, Double> fuelUntil = new HashMap<>();
+
+    /** A running generator at (x, y) unloaded: the building lights in its reach stop luring at {@code untilHours}. */
+    void poweredUntil(float x, float y, int radius, double untilHours) {
+        float r2 = (float) radius * radius;
+        for (Light l : remembered.values()) {
+            if (l.kind() == BUILDING && (l.x() - x) * (l.x() - x) + (l.y() - y) * (l.y() - y) <= r2) fuelUntil.put(l.key(), untilHours);
+        }
+    }
     private final WeakHashMap<IsoZombie, Set<Long>> rolled = new WeakHashMap<>();
     /** Real zombies a streetlight took: kept under it until morning. */
     private final WeakHashMap<IsoZombie, Light> captured = new WeakHashMap<>();
@@ -84,6 +94,9 @@ final class LightLure {
         double morning = now + ((DAWN - hour + 24) % 24) - GameTime.getInstance().getMinutes() / 60.0;
         if (sim != null) {
             List<Simulation.Lure> ls = new ArrayList<>(remembered.size());
+            // A generator's lights go dark when its fuel would have run out.
+            remembered.values().removeIf(l -> fuelUntil.getOrDefault(l.key(), Double.POSITIVE_INFINITY) <= now);
+            fuelUntil.keySet().retainAll(remembered.keySet());
             for (Light l : remembered.values()) {
                 boolean st = l.kind() == STREET;
                 ls.add(new Simulation.Lure(l.key(), l.x(), l.y(), st ? streetReach : reach, st ? streetChance : buildingChance,
@@ -179,8 +192,10 @@ final class LightLure {
     String saveString() {
         StringBuilder sb = new StringBuilder();
         for (Light l : remembered.values()) {
-            sb.append((int) l.x()).append(',').append((int) l.y()).append(',').append(l.z()).append(',').append(l.kind())
-                .append(';');
+            sb.append((int) l.x()).append(',').append((int) l.y()).append(',').append(l.z()).append(',').append(l.kind());
+            Double until = fuelUntil.get(l.key());
+            if (until != null) sb.append(',').append(until);
+            sb.append(';');
         }
         return sb.toString();
     }
@@ -191,6 +206,7 @@ final class LightLure {
             if (f.length < 4) continue;
             int x = Integer.parseInt(f[0]), y = Integer.parseInt(f[1]), z = Integer.parseInt(f[2]);
             remembered.put(key(x, y, z), new Light(key(x, y, z), x + 0.5f, y + 0.5f, z, Integer.parseInt(f[3])));
+            if (f.length >= 5) fuelUntil.put(key(x, y, z), Double.parseDouble(f[4]));
         }
     }
 

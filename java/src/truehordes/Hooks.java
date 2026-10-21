@@ -239,6 +239,7 @@ public final class Hooks {
         } catch (Throwable t) {
             Log.errorOnce("hook:unload:" + t.getClass().getName(), "taking zombies from an unloading area failed", t);
         }
+        AftermathBridge.onUnloading(chunk);
     }
 
     /** True when the mod took the zombie and the game's own hand-over must be skipped. */
@@ -256,6 +257,11 @@ public final class Hooks {
             PopulationBridge.onPopulationChunkLoaded(core, chunk);
         } catch (Throwable t) {
             Log.errorOnce("hook:arrive:" + t.getClass().getName(), "bringing held zombies into a loaded area failed", t);
+        }
+        try {
+            AftermathBridge.onLoaded(core, chunk);
+        } catch (Throwable t) {
+            Log.errorOnce("hook:aftermath:" + t.getClass().getName(), "consequences while away failed", t);
         }
     }
 
