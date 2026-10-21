@@ -60,6 +60,49 @@ public final class FarSight {
         return out;
     }
 
+    /** Floats per far mark: x, y, heading, speed, radius (0: one zombie; else a horde drawn as a crowd that wide). */
+    public static final int FAR_STRIDE = 5;
+
+    /**
+     * The far view, low detail (user, 2026-10-21: as far as Viewpoint's far world draws, up to 4,096 tiles): beyond
+     * {@code near} and out to {@code far} from (px, py), each horde one crowd mark (the nearest {@code maxHordes}) and
+     * lone zombies single marks (the nearest {@code maxSingles}), none in a loaded chunk. Under the core's lock.
+     */
+    public static float[] farMarks(Simulation sim, float px, float py, float near, float far, int maxHordes, int maxSingles) {
+        PlayerNearby loaded = sim.players();
+        SimSettings s = sim.settings();
+        Movement mv = sim.movement();
+        double now = sim.currentHours();
+        java.util.PriorityQueue<float[]> singles = new java.util.PriorityQueue<>((a, b) -> Float.compare(b[5], a[5]));
+        if (maxSingles > 0) {
+            sim.grid().wanderersIn(px - far, py - far, px + far, py + far, r -> {
+                float d = Hearing.dist(px, py, r.x(), r.y());
+                if (d <= near || d > far || r.idle) return;
+                if (singles.size() >= maxSingles && d >= singles.peek()[5]) return;
+                if (inLoaded(loaded, r.x(), r.y())) return;
+                boolean walking = r.lingerUntilHours <= now && r.pauseMinutes <= 0;
+                float v = walking ? mv.speedTilesPerGameMinute(1, s.speedSetting(), r.id, (r.stateFlags & 2) != 0) : 0;
+                singles.add(new float[] {r.x(), r.y(), r.heading, v, 0, d});
+                if (singles.size() > maxSingles) singles.poll();
+            });
+        }
+        List<float[]> crowds = new ArrayList<>();
+        for (Horde h : sim.hordes().all()) {
+            if (h.dormant) continue;
+            float d = Hearing.dist(px, py, h.x, h.y);
+            if (d <= near || d - h.spread() > far || inLoaded(loaded, h.x, h.y)) continue;
+            float v = h.pauseMinutes > 0 ? 0 : mv.speedTilesPerGameMinute(h.size(), s.speedSetting(), h.id, h.allCrawlers());
+            crowds.add(new float[] {h.x, h.y, h.heading, v, Math.max(1, h.spread()), d});
+        }
+        crowds.sort((a, b) -> Float.compare(a[5], b[5]));
+        int nh = Math.min(maxHordes, crowds.size());
+        float[] flat = new float[(nh + singles.size()) * FAR_STRIDE];
+        int i = 0;
+        for (int k = 0; k < nh; k++, i++) System.arraycopy(crowds.get(k), 0, flat, i * FAR_STRIDE, FAR_STRIDE);
+        for (float[] m : singles) System.arraycopy(m, 0, flat, i++ * FAR_STRIDE, FAR_STRIDE);
+        return flat;
+    }
+
     /** The nearest {@code max} candidates, flattened (no lock needed). */
     public static float[] nearest(List<float[]> out, int max) {
         out.sort((a, b) -> Float.compare(a[4], b[4]));

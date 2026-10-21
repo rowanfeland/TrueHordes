@@ -190,6 +190,26 @@ public final class BridgeTest {
         Check.equal(true, BreakIn.canBreakDoor(1, 0), "0 or 1: anyone can");
     }
 
+    public static void testFarMarksReachViewpointsFarWorld() {
+        truehordes.store.Store s = new truehordes.store.Store();
+        truehordes.sim.Simulation sim = new truehordes.sim.Simulation(s, SimulationTest.openMap(9000, -1),
+            SimulationTest.quiet(), 12, 24 * 10);
+        SimulationTest.add(s, 4000 + 100, 4000, 0); // near: the near tier draws it
+        SimulationTest.add(s, 4000 + 1500, 4000, 0);
+        SimulationTest.add(s, 4000, 4000 + 3900, 0);
+        SimulationTest.add(s, 4000 + 4500, 4000, 0); // past 4,096: unseen
+        List<truehordes.store.ZombieRecord> rs = new ArrayList<>();
+        for (int i = 0; i < 40; i++) rs.add(SimulationTest.add(s, 6000 + (i % 6), 4000 + i / 6, 0));
+        sim.edgeHorde(rs, 0f);
+        float[] f = truehordes.sim.FarSight.farMarks(sim, 4000, 4000, 300, 4096, 10, 10);
+        int st = truehordes.sim.FarSight.FAR_STRIDE;
+        Check.equal(3, f.length / st, "two lone zombies and one horde mark");
+        int crowds = 0;
+        for (int i = 0; i < f.length / st; i++) if (f[i * st + 4] > 0) crowds++;
+        Check.equal(1, crowds, "the horde is one crowd mark with its width");
+        Check.equal(1, truehordes.sim.FarSight.farMarks(sim, 4000, 4000, 300, 4096, 10, 0).length / st, "singles capped");
+    }
+
     public static void testRainWashesBloodOverDays() {
         Check.near(0, truehordes.sim.Aftermath.washed(0), 1e-9, "no rain: nothing washed");
         double day = truehordes.sim.Aftermath.washed(24);

@@ -459,6 +459,42 @@ public final class LuaApi {
     @LuaMethod(name = "Hordes_j_vpH", global = true)
     public static double vpH() { return truehordes.compat.ViewpointBridge.h(); }
 
+    /** How far Viewpoint's far world draws (tiles), or 0 without Viewpoint's 3D view. */
+    @LuaMethod(name = "Hordes_j_vpReach", global = true)
+    public static double vpReach() { return truehordes.compat.ViewpointBridge.farReach(); }
+
+    /**
+     * The far view (single player, with Viewpoint): beyond {@code near} tiles from the loaded edge, out to {@code far}
+     * tiles from (x, y): {@code n}, {@code rspm}, then x, y, heading, speed, radius per mark (radius 0: one zombie;
+     * else a horde as a crowd that wide). Nil when the simulation is not running here.
+     */
+    @LuaMethod(name = "Hordes_j_farMarks", global = true)
+    public static KahluaTable farMarks(Object x, Object y, Object near, Object far, Object maxHordes, Object maxSingles) {
+        Core c = Hooks.core();
+        if (c == null || c.state() != Core.State.RUNNING) return null;
+        try {
+            float[] f;
+            double rspm;
+            synchronized (c) {
+                truehordes.sim.Simulation sim = c.simulation();
+                if (sim == null) return null;
+                float edge = zombie.iso.IsoChunkMap.chunkWidthInTiles / 2f;
+                f = truehordes.sim.FarSight.farMarks(sim, LuaArgs.toFloat(x, 0), LuaArgs.toFloat(y, 0),
+                    edge + LuaArgs.toFloat(near, 200), LuaArgs.toFloat(far, 4096), LuaArgs.toInt(maxHordes, 80),
+                    LuaArgs.toInt(maxSingles, 300));
+                rspm = sim.settings().realSecondsPerGameMinute();
+            }
+            KahluaTable t = LuaManager.platform.newTable();
+            t.rawset("n", (double) (f.length / truehordes.sim.FarSight.FAR_STRIDE));
+            t.rawset("rspm", rspm);
+            for (int i = 0; i < f.length; i++) t.rawset((double) (i + 1), (double) f[i]);
+            return t;
+        } catch (Throwable t) {
+            Log.errorOnce("lua:farMarks:" + t.getClass().getName(), "far view failed", t);
+            return null;
+        }
+    }
+
     /**
      * Seeing hordes coming (sub-project 6): held zombies beyond the loaded area within {@code reach} tiles of (x, y),
      * nearest first, at most {@code max}: {@code n}, {@code rspm} (real seconds per in-game minute), then x, y, heading,

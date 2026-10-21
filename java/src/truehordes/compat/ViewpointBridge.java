@@ -91,6 +91,29 @@ public final class ViewpointBridge {
         }
     }
 
+    private static Method farReach;
+    private static boolean reachTried;
+
+    /**
+     * How far Viewpoint's far world draws, in tiles (its "Far world up to" setting in 64-tile blocks; a tile is a
+     * metre, so 64 blocks is about 4.1 km), or 0 when Viewpoint is off, missing or changed.
+     */
+    public static float farReach() {
+        if (!init()) return 0;
+        try {
+            if (!enabled.getBoolean(null)) return 0;
+            if (!reachTried) {
+                reachTried = true;
+                farReach = find("viewpoint.far.FarWorld").getMethod("reach");
+            }
+            return farReach == null ? 0 : Math.max(0, ((Number) farReach.invoke(null)).floatValue());
+        } catch (Throwable t) {
+            farReach = null;
+            Log.errorOnce("viewpoint:reach", "reading Viewpoint's far-world reach failed; far sight keeps its own reach", t);
+            return 0;
+        }
+    }
+
     /** How tall a standing figure is, in Viewpoint's height units (metres). */
     static final float FIGURE = 1.75f;
 
