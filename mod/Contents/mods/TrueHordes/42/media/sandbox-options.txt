@@ -347,7 +347,7 @@ option TrueHordes.CrowdBreakIn
 option TrueHordes.FarSight
 {
 	type = boolean,
-	default = true,
+	default = false,
 	page = TrueHordes,
 	translation = TrueHordes_FarSight,
 }
@@ -360,6 +360,24 @@ option TrueHordes.FarSightTiles
 	default = 200,
 	page = TrueHordes,
 	translation = TrueHordes_FarSightTiles,
+}
+
+option TrueHordes.HordeMoan
+{
+	type = boolean,
+	default = true,
+	page = TrueHordes,
+	translation = TrueHordes_HordeMoan,
+}
+
+option TrueHordes.HordeMoanVolume
+{
+	type = integer,
+	min = 0,
+	max = 100,
+	default = 60,
+	page = TrueHordes,
+	translation = TrueHordes_HordeMoanVolume,
 }
 
 option TrueHordes.EdgeHordes

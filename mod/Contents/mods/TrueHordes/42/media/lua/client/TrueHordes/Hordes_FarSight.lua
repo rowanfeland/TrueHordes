@@ -34,7 +34,7 @@ end
 local function refresh(now)
     lastRefresh = now
     data = nil
-    if not sandbox("FarSight", true) then return end
+    if not sandbox("FarSight", false) then return end
     local p = getPlayer()
     if not p or not TrueHordes or not TrueHordes.farSight then return end
     data = TrueHordes.farSight(p:getX(), p:getY(), sandbox("FarSightTiles", 200), MAX)
@@ -46,7 +46,7 @@ local function refreshFar(now)
     far = nil
     local J = TrueHordesJ
     local p = getPlayer()
-    if not p or not J or not J.vpReach or not J.farMarks or isClient() or not sandbox("FarSight", true) then return end
+    if not p or not J or not J.vpReach or not J.farMarks or isClient() or not sandbox("FarSight", false) then return end
     local reach = J.vpReach()
     local near = sandbox("FarSightTiles", 200)
     if not reach or reach <= near then return end

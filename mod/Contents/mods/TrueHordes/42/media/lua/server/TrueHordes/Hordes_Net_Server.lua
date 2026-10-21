@@ -48,7 +48,7 @@ local function onTick()
     lastView = now
     local players = getOnlinePlayers()
     if not players then return end
-    local farOn, reach = sandbox("FarSight", true), sandbox("FarSightTiles", 200)
+    local farOn, reach = sandbox("FarSight", false), sandbox("FarSightTiles", 200)
     for i = 0, players:size() - 1 do
         local p = players:get(i)
         if p and not p:isDead() then
