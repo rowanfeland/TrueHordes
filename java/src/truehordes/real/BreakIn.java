@@ -17,6 +17,12 @@ public final class BreakIn {
     /** Thumps one zombie lands per real second while thumping (the thump animation; Claude's estimate, tuning). */
     public static final double THUMPS_PER_SECOND = 0.75;
 
+    /** Fewer zombies than this at a door only claw at it: no damage (user, 2026-10-21: not just one). Default. */
+    public static final int DOOR_MIN_CROWD = 3;
+
+    /** True when {@code n} zombies can break a door at all, needing {@code min} of them. */
+    public static boolean canBreakDoor(int n, int min) { return n >= Math.max(1, min); }
+
     /** In-game hours for {@code n} zombies to break it. */
     public static double hours(boolean window, int n) {
         double[] t = window ? WINDOW_HOURS : DOOR_HOURS;

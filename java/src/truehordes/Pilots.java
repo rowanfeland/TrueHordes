@@ -279,7 +279,7 @@ final class Pilots {
             p.y = z.getY();
             soundPath(z, p, now, client);
             sight(z, p, now, client);
-            if (busy(z)) {
+            if (busy(z) || Hooks.DOORS.clawing(z)) {
                 p.wpX = Float.NaN;
                 continue;
             }

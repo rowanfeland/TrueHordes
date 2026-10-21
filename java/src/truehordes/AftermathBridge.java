@@ -99,6 +99,7 @@ final class AftermathBridge {
 
     private static void press(IsoChunk chunk, IsoGridSquare sq, IsoObject o, Aftermath.Siege s)
         throws ReflectiveOperationException {
+        if (BreakInHook.doorLike(o) && !BreakIn.canBreakDoor(s.crowd, Hooks.BREAK_IN.doorMin)) return;
         if (o instanceof IsoBarricade b) {
             double f = s.hours / BreakIn.hours(false, s.crowd);
             b.Damage((float) Math.min(b.getHealth() + 1, f * 1000));

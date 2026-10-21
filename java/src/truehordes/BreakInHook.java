@@ -35,7 +35,21 @@ final class BreakInHook {
     private boolean inner;
     private static Field windowMax;
 
-    void readSettings() { on = GameEnvImpl.sandboxBool("TrueHordes.CrowdBreakIn", true); }
+    /** A door needs this many zombies at it to take damage (barricades on it and player-built doors too). */
+    int doorMin = BreakIn.DOOR_MIN_CROWD;
+
+    void readSettings() {
+        on = GameEnvImpl.sandboxBool("TrueHordes.CrowdBreakIn", true);
+        doorMin = (int) GameEnvImpl.sandboxDouble("TrueHordes.DoorBreakMinCrowd", BreakIn.DOOR_MIN_CROWD);
+    }
+
+    /** A door, a player-built door, or a barricade on one. */
+    static boolean doorLike(IsoObject o) {
+        if (o instanceof IsoDoor) return true;
+        if (o instanceof IsoThumpable t) return t.isDoor();
+        if (o instanceof IsoBarricade b) return b.getBarricadedObject() instanceof IsoDoor || b.getBarricadedObject() instanceof IsoThumpable t && t.isDoor();
+        return false;
+    }
 
     /** Before vanilla's Thump: returns nothing; remembers the zombie's strength and the object's health. */
     void enter(Object target, Object thumper, int count) {
@@ -50,6 +64,13 @@ final class BreakInHook {
                 return;
             }
             int n = crowdAt(o);
+            if (doorLike(o) && !BreakIn.canBreakDoor(n, doorMin)) {
+                // Too few: it only claws. Its health is put back after vanilla's thump.
+                int strength = z.strength;
+                z.strength = 0;
+                frames.push(new int[] {strength, health(o), 0, 1});
+                return;
+            }
             boolean window = o instanceof IsoWindow;
             double per = BreakIn.damagePerThump(maxHealth(o), n, window, c.simSettings().realSecondsPerGameMinute());
             double[] acc = carry.computeIfAbsent(o, k -> new double[1]);
@@ -58,7 +79,7 @@ final class BreakInHook {
             acc[0] -= k;
             int strength = z.strength;
             z.strength = count > 1 ? k / count : k;
-            frames.push(new int[] {strength, health(o), k});
+            frames.push(new int[] {strength, health(o), k, 0});
         } catch (Throwable t) {
             frames.push(new int[] {Integer.MIN_VALUE});
             Log.errorOnce("breakin:enter:" + t.getClass().getName(), "crowd break-in failed (vanilla kept)", t);
@@ -72,6 +93,13 @@ final class BreakInHook {
         z.strength = f[0];
         try {
             IsoObject o = (IsoObject) target;
+            if (f[3] == 1) {
+                if (destroyed(o)) return;
+                if (o instanceof IsoDoor d) d.setHealth(Math.max(d.getHealth(), f[1]));
+                else if (o instanceof IsoThumpable t) t.setHealth(Math.max(t.getHealth(), f[1]));
+                else if (o instanceof IsoBarricade b) b.setHealth(Math.max(b.getHealth(), f[1]));
+                return;
+            }
             if (!(o instanceof IsoDoor || o instanceof IsoThumpable) || destroyed(o)) return;
             int after = health(o), done = f[1] - after, missing = f[2] - done;
             if (missing <= 0) return;

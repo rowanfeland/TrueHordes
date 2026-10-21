@@ -183,6 +183,13 @@ public final class BridgeTest {
         Check.equal(before - t.size(), a.trampleCount(), "taken once");
     }
 
+    public static void testALoneZombieCannotBreakADoor() {
+        Check.equal(false, BreakIn.canBreakDoor(1, BreakIn.DOOR_MIN_CROWD), "one only claws");
+        Check.equal(false, BreakIn.canBreakDoor(2, 3), "two of three only claw");
+        Check.equal(true, BreakIn.canBreakDoor(3, 3), "three break it in time");
+        Check.equal(true, BreakIn.canBreakDoor(1, 0), "0 or 1: anyone can");
+    }
+
     public static void testRainWashesBloodOverDays() {
         Check.near(0, truehordes.sim.Aftermath.washed(0), 1e-9, "no rain: nothing washed");
         double day = truehordes.sim.Aftermath.washed(24);

@@ -72,6 +72,15 @@ final class WeatherBridge {
         if (sim != null) sim.setWeather(w);
     }
 
+    /** Where it rains now, whatever the hearing setting (rain washing blood, sub-project 8): regional with True Weathers. */
+    synchronized Weather rain() {
+        if (grid != null && System.currentTimeMillis() - lastSampleMs < STALE_MS) {
+            return Weather.regional(originX, originY, STEP, width, height, grid.clone(), maxMuffleDb);
+        }
+        float p = ClimateManager.getInstance() == null ? 0f : ClimateManager.getInstance().getPrecipitationIntensity();
+        return Weather.uniform(p, maxMuffleDb);
+    }
+
     /** dB a real zombie at (lx, ly) loses for a sound at (sx, sy), or 0 when True Weathers already muffles it. */
     float realLossDb(float sx, float sy, float lx, float ly, boolean thunder) {
         if (!on) return 0f;

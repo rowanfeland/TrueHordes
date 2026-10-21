@@ -50,7 +50,7 @@ public final class Hooks {
             long now = System.currentTimeMillis();
             PILOTS.tick(c, now);
             if (c.ownsPopulation()) DOORS.tick(now);
-            RAIN.tick(now);
+            RAIN.tick(c, now);
         } catch (Throwable t) {
             Log.errorOnce("hook:pilots:" + t.getClass().getName(), "steering real zombies failed", t);
         }
